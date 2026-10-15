@@ -4,9 +4,10 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
  *
  *   C150.UI.init()            boots once (auto on DOMContentLoaded): theme, tabs, help, viewport overlays,
  *                             Core.init({container:#viewport, state}) and the six modes.
- *   C150.UI.setMode(name)     'explorar' | 'basico' | 'recorrido' | 'checklists' | 'volar' | 'quiz'
+ *   C150.UI.setMode(name)     'explorar' | 'basico' | 'recorrido' | 'checklists' | 'volar' | 'quiz' | 'aire'
  *   C150.UI.showControl(id)   opens Explorar with that control's card.
  *   C150.UI.getMode()         current mode name.
+ *   C150.UI.openLab(expId?)   opens the AIRE tab ("Laboratorio del aire", lab.js) and, if given, that experiment.
  *
  * Decisions where the contract leaves room (other agents: please read):
  *  - Every Core call goes through cc(): a missing core.js, a missing method or a failed WebGL start never
@@ -26,6 +27,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
  *    real displays (118.10).
  *  - The 'select' event opens the card in Explorar; in other modes it shows a small "Tocaste…" bar
  *    instead of leaving the current activity.
+ *  - AIRE mode is built by C150.Lab (lab.js) through labApi(): the same helpers (h, icon, cc, setInput,
+ *    applyPreset…) so every Core call stays guarded. Without lab.js the tab shows a short notice.
  */
 (function (C150) {
   'use strict';
@@ -130,7 +133,10 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     play: '<path d="M7 5l12 7-12 7z"/>',
     hand: '<path d="M9 11V5.5a1.5 1.5 0 0 1 3 0V11m0-1.5V4.5a1.5 1.5 0 0 1 3 0V11m0-4a1.5 1.5 0 0 1 3 0v6.5a7 7 0 0 1-7 7h-.5a6 6 0 0 1-5-2.7L3.6 14a1.5 1.5 0 0 1 2.4-1.8L9 15"/>',
     retry: '<path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v4.5h4.5"/>',
-    cabin: '<path d="M3 18c2-7 5-10 9-10s7 3 9 10"/><path d="M8 18v-3h8v3"/>'
+    cabin: '<path d="M3 18c2-7 5-10 9-10s7 3 9 10"/><path d="M8 18v-3h8v3"/>',
+    close: '<path d="M6 6l12 12M18 6L6 18"/>',
+    eye: '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>',
+    wind: '<path d="M3 8.5h11a3 3 0 1 0-3-3M3 12.5h16a3 3 0 1 1-3 3M3 16.5h7"/>'
   };
   function icon(name) {
     var s = doc.createElementNS(SVGNS, 'svg');
@@ -316,7 +322,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
 
   /* ================================================================== modes framework */
 
-  var MODES = ['explorar', 'basico', 'recorrido', 'checklists', 'volar', 'quiz'];
+  var MODES = ['explorar', 'basico', 'recorrido', 'checklists', 'volar', 'quiz', 'aire'];
   var modeImpl = {};          // name → { render(section), enter(), exit(), slow(state), frame(state, dt) }
   var rendered = {};
   var scrollMem = {};
@@ -1625,6 +1631,11 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     var extLbl = h('span', { text: 'Ver en el avión' });
     var extBtn = parts.length ? h('button', { type: 'button', class: 'btn', onclick: function () { toggleOnAirplane(c); } }, icon('plane'), extLbl) : null;
     if (extBtn) EX.live.push(function () { setText(extLbl, mainView === 'exterior' ? 'Volver a la cabina' : 'Ver en el avión'); });
+    var airExps = (C150.Lab && isFn(C150.Lab.experimentsFor)) ? arr(safe(function () { return C150.Lab.experimentsFor(c.id); })) : [];
+    var airBtns = airExps.slice(0, 2).map(function (x) {
+      return h('button', { type: 'button', class: 'btn btn--air', onclick: function () { UI.openLab(x.id); } },
+        icon('wind'), h('span', { text: airExps.length > 1 ? 'Ver el aire: ' + x.titulo.toLowerCase() : 'Ver el aire' }));
+    });
 
     var otros = arr(c.otrosNombres).filter(function (x) { return x && x !== c.nombre; });
     var pasos = arr(c.comoSeUsa), errores = arr(c.errores), rangos = arr(c.rangos), subs = arr(c.subitems);
@@ -1662,7 +1673,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       c.ingles ? h('p', { class: 'detail-en', lang: 'en', text: c.ingles }) : null,
       otros.length ? h('p', { class: 'detail-also', text: 'También le dicen: ' + otros.join(' · ') }) : null,
       c.resumen ? h('p', { class: 'lead', text: c.resumen }) : null,
-      h('div', { class: 'btn-row' }, showBtn, extBtn),
+      h('div', { class: 'btn-row' }, showBtn, extBtn, airBtns),
       c.ubicacion ? sec('Dónde está', para(c.ubicacion)) : null,
       c.queHace ? sec('Qué hace', para(c.queHace)) : null,
       subList ? sec('Cada parte', subList) : null,
@@ -2727,6 +2738,29 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     exit: function () { cc('pickMode', null); cc('setTargetHighlight', null); }
   };
 
+  /* ================================================================== AIRE (laboratorio del aire, lab.js) */
+
+  function labApi() {
+    return {
+      h: h, icon: icon, setText: setText, setAttr: setAttr, toggleClass: toggleClass, fmt: fmt, safe: safe, store: store,
+      cc: cc, has: has, core: Core, S: S, setInput: setInput, applyPreset: applyPreset, setFlapSwitch: setFlapSwitch,
+      kick: kick, viewport: $('viewport'), panel: $('panel'), setMode: setMode, getMode: function () { return mode; },
+      currentPreset: function () { return currentPreset; }, getMainView: function () { return mainView; },
+      syncMainView: syncMainView, reducedMotion: reducedMotion, now: now, showToast: showToast
+    };
+  }
+  function labOk() { var Lb = C150.Lab; return !!(Lb && isFn(Lb.mount) && isFn(Lb.enter)); }
+  modeImpl.aire = {
+    render: function (sec) {
+      if (labOk()) { safe(function () { C150.Lab.mount(sec, labApi()); }, 'Lab.mount'); return; }
+      sec.appendChild(h('div', { class: 'mode-head' }, h('h2', { class: 'placard mode-title', text: 'Laboratorio del aire' }),
+        h('p', { class: 'mode-sub', text: 'Esta parte no se pudo cargar. Recargá la página.' })));
+    },
+    enter: function () { if (labOk()) { C150.Lab.enter(); kick(); } },
+    exit: function () { if (labOk()) C150.Lab.exit(); },
+    slow: function (s) { if (labOk() && isFn(C150.Lab.slow)) C150.Lab.slow(s); }
+  };
+
   /* ================================================================== boot */
 
   function onSelect(id) {
@@ -2809,6 +2843,10 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   };
   UI.setMode = function (name) { setMode(name); };
   UI.getMode = function () { return mode; };
+  UI.openLab = function (expId) {
+    setMode('aire');
+    if (expId && C150.Lab && isFn(C150.Lab.startExperiment)) safe(function () { C150.Lab.startExperiment(expId); }, 'Lab.startExperiment');
+  };
   UI.showControl = function (id) {
     if (!CTRL[id]) return;
     setMode('explorar');

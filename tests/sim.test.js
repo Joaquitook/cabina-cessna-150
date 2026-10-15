@@ -717,6 +717,283 @@ test('step(): dt clamping, pause, garbage dt', function () {
   record('Costo: 10 min simulados a 60 fps', ms, '< 3000', 'ms');
 });
 
+/* ====================================================== aero snapshot (v2 §1) */
+
+var AERO_KEYS = ['ias', 'tas', 'aoa', 'beta', 'q', 'cl', 'cd', 'lOverD', 'liftN', 'dragN', 'thrustN', 'weightN',
+  'liftLN', 'liftRN', 'flapLiftN', 'tailN', 'rollMoment', 'pitchMoment', 'yawMoment', 'downwashDeg', 'propWashMs',
+  'propSwirl', 'stallBlend', 'groundEffect'];
+function aeroFinite(a, what) {
+  AERO_KEYS.forEach(function (k) { assert.ok(typeof a[k] === 'number' && isFinite(a[k]), what + ': aero.' + k + ' = ' + a[k]); });
+  ['rollMoment', 'pitchMoment', 'yawMoment'].forEach(function (k) { inRange(a[k], -1, 1, what + ' ' + k); });
+  inRange(a.stallBlend, 0, 1, what + ' stallBlend');
+  inRange(a.propSwirl, 0, 1, what + ' propSwirl');
+  inRange(a.groundEffect, 0, 1, what + ' groundEffect');
+}
+function tunnelState(ias, aoa) {
+  var s = Sim.createState('parked');
+  Sim.applyPreset(s, 'tunnel');
+  if (ias !== undefined) s.tunnel.ias = ias;
+  if (aoa !== undefined) s.tunnel.aoa = aoa;
+  run(s, 0.5);
+  return s;
+}
+
+test('aero: every preset has a complete snapshot (same object across steps and presets)', function () {
+  ['parked', 'runup', 'runway', 'cruise', 'approach', 'tunnel'].forEach(function (p) {
+    var s = Sim.createState(p);
+    var ref = s.aero;
+    aeroFinite(s.aero, p + ' (preset)');
+    run(s, 1);
+    assert.ok(s.aero === ref, p + ': state.aero keeps its reference');
+    aeroFinite(s.aero, p + ' (1 s)');
+    Sim.applyPreset(s, 'cruise');
+    assert.ok(s.aero === ref, p + ': applyPreset keeps the aero reference');
+  });
+  var parked = Sim.createState('parked');
+  assert.strictEqual(parked.aero.liftN, 0, 'no wind → no lift');
+  assert.strictEqual(parked.aero.cl, 0, 'no wind → cl 0');
+  inRange(parked.aero.weightN, 7000, 7200, 'weight always reported (N)');
+});
+
+test('aero: lift ≈ weight and thrust ≈ drag in level cruise', function () {
+  var s = Sim.createState('cruise');
+  run(s, 10);
+  var a = s.aero;
+  inRange(a.liftN / a.weightN, 0.97, 1.03, 'lift / weight');
+  inRange(a.thrustN / a.dragN, 0.9, 1.1, 'thrust / drag');
+  inRange(a.lOverD, 8, 14, 'L/D cruise');
+  inRange(Math.abs(a.liftLN - a.liftRN), 0, 30, 'wings even with the wheel centred (N)');
+  assert.ok(a.tailN < 0, 'the horizontal tail pushes DOWN in cruise (' + Math.round(a.tailN) + ' N)');
+  inRange(a.downwashDeg, 1, 4, 'downwash behind the wing (deg)');
+  inRange(a.propWashMs, 2, 12, 'prop wash in cruise (m/s)');
+  inRange(Math.abs(a.pitchMoment) + Math.abs(a.rollMoment) + Math.abs(a.yawMoment), 0, 0.1, 'trimmed: no tendencies');
+  assert.strictEqual(a.stallBlend, 0, 'attached flow');
+  record('Sustentación / peso en crucero', a.liftN / a.weightN, '≈ 1', '');
+  record('L/D en crucero', a.lOverD, '8…14', '');
+  var ap = Sim.createState('approach');
+  run(ap, 3);
+  inRange(ap.aero.liftN / ap.aero.weightN, 0.95, 1.05, 'lift / weight on the approach');
+  assert.ok(ap.aero.flapLiftN > 1500, 'flaps 20 carry part of the lift on the approach');
+});
+
+test('aero: flaps raise cl and cd (pure function and tunnel)', function () {
+  var c0 = Sim.aero({ ias: 70, aoa: 6, flaps: 0 }), c20 = Sim.aero({ ias: 70, aoa: 6, flaps: 20 });
+  var c40 = Sim.aero({ ias: 70, aoa: 6, flaps: 40 });
+  assert.ok(c20.cl > c0.cl && c40.cl > c20.cl, 'cl grows with flaps');
+  assert.ok(c20.cd > c0.cd && c40.cd > c20.cd, 'cd grows with flaps');
+  assert.ok(c40.flapLiftN > 0 && c0.flapLiftN === 0, 'flapLiftN only with flaps');
+  assert.ok(c40.downwashDeg > c0.downwashDeg, 'more downwash with flaps');
+  assert.ok(c40.lOverD < c0.lOverD, 'flaps lower L/D');
+  var s = tunnelState(70, 6);
+  var before = { cl: s.aero.cl, cd: s.aero.cd, lift: s.aero.liftN, drag: s.aero.dragN, pm: s.aero.pitchMoment };
+  Sim.actions.setFlapSwitch(s, 'DOWN');
+  run(s, 10);
+  inRange(s.flaps, 39.9, 40, 'flaps run down in the tunnel');
+  assert.ok(s.aero.cl > before.cl + 0.3 && s.aero.cd > before.cd + 0.03, 'tunnel: cl and cd up with flaps');
+  assert.ok(s.aero.liftN > before.lift && s.aero.dragN > before.drag, 'tunnel: more lift AND more drag');
+  assert.ok(s.aero.pitchMoment > before.pm + 0.1, 'flaps: nose-up tendency (balloon)');
+  assert.ok(s.aero.tailN < 0, 'tail down force with flaps');
+});
+
+test('aero: ailerons make liftL ≠ liftR with the right sign (and adverse yaw)', function () {
+  var s = tunnelState(80, 4);
+  s.yokeRoll = 1;                                         // wheel right: left aileron DOWN
+  run(s, 0.5);
+  assert.ok(s.surfaces.aileronL > 0 && s.surfaces.aileronR < 0, 'surfaces: left down, right up');
+  assert.ok(s.aero.liftLN > s.aero.liftRN + 500, 'wheel right: LEFT wing lifts more (' +
+    Math.round(s.aero.liftLN) + ' vs ' + Math.round(s.aero.liftRN) + ')');
+  assert.ok(s.aero.rollMoment > 0.5, 'wheel right: right wing goes down (+)');
+  assert.ok(s.aero.yawMoment < 0, 'adverse yaw: the nose goes LEFT, toward the rising wing');
+  s.yokeRoll = -1;
+  run(s, 0.5);
+  assert.ok(s.aero.liftRN > s.aero.liftLN + 500 && s.aero.rollMoment < -0.5, 'wheel left: mirror');
+  assert.ok(s.aero.yawMoment > 0, 'wheel left: adverse yaw to the right');
+  s.yokeRoll = 0; s.rudder = 1;
+  run(s, 0.5);
+  assert.ok(s.aero.yawMoment > 0.5, 'right pedal: nose right');
+  // In flight the airplane really rolls; roll damping shrinks (but keeps) the differential.
+  var f = Sim.createState('cruise');
+  f.yokeRoll = 0.6;
+  run(f, 0.1);
+  var d0 = f.aero.liftLN - f.aero.liftRN;
+  run(f, 2);
+  var d1 = f.aero.liftLN - f.aero.liftRN;
+  assert.ok(d0 > 0 && d1 > 0 && d1 < d0, 'flight: differential shrinks with roll damping (' + Math.round(d0) + ' → ' + Math.round(d1) + ')');
+  assert.ok(f.air.bank > 10, 'flight: the airplane banks right');
+  assert.ok(f.aero.rollMoment > 0, 'flight: roll tendency to the right while rolling');
+  // Sideslip in the tunnel: wind from the right lifts the right wing (dihedral) and weathercocks the nose right.
+  var b = tunnelState(80, 4);
+  b.tunnel.beta = 10;
+  run(b, 0.3);
+  assert.ok(b.aero.liftRN > b.aero.liftLN && b.aero.rollMoment < 0 && b.aero.yawMoment > 0, 'sideslip from the right');
+});
+
+test('aero: throttle raises thrust, prop wash and swirl; P-factor yaws left', function () {
+  var s = tunnelState(50, 6);
+  s.throttle = 0.2;
+  run(s, 4);
+  var lo = { T: s.aero.thrustN, w: s.aero.propWashMs, sw: s.aero.propSwirl, pm: s.aero.pitchMoment };
+  s.throttle = 1;
+  run(s, 4);
+  assert.ok(s.engine.rpm > 2200, 'full throttle in the tunnel: rpm up (' + Math.round(s.engine.rpm) + ')');
+  assert.ok(s.aero.thrustN > lo.T + 500, 'thrust up (' + Math.round(lo.T) + ' → ' + Math.round(s.aero.thrustN) + ' N)');
+  assert.ok(s.aero.propWashMs > lo.w + 5, 'prop wash up (' + lo.w.toFixed(1) + ' → ' + s.aero.propWashMs.toFixed(1) + ' m/s)');
+  assert.ok(s.aero.propSwirl > lo.sw, 'swirl up');
+  assert.ok(s.aero.yawMoment < -0.1, 'P-factor + slipstream at 50 kt full power: nose left');
+  assert.ok(s.aero.pitchMoment > lo.pm + 0.1, 'power pitches the nose up');
+  var r = Sim.createState('runup');
+  r.throttle = 1;
+  run(r, 4);
+  inRange(r.aero.propWashMs, 25, 45, 'static full-power slipstream (m/s)');
+  assert.strictEqual(r.aero.liftN, 0, 'no wind on the ground → no lift');
+});
+
+test('aero: stallBlend → 1 past the stall (tunnel and flight), 0 when attached', function () {
+  var s = tunnelState(60, 4);
+  assert.ok(s.aero.stallBlend < 0.01, 'attached at 4°');
+  s.tunnel.aoa = 14;
+  run(s, 1.5);
+  assert.ok(s.aero.stallBlend > 0.1 && s.aero.stallBlend < 0.9 && s.air.stallWarning && !s.air.stalled,
+    'near the stall: partial separation + horn (' + s.aero.stallBlend.toFixed(2) + ')');
+  var clNear = s.aero.cl;
+  s.tunnel.aoa = 20;
+  run(s, 1.5);
+  assert.ok(s.aero.stallBlend > 0.97 && s.air.stalled, 'stalled at 20° (' + s.aero.stallBlend.toFixed(2) + ')');
+  assert.ok(s.aero.cl < clNear, 'lift coefficient drops past the stall');
+  assert.ok(!hasEvent(s, /Pérdida!/), 'no stall event in the tunnel');
+  var f = Sim.createState('cruise');
+  f.throttle = 0;
+  run(f, 40, function (st) { st.yokePitch = 1; if (st.air.stalled) return false; });
+  assert.ok(f.air.stalled, 'flight: full pull stalls');
+  run(f, 0.8, function (st) { st.yokePitch = 1; });
+  assert.ok(f.aero.stallBlend > 0.9, 'flight: stallBlend high when stalled (' + f.aero.stallBlend.toFixed(2) + ')');
+  var curve = Sim.clCurve(0);
+  assert.strictEqual(curve.length, 61, 'clCurve −8…22 every 0.5');
+  assert.ok(curve[0].aoa === -8 && curve[60].aoa === 22, 'clCurve range');
+  var best = curve.reduce(function (m, p) { return p.cl > m.cl ? p : m; });
+  assert.strictEqual(best.aoa, Sim.stallAoa(0), 'CLmax at the stall AoA');
+  inRange(best.cl, 1.3, 1.42, 'CLmax clean');
+  assert.ok(curve[60].cl < best.cl * 0.8, 'post-stall drop');
+  inRange(Sim.stallAoa(0), 15.9, 16.1, 'stallAoa clean');
+  inRange(Sim.stallAoa(40), 14.9, 15.1, 'stallAoa flaps 40');
+  var c40 = Sim.clCurve(40);
+  assert.ok(c40[24].cl > curve[24].cl + 0.4, 'flaps 40 shift the curve up');
+});
+
+test('tunnel: holds position and attitude, no takeoff/landing events, leaves with any preset', function () {
+  var s = tunnelState();
+  assert.ok(s.tunnel.on && Sim.PRESETS.tunnel && Sim.PRESETS.tunnel.label === 'Túnel de viento', 'tunnel preset');
+  assert.ok(Object.keys(Sim.PRESETS).indexOf('tunnel') < 0, 'tunnel preset is not enumerable');
+  var x = s.pos.x, z = s.pos.z, alt = s.air.altitude, hdg = s.air.heading;
+  inRange(s.air.ias, 79.9, 80.1, 'tunnel ias');
+  inRange(s.air.pitch, 3.99, 4.01, 'pitch = aoa');
+  assert.ok(s.engine.running && s.masterBat && s.gyro.aiSpin > 0.99, 'engine running, master on, gyros spun');
+  inRange(s.aero.pitchMoment, -0.02, 0.02, 'tunnel preset is trimmed');
+  inRange(s.aero.thrustN / s.aero.dragN, 0.9, 1.1, 'tunnel preset: thrust ≈ drag');
+  s.yokePitch = 1; s.yokeRoll = 0.7; s.rudder = -0.5; s.throttle = 1;
+  run(s, 30);
+  assert.ok(s.pos.x === x && s.pos.z === z && s.air.altitude === alt && s.air.heading === hdg, 'position held');
+  assert.ok(s.air.bank === 0 && s.air.vs === 0 && s.air.groundSpeed === 0 && !s.air.onGround, 'attitude held');
+  inRange(s.air.pitch, 3.99, 4.01, 'pitch still = aoa');
+  assert.ok(s.aero.pitchMoment > 0.5, 'pull: nose-up tendency');
+  assert.ok(s.surfaces.elevator < -20, 'elevator moves in the tunnel');
+  assert.ok(!hasEvent(s, /Despegaste|Tocaste|Aterrizaje/), 'no takeoff/landing events');
+  s.tunnel.ias = 110; s.tunnel.aoa = 2;
+  run(s, 0.5);
+  inRange(s.aero.ias, 109.9, 110.1, 'tunnel ias follows the input');
+  inRange(s.air.pitch, 1.99, 2.01, 'pitch follows the tunnel aoa');
+  s.tunnel.ias = 0;
+  run(s, 0.5);
+  assert.ok(s.aero.liftN === 0 && s.aero.cl === 0 && s.aero.thrustN > 0, 'no wind: no lift, the prop still pushes');
+  Sim.applyPreset(s, 'cruise');
+  assert.ok(!s.tunnel.on, 'applyPreset(cruise) leaves the tunnel');
+  var x0 = s.pos.x;
+  run(s, 2);
+  assert.ok(s.pos.x !== x0, 'flying again');
+  // The pure snapshot uses the same formulas as the tunnel.
+  var t = tunnelState(90, 7);
+  var p = Sim.aero({ ias: 90, aoa: 7, flaps: t.flaps, rpm: t._sim.rpmS, throttle: t.throttle, trim: t.trim,
+    altitude: t.air.altitude });
+  ['cl', 'cd', 'liftN', 'dragN', 'thrustN', 'tailN', 'pitchMoment', 'propWashMs'].forEach(function (k) {
+    assert.ok(Math.abs(p[k] - t.aero[k]) <= 1e-6 * Math.max(1, Math.abs(p[k])), 'Sim.aero == tunnel for ' + k + ' (' + p[k] + ' vs ' + t.aero[k] + ')');
+  });
+  var z0 = Sim.aero({});
+  aeroFinite(z0, 'Sim.aero({})');
+  assert.ok(z0.liftN === 0 && z0.thrustN === 0, 'Sim.aero with no input: still air');
+});
+
+test('tunnel: no NaN with random tunnel inputs', function () {
+  var seed = 11;
+  function rand() { seed = (seed * 16807) % 2147483647; return seed / 2147483647; }
+  var s = tunnelState();
+  for (var i = 0; i < 3000; i++) {
+    if (i % 15 === 0) {
+      s.tunnel.ias = rand() * 220 - 10; s.tunnel.aoa = rand() * 60 - 25; s.tunnel.beta = rand() * 50 - 25;
+      s.yokeRoll = rand() * 2 - 1; s.yokePitch = rand() * 2 - 1; s.rudder = rand() * 2 - 1; s.throttle = rand();
+      s.trim = rand() * 2 - 1;
+      if (rand() < 0.1) Sim.actions.setFlapSwitch(s, ['UP', 'OFF', 'DOWN'][Math.floor(rand() * 3)]);
+      if (rand() < 0.02) s.tunnel.ias = NaN;
+    }
+    Sim.step(s, 1 / 30);
+  }
+  aeroFinite(s.aero, 'random tunnel');
+  assert.ok(isFinite(s.air.ias) && isFinite(s.air.pitch), 'air data finite');
+});
+
+/* ============================================ airfoil.js flow model (v2 §2) */
+
+test('airfoil model: NACA 2412-like section, Kutta lift, flaps, streamlines never enter the section', function () {
+  var M = require(path.join(__dirname, '..', 'src', 'airfoil.js')).model;
+  var S0 = M.buildSection(0);
+  var NX = S0.upDef.length, tmax = 0, xt = 0, cmax = 0;
+  for (var k = 0; k < NX; k++) {
+    var t = S0.upDef[k] - S0.loDef[k], x = k / (NX - 1);
+    if (t > tmax) { tmax = t; xt = x; }
+    cmax = Math.max(cmax, S0.camber[k]);
+  }
+  inRange(tmax, 0.11, 0.13, 'thickness / chord');
+  inRange(xt, 0.25, 0.35, 'max thickness position');
+  inRange(cmax, 0.015, 0.025, 'camber / chord');
+  inRange(S0.tex, 0.999, 1.001, 'TE at x = 1 with flaps up');
+  // lift grows linearly with the angle of attack; zero lift a little below 0° (cambered section)
+  var cl0 = M.sectionCl(M.solveFlow(S0, 0, 0, null)), cl8 = M.sectionCl(M.solveFlow(S0, 8, 0, null));
+  inRange((cl8 - cl0) / 8, 0.105, 0.125, '2D lift slope per degree (≈ 2π/rad)');
+  inRange(-cl0 / ((cl8 - cl0) / 8), -3, -1.5, 'zero-lift angle (deg)');
+  // flaps: the trailing edge goes down and back up the circulation
+  var S40 = M.buildSection(40);
+  assert.ok(S40.tey < -0.12 && S40.tex > 0.9, 'flap 40°: TE down (' + S40.tex.toFixed(2) + ', ' + S40.tey.toFixed(2) + ')');
+  var clF = M.sectionCl(M.solveFlow(S40, 4, 0, null)), clC = M.sectionCl(M.solveFlow(S0, 4, 0, null));
+  inRange(clF - clC, 0.8, 1.6, '2D ΔCL of a 40° flap');
+  // forward 70 % of the section does not move with the flap
+  inRange(Math.abs(S40.upDef[Math.round(0.3 * (NX - 1) / S40.tex)] - S0.upDef[Math.round(0.3 * (NX - 1))]), 0, 0.01, 'flap leaves the front alone');
+  // Kutta: the upper surface is faster than the lower one, the flow leaves the TE smoothly
+  var F = M.solveFlow(S0, 6, 0, null), cp = F.surfCp, minUp = 9, minLo = 9;
+  for (k = 0; k < cp.length; k++) {
+    if (k <= S0.iLE) minUp = Math.min(minUp, cp[k]); else minLo = Math.min(minLo, cp[k]);
+  }
+  assert.ok(minUp < -1 && minUp < minLo - 0.5, 'suction peak on top (' + minUp.toFixed(2) + ' vs ' + minLo.toFixed(2) + ')');
+  // streamlines with a real view: none crosses into the drawn section (flaps 30, stalled and attached)
+  function pointIn(S, x, y) {
+    if (x <= 0.002 || x >= S.tex - 0.002) return false;
+    var f = x / S.tex * (NX - 1), i = Math.floor(f), u = f - i;
+    var yu = S.upDef[i] + (S.upDef[Math.min(NX - 1, i + 1)] - S.upDef[i]) * u;
+    var yl = S.loDef[i] + (S.loDef[Math.min(NX - 1, i + 1)] - S.loDef[i]) * u;
+    return y < yu - 0.004 && y > yl + 0.004;
+  }
+  [[30, 6, 0], [0, 18, 1], [20, 10, 0.5], [0, -5, 0]].forEach(function (c) {
+    var S = M.buildSection(c[0]);
+    var Fl = M.solveFlowBody(S, c[1], c[2], 30);
+    var inside = 0, total = 0;
+    Fl.lines.forEach(function (L) {
+      for (var j = 0; j < L.n; j++) { total++; if (pointIn(S, L.bx[j], L.by[j])) inside++; }
+    });
+    assert.ok(Fl.lines.length >= 20, 'flaps ' + c[0] + ' aoa ' + c[1] + ': streamlines traced (' + Fl.lines.length + ')');
+    assert.ok(inside === 0, 'flaps ' + c[0] + ' aoa ' + c[1] + ' stall ' + c[2] + ': ' + inside + ' of ' + total + ' points inside the section');
+    var ups = Fl.lines.filter(function (L) { return L.upper; }).length;
+    assert.ok(ups > 3 && ups < Fl.lines.length - 3, 'lines on both sides');
+  });
+});
+
 /* ================================================================== summary */
 console.log('\nC150.Sim tests');
 console.table(results);

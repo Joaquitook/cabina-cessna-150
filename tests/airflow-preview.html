@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flujo de aire: vista de prueba</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=B612+Mono:wght@400;700&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<!--
+  tests/airflow-preview.html: standalone check of src/airflow.js (C150.Airflow) on src/exterior.js, with the real modules.
+  Serve the project root (python -m http.server 8741) and open /tests/airflow-preview.html.
+  - Modo "Túnel": the airplane is held still (state.tunnel), the sliders set the wind (kt), AoA, sideslip, flaps,
+    throttle (→ RPM), yoke, pedals. If sim.js has the tunnel preset it is used (C150.Sim.step), otherwise the state is
+    written by hand and airflow.js derives the aero snapshot itself.
+  - Modo "Vuelo": crucero preset, C150.Sim.step runs, the airplane banks/pitches, trails on.
+  - Every flow toggle, density, slow motion, focus region, backdrop and view. The log shows the flow cost (ms/frame).
+  - ?autotest=1 exercises every view / focus / backdrop / density; results in window.__flowTestResults.
+-->
+<style>
+  :root {
+    --bg: #0B1220; --surface: #121B2B; --line: #26344A; --fg: #E4EAEE; --fg-soft: #9AA9B5; --accent: #F08A3C;
+    --font-display: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+    --font-body: 'Atkinson Hyperlegible', system-ui, sans-serif;
+    --font-data: 'B612 Mono', ui-monospace, monospace;
+    color-scheme: dark;
+  }
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--bg); color: var(--fg); font: 13px/1.35 var(--font-body); display: flex; flex-direction: column; }
+  header { background: var(--surface); border-bottom: 1px solid var(--line); padding: 6px 12px; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
+  h1 { font: 600 17px/1.2 var(--font-display); text-transform: uppercase; letter-spacing: .05em; margin: 0 6px 0 0; }
+  select, button, input { font: 12px var(--font-body); color: var(--fg); }
+  select, button { padding: 3px 7px; border: 1px solid var(--line); background: var(--bg); border-radius: 6px; }
+  button[aria-pressed="true"] { background: var(--accent); color: #111; border-color: var(--accent); }
+  button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  label { display: inline-flex; align-items: center; gap: 4px; }
+  label output { font: 11px var(--font-data); color: var(--fg-soft); min-width: 32px; }
+  input[type=range] { width: 84px; }
+  #view { position: relative; flex: 1; min-height: 0; }
+  #view canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+  #log { position: absolute; left: 12px; top: 12px; padding: 6px 10px; border-radius: 6px; background: rgba(8,14,22,.72); color: #9AA9B5; font: 11px var(--font-data); pointer-events: none; white-space: pre; }
+  .grp { display: inline-flex; gap: 3px; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Flujo de aire — prueba</h1>
+  <label>Modo <select id="mode"><option value="tunnel">Túnel (quieto)</option><option value="flight">Vuelo (crucero)</option></select></label>
+  <label>Viento <input id="ias" type="range" min="0" max="140" step="1" value="80"><output id="iasO"></output></label>
+  <label>AoA <input id="aoa" type="range" min="-6" max="22" step="0.5" value="4"><output id="aoaO"></output></label>
+  <label>Deriva <input id="beta" type="range" min="-12" max="12" step="1" value="0"><output id="betaO"></output></label>
+  <label>Flaps <input id="flaps" type="range" min="0" max="40" step="1" value="0"><output id="flapsO"></output></label>
+  <label>Acel. <input id="thr" type="range" min="0" max="1" step="0.01" value="0.6"><output id="thrO"></output></label>
+  <label>Alabeo <input id="roll" type="range" min="-1" max="1" step="0.05" value="0"><output id="rollO"></output></label>
+  <label>Cabeceo <input id="pitch" type="range" min="-1" max="1" step="0.05" value="0"><output id="pitchO"></output></label>
+  <label>Pedales <input id="rud" type="range" min="-1" max="1" step="0.05" value="0"><output id="rudO"></output></label>
+  <span class="grp" id="toggles"></span>
+  <label>Densidad <select id="density"><option>alta</option><option>media</option><option>baja</option></select></label>
+  <label>Lento <input id="slow" type="range" min="0.2" max="1" step="0.05" value="1"><output id="slowO"></output></label>
+  <label>Foco <select id="focus"><option value="">(ninguno)</option></select></label>
+  <label>Fondo <select id="backdrop"><option>tunel</option><option>estudio</option><option>cielo</option></select></label>
+  <label>Vista <select id="viewSel"></select></label>
+  <button id="inset" aria-pressed="false">Inset (baja)</button>
+</header>
+<div id="view"><div id="log"></div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+<script src="../src/sim.js"></script>
+<script src="../src/exterior.js"></script>
+<script src="../src/airflow.js"></script>
+<script src="../src/core.js"></script><!-- pipeline helpers only (Core.configureRenderer / createEnvironment) -->
+<script>
+(function () {
+  'use strict';
+  var C150 = window.C150 || {};
+  var $ = function (id) { return document.getElementById(id); };
+  var view = $('view'), logEl = $('log');
+  var Sim = C150.Sim;
+  var hasTunnel = !!(Sim.PRESETS && Sim.PRESETS.tunnel);
+  var state = Sim.createState(hasTunnel ? 'tunnel' : 'cruise');
+  var renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+  view.insertBefore(renderer.domElement, view.firstChild);
+  C150.Core.configureRenderer(renderer, 'alta');
+  var ext = C150.Exterior.create(THREE);
+  if (!ext.scene.environment) ext.scene.environment = C150.Core.createEnvironment(renderer, { cabin: false, studio: true, size: 128 }).texture;
+  var flow = C150.Airflow.create(THREE, ext, {});
+  ext.scene.traverse(function (o) {
+    if (o.material) [].concat(o.material).forEach(function (m) { if (m.isMeshBasicMaterial || m.isSpriteMaterial || m.isLineBasicMaterial) m.toneMapped = false; });
+  });
+  var controls = new THREE.OrbitControls(ext.camera, renderer.domElement);
+  if (ext.target && ext.target.isVector3) controls.target = ext.target;
+  controls.enableDamping = true; controls.minDistance = 2.5; controls.maxDistance = 40;
+  controls.addEventListener('start', function () { if (Math.abs(ext.camera.up.y - 1) > 1e-3) ext.camera.up.set(0, 1, 0); });
+  var insetMode = false;
+  function resize() {
+    var w = Math.max(1, view.clientWidth), h = Math.max(1, view.clientHeight);
+    renderer.setSize(w, h, false);
+    ext.camera.aspect = w / h; ext.camera.updateProjectionMatrix();
+    if (ext.setSize) ext.setSize(w, h);
+  }
+  window.addEventListener('resize', resize); resize();
+
+  function opt(sel, v, label) { var o = document.createElement('option'); o.value = v; o.textContent = label || v; sel.appendChild(o); }
+  ext.VIEWS.forEach(function (v) { opt($('viewSel'), v); });
+  flow.REGIONS.forEach(function (r) { opt($('viewSel'), 'flow:' + r, 'foco ' + r); opt($('focus'), r); });
+  $('viewSel').value = 'tres-cuartos';
+
+  var TOG = [['enabled', 'Flujo'], ['streamlines', 'Líneas'], ['propwash', 'Hélice'], ['vortices', 'Vórtices'], ['pressure', 'Presión'],
+    ['forces', 'Fuerzas'], ['moments', 'Giros'], ['trails', 'Estelas']];
+  var cfg = { enabled: true, streamlines: true, propwash: true, vortices: true, pressure: true, forces: true, moments: true, trails: true };
+  TOG.forEach(function (t) {
+    var b = document.createElement('button'); b.textContent = t[1]; b.setAttribute('aria-pressed', String(cfg[t[0]]));
+    b.onclick = function () { cfg[t[0]] = !cfg[t[0]]; b.setAttribute('aria-pressed', String(cfg[t[0]])); var o = {}; o[t[0]] = cfg[t[0]]; flow.set(o); };
+    $('toggles').appendChild(b);
+  });
+  flow.set(cfg);
+  $('density').onchange = function () { flow.set({ density: this.value }); };
+  $('focus').onchange = function () { flow.focus(this.value || null); if (this.value) ext.setView(flow.views[this.value]); };
+  $('backdrop').onchange = function () { ext.setBackdrop(this.value); };
+  $('viewSel').onchange = function () { var v = this.value; ext.setView(v.indexOf('flow:') === 0 ? flow.views[v.slice(5)] : v); };
+  $('inset').onclick = function () { insetMode = !insetMode; this.setAttribute('aria-pressed', String(insetMode)); };
+  ext.setBackdrop('tunel');
+  ext.setView('tres-cuartos', true);
+
+  var V = {};
+  ['ias', 'aoa', 'beta', 'flaps', 'thr', 'roll', 'pitch', 'rud', 'slow'].forEach(function (id) {
+    var el = $(id), out = $(id + 'O');
+    function rd() { V[id] = +el.value; if (out) out.textContent = el.value; }
+    el.oninput = function () { rd(); if (id === 'slow') flow.set({ slowmo: V.slow }); applyInputs(); };
+    rd();
+  });
+  function mode() { return $('mode').value; }
+  $('mode').onchange = function () {
+    if (mode() === 'flight') {
+      Sim.applyPreset(state, 'cruise');
+      if (state.tunnel) state.tunnel.on = false;
+      $('backdrop').value = 'cielo'; ext.setBackdrop('cielo'); ext.setView('persecucion');
+      $('thr').value = state.throttle.toFixed(2); V.thr = state.throttle;
+    } else {
+      if (hasTunnel) Sim.applyPreset(state, 'tunnel');
+      $('backdrop').value = 'tunel'; ext.setBackdrop('tunel'); ext.setView('tres-cuartos');
+    }
+    applyInputs();
+  };
+
+  function surfaces() {
+    var yr = V.roll, yp = V.pitch;
+    state.surfaces = state.surfaces || {};
+    var s = state.surfaces;
+    s.aileronL = yr < 0 ? 20 * yr : 14 * yr; s.aileronR = yr < 0 ? -14 * yr : -20 * yr;
+    s.elevator = yp > 0 ? -25 * yp : -15 * yp; s.rudder = 23 * V.rud; s.trimTab = 0; s.flaps = state.flaps;
+  }
+  function applyInputs() {
+    state.controlLock = false;
+    state.yokeRoll = V.roll; state.yokePitch = V.pitch; state.rudder = V.rud; state.throttle = V.thr;
+    if (mode() === 'tunnel') {
+      state.tunnel = state.tunnel || {};
+      state.tunnel.on = true; state.tunnel.ias = V.ias; state.tunnel.aoa = V.aoa; state.tunnel.beta = V.beta;
+      if (!hasTunnel) {
+        state.flaps = V.flaps;
+        state.engine.running = true;
+        state.air.onGround = false; state.air.ias = V.ias; state.air.aoa = V.aoa; state.air.pitch = V.aoa; state.air.bank = 0; state.air.vs = 0;
+        state.propRpm = state.engine.rpm = V.thr > 0.01 ? Math.max(650, 650 + 1900 * V.thr + 2.2 * V.ias * V.thr) : 0;
+        surfaces();
+        delete state.aero;
+      } else {
+        state.flapSwitch = 'OFF';
+        state.flaps = V.flaps;
+      }
+    } else {
+      state.flaps = V.flaps;
+    }
+  }
+  applyInputs();
+
+  var last = performance.now(), lastRaf = 0, cost = 0, frames = 0, fpsT = 0, fps = 0;
+  function frame(dt) {
+    if (mode() === 'flight' || hasTunnel) { applyInputs(); Sim.step(state, dt); if (mode() === 'tunnel' && hasTunnel) { state.flaps = V.flaps; } }
+    else applyInputs();
+    ext.followAttitude = !(state.air && state.air.onGround);
+    ext.update(state, dt);
+    var t0 = performance.now();
+    flow.update(state, dt, { inset: insetMode, quality: 'alta' });
+    var c = performance.now() - t0;
+    cost = cost * 0.95 + c * 0.05;
+    if (!ext.cameraBusy) controls.update();
+    var csz = renderer.getSize(new THREE.Vector2());
+    if (insetMode) {
+      var w = csz.x, h = csz.y, iw = Math.round(Math.min(360, w * 0.3)), ih = Math.round(iw * 0.75);
+      renderer.setScissorTest(true);
+      renderer.setViewport(0, 0, w, h); renderer.setScissor(0, 0, w, h); renderer.setClearColor(0x223344); renderer.clear();
+      ext.camera.aspect = iw / ih; ext.camera.updateProjectionMatrix();
+      renderer.setViewport(w - iw - 12, h - ih - 12, iw, ih); renderer.setScissor(w - iw - 12, h - ih - 12, iw, ih);
+      renderer.render(ext.scene, ext.camera);
+      renderer.setScissorTest(false);
+      ext.camera.aspect = w / h; ext.camera.updateProjectionMatrix();
+    } else {
+      renderer.setViewport(0, 0, csz.x, csz.y);
+      renderer.render(ext.scene, ext.camera);
+    }
+    frames++; fpsT += dt; if (fpsT > 1) { fps = frames / fpsT; frames = 0; fpsT = 0; }
+    var a = flow.snapshot, st = flow.stats();
+    logEl.textContent = 'flujo ' + cost.toFixed(2) + ' ms · ' + fps.toFixed(0) + ' fps · ' + st.particles + '/' + st.max + ' part. (' + st.level + ') · ' + st.segments + ' seg' +
+      '\nias ' + a.ias.toFixed(0) + ' kt · aoa ' + a.aoa.toFixed(1) + '° · cl ' + a.cl.toFixed(2) + ' · L ' + (a.liftN / 9.81).toFixed(0) + ' kg (' + (a.liftLN / 9.81).toFixed(0) + '/' + (a.liftRN / 9.81).toFixed(0) + ')' +
+      '\nD ' + (a.dragN / 9.81).toFixed(0) + ' kg · T ' + (a.thrustN / 9.81).toFixed(0) + ' kg · cola ' + (a.tailN / 9.81).toFixed(0) + ' kg · estela ' + a.propWashMs.toFixed(1) + ' m/s · pérdida ' + a.stallBlend.toFixed(2) +
+      '\nmomentos alabeo ' + a.rollMoment.toFixed(2) + ' cabeceo ' + a.pitchMoment.toFixed(2) + ' guiñada ' + a.yawMoment.toFixed(2) + ' · ' + (a.fromSim ? 'state.aero (sim)' : 'derivado (airflow)') +
+      '\nvista ' + ext.view + ' · fondo ' + ext.backdrop;
+  }
+  function loop(now) { lastRaf = now; var dt = Math.min(0.1, (now - last) / 1000); last = now; frame(dt); requestAnimationFrame(loop); }
+  requestAnimationFrame(loop);
+  setInterval(function () { var t = performance.now(); if (t - lastRaf > 250) { frame(Math.min(0.1, (t - last) / 1000)); last = t; } }, 33);
+
+  window.__ext = ext; window.__flow = flow; window.__state = state; window.__renderer = renderer; window.__frame = frame;
+  // native-resolution capture for tuning: renders at w×h and POSTs the PNG (scratch shot server)
+  window.__shot = function (name, w, h, steps) {
+    w = w || 1280; h = h || 760;
+    renderer.setSize(w, h, false); ext.camera.aspect = w / h; ext.camera.updateProjectionMatrix(); if (ext.setSize) ext.setSize(w, h);
+    for (var i = 0; i < (steps || 1); i++) frame(1 / 60);
+    var url = renderer.domElement.toDataURL('image/png');
+    resize();
+    return fetch('/__shot?name=' + encodeURIComponent(name), { method: 'POST', body: url }).then(function (r) { return r.text(); });
+  };
+  window.__view = function (v) { ext.setView(typeof v === 'string' && flow.views[v] ? flow.views[v] : v); for (var i = 0; i < 40; i++) ext.update(state, 0.05); if (!ext.cameraBusy) controls.update(); };
+  window.__set = function (o) { for (var k in o) { if ($(k)) { $(k).value = o[k]; $(k).oninput && $(k).oninput(); } } };
+
+  if (/autotest=1/.test(location.search)) {
+    var results = [];
+    function check(name, fn) { try { var r = fn(); results.push({ name: name, ok: r !== false }); } catch (e) { results.push({ name: name, ok: false, error: e.message }); } }
+    ['tunel', 'estudio', 'cielo'].forEach(function (b) { check('backdrop ' + b, function () { return ext.setBackdrop(b) && (frame(0.05), ext.backdrop === b); }); });
+    ext.VIEWS.forEach(function (v) { check('view ' + v, function () { return ext.setView(v); }); });
+    flow.REGIONS.forEach(function (r) { check('focus ' + r, function () { flow.focus(r); frame(0.05); return !!flow.views[r] && flow.get().focus === r; }); });
+    flow.focus(null);
+    ['alta', 'media', 'baja'].forEach(function (d) { check('density ' + d, function () { flow.set({ density: d }); for (var i = 0; i < 5; i++) frame(0.03); return flow.stats().level === d; }); });
+    window.__flowTestResults = results;
+  }
+})();
+</script>
+</body>
+</html>

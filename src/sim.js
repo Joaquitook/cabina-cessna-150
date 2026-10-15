@@ -21,6 +21,31 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
  *    Private integrator state lives in state._sim (do not read it from other modules).
  *  - Several time constants are ACCELERATED for teaching (oil temperature, gyro spin-up/down,
  *    battery drain, heading-indicator drift); each is marked "accelerated" below.
+ *
+ * AERODYNAMICS SNAPSHOT (contract v2 §1, "El aire"):
+ *  - OUTPUT state.aero, rewritten at the end of every Sim.step and by applyPreset (same object reference):
+ *      { ias, tas, aoa, beta, q, cl, cd, lOverD, liftN, dragN, thrustN, weightN, liftLN, liftRN, flapLiftN,
+ *        tailN, rollMoment, pitchMoment, yawMoment, downwashDeg, propWashMs, propSwirl, stallBlend, groundEffect }
+ *    Forces in newtons (kgf = N / 9.81). With no wind (ias < 0.5 kt) cl, cd and every aerodynamic force are 0;
+ *    thrust, prop wash and weight are still reported (static run-up). dragN includes the drag of an idling /
+ *    windmilling propeller; cd is the airframe only. thrustN < 0 = windmilling propeller (drag).
+ *    Sign conventions: rollMoment + = right wing goes down, pitchMoment + = nose up, yawMoment + = nose right,
+ *    beta + = relative wind from the RIGHT (nose left of the wind), tailN < 0 = down force (usual).
+ *    Moments are -1..1 TENDENCIES: in flight they combine what the controls ask for with what the airplane is
+ *    doing (roll damping, flight-path curvature); in the tunnel (attitude held) they show where the airplane
+ *    WOULD go if released. liftLN − liftRN carries the aileron differential (reduced by roll damping while the
+ *    airplane is rolling). stallBlend 0 attached → 1 stalled, starts ≈ 3° before the stall AoA (smoothed).
+ *  - INPUT state.tunnel = { on, ias, aoa, beta } ("túnel de viento"): while on, step() does not integrate the
+ *    position or attitude: ias/aoa come from the tunnel, pitch = aoa (horizontal wind), bank 0, vs 0, ground
+ *    speed 0, onGround false; engine, electrics, flaps, surfaces and state.aero work normally; no takeoff /
+ *    landing / stall events. Preset 'tunnel' turns it on (80 kt, 4°, engine running, trimmed so the hands-off
+ *    pitch tendency is 0 and throttle so thrust ≈ drag); applyPreset of any other preset turns it off.
+ *    Sim.PRESETS.tunnel is NON-ENUMERABLE so the classic five-scenario lists (UI, consistency tests) stay as
+ *    they were: use Sim.PRESETS.tunnel / applyPreset(s, 'tunnel') explicitly.
+ *  - Pure helpers: Sim.aero(input) → snapshot (input { ias, aoa, beta, flaps, rpm, yokeRoll, yokePitch, rudder,
+ *    trim, altitude, throttle }, the same formulas as the tunnel), Sim.clCurve(flaps) → [{aoa, cl}] −8…+22° every
+ *    0.5° (drops past the stall), Sim.stallAoa(flaps) → deg. The wing CL is linear (CLA) up to the stall AoA,
+ *    then breaks to STALL_LIFT·CLmax over 2°.
  */
 (function (C150) {
   'use strict';
@@ -68,6 +93,16 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   var WHEELBASE = 1.5;          // m (nose wheel to main wheels)
   var MAX_LAT_ACCEL = 0.3 * G;  // tyre grip limit when steering on the ground
   var ROTATE_PITCH = 10;        // deg, full rotation attitude
+
+  /* ------------------------------------------- aerodynamics snapshot (state.aero) */
+  var AIL_DCL = 0.12;           // CL change of one wing half at full aileron (illustrative, teaching)
+  var S_TAIL = 2.8;             // m², horizontal tail (≈ 30 ft²)
+  var TAIL_INC = -1;            // deg, tail incidence relative to the fuselage reference
+  var PROP_AREA = 2.41;         // m², propeller disk (69 in diameter)
+  var SPAN = 10.1;              // m (33 ft 4 in)
+  var WING_H = 2.1;             // m, wing height above the ground with the wheels on it
+  var ALPHA_NEG_STALL = -12;    // deg, negative stall (only shapes the curve below −8°)
+  var Q80 = 0.5 * RHO0 * Math.pow(80 * KT, 2);   // Pa, reference dynamic pressure (80 KIAS)
 
   /* ------------------------------------------------------ propeller / engine */
   var T0 = 1980;                // N: thrust scale at 2550 rpm (tuned: climb ≈ 650 fpm, Vmax ≈ 107 KIAS)
@@ -129,6 +164,14 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       description: 'En final de la pista 06 a 700 ft sobre el terreno, 65 nudos, flaps 20° y calefacción al carburador puesta, bajando unos 450 ft/min.'
     }
   };
+  // Non-enumerable on purpose (see the header): not one of the classic flight scenarios.
+  Object.defineProperty(Sim.PRESETS, 'tunnel', {
+    enumerable: false, configurable: true, writable: true,
+    value: {
+      label: 'Túnel de viento',
+      description: 'El avión queda quieto y el viento sopla a 80 nudos con 4° de ángulo de ataque. Motor en marcha y avión compensado: mové el viento, el ángulo, los flaps, el acelerador y los comandos y mirá qué hace el aire.'
+    }
+  });
 
   function freezeDeep(o) {
     for (var k in o) { if (o[k] && typeof o[k] === 'object') freezeDeep(o[k]); }
@@ -263,6 +306,140 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
 
   function alphaStall(flaps) {
     return ALPHA_STALL_CLEAN - (ALPHA_STALL_CLEAN - ALPHA_STALL_F40) * flaps / FLAP_MAX;
+  }
+
+  /* ------------------------------------------------- aerodynamics snapshot */
+
+  function smooth01(x) { return x <= 0 ? 0 : (x >= 1 ? 1 : x * x * (3 - 2 * x)); }
+
+  /** Wing CL without hysteresis: linear up to the stall AoA, then the break (tunnel, charts, Sim.aero). */
+  function clOf(aoa, flaps) {
+    var dCLf = FLAP_DCL * clamp(flaps, 0, FLAP_MAX) / FLAP_MAX, aS = alphaStall(flaps);
+    if (aoa > aS) {
+      var cmax = CLA * aS + dCLf;
+      return cmax + (STALL_LIFT * cmax - cmax) * smooth01((aoa - aS) / 2) - 0.01 * Math.max(0, aoa - aS - 2);
+    }
+    if (aoa < ALPHA_NEG_STALL) {
+      var cmin = CLA * ALPHA_NEG_STALL + dCLf;
+      return cmin + (STALL_LIFT * cmin - cmin) * smooth01((ALPHA_NEG_STALL - aoa) / 2);
+    }
+    return CLA * aoa + dCLf;
+  }
+  /** Fraction of the stall break reached (0 below the stall AoA, 1 two degrees past it): extra drag. */
+  function sepOf(aoa, flaps) {
+    var aS = alphaStall(flaps);
+    return Math.max(smooth01((aoa - aS) / 2), smooth01((ALPHA_NEG_STALL - aoa) / 2));
+  }
+  /** Visual separation 0..1: starts ≈ 3° before the stall AoA (trailing-edge separation), 1 just past it. */
+  function stallBlendOf(aoa, flaps) {
+    var aS = alphaStall(flaps);
+    return smooth01((aoa - (aS - 3)) / 4.5);
+  }
+  function cdOf(cl, aoa, flaps) {
+    var fr = clamp(flaps, 0, FLAP_MAX) / FLAP_MAX, aS = alphaStall(flaps);
+    return CD0 + FLAP_DCD * fr + K_IND * cl * cl + STALL_DRAG * sepOf(aoa, flaps) +
+      0.012 * Math.max(0, aoa - aS - 2);
+  }
+  function surfaceAileronL(yr) { return yr < 0 ? 20 * yr : 14 * yr; }
+  function surfaceElevator(yp, variant) { return yp > 0 ? -(variant === 'A150M' ? 23 : 25) * yp : -15 * yp; }
+  function surfaceTrimTab(trim) { return trim > 0 ? 20 * trim : 10 * trim; }
+
+  function newAero() {
+    return { ias: 0, tas: 0, aoa: 0, beta: 0, q: 0, cl: 0, cd: 0, lOverD: 0,
+      liftN: 0, dragN: 0, thrustN: 0, weightN: WEIGHT, liftLN: 0, liftRN: 0, flapLiftN: 0, tailN: 0,
+      rollMoment: 0, pitchMoment: 0, yawMoment: 0, downwashDeg: 0, propWashMs: 0, propSwirl: 0,
+      stallBlend: 0, groundEffect: 0 };
+  }
+
+  /* Reused parameter block for fillAero (no allocation per step). */
+  var AP = {
+    mode: 'tunnel',          // 'tunnel' | 'air' | 'ground'
+    ias: 0, tas: 0, sig: 1, aoa: 0, beta: 0, flaps: 0,
+    cl: 0, cd: 0,            // airframe coefficients (cd without the windmilling propeller)
+    sep: 0,                  // 0..1 stall break reached (scales the flap lift)
+    T: 0, Dwm: 0, rpm: 0, thrEff: 0,
+    yr: 0, yp: 0, rud: 0, elev: 0, tab: 0,
+    aCmd: 0,                 // aoa the elevator/trim/power/flaps ask for
+    pN: 0,                   // roll rate normalised by the full-wheel rate at this speed
+    gdotDeg: 0,              // flight-path curvature, deg/s
+    slip: 0, stalled: false, agl: 1e4
+  };
+
+  /** Fill snapshot `o` from the parameter block `p` (the single place where state.aero is computed). */
+  function fillAero(o, p) {
+    var V = p.tas * KT;
+    var q = 0.5 * RHO0 * p.sig * V * V;
+    var wind = p.ias >= 0.5;
+    var fr = clamp(p.flaps, 0, FLAP_MAX) / FLAP_MAX;
+    var cl = wind ? p.cl : 0, cdA = wind ? p.cd : 0;
+    var L = q * S_WING * cl;
+    var D = q * S_WING * cdA + (wind ? p.Dwm : 0);
+    var spd = clamp(p.ias / 60, 0, 1);                    // rudder / elevator authority (as stepFlight)
+    var auth = clamp(p.ias / 80, 0, 1.2);                  // aileron authority (as the roll rate)
+    var pFactor = 0.3 * clamp((p.thrEff - 0.6) / 0.4, 0, 1) * clamp((85 - p.ias) / 35, 0, 1);
+    var tunnel = p.mode === 'tunnel', ground = p.mode === 'ground';
+
+    o.ias = p.ias; o.tas = p.tas; o.aoa = p.aoa; o.beta = p.beta; o.q = q;
+    o.cl = cl; o.cd = cdA;
+    o.liftN = L; o.dragN = D; o.thrustN = p.T; o.weightN = WEIGHT;
+    o.lOverD = D > 1e-6 ? L / D : 0;
+
+    // Roll: aileron (wheel) minus roll damping, rudder → roll (dihedral), sideslip (dihedral), stalled wing drop.
+    var rudNeed = 0.35 * p.pN + pFactor;
+    var rawRoll = (p.yr - 0.5 * p.pN);
+    if (!ground) rawRoll += 0.3 * (p.rud - rudNeed) * spd;
+    if (tunnel) rawRoll -= 0.03 * p.beta;
+    if (p.stalled) rawRoll -= 0.4 * p.slip;
+    rawRoll = clamp(rawRoll, -1.5, 1.5);
+    var diff = wind ? q * 0.5 * S_WING * AIL_DCL * rawRoll : 0;
+    o.liftLN = 0.5 * L + 0.5 * diff;
+    o.liftRN = 0.5 * L - 0.5 * diff;
+    o.rollMoment = clamp(rawRoll * auth, -1, 1);
+    o.flapLiftN = wind ? q * S_WING * FLAP_DCL * fr * (1 - (1 - STALL_LIFT) * p.sep) : 0;
+
+    // Pitch tendency
+    var pm;
+    if (tunnel) pm = clamp((p.aCmd - p.aoa) / 5 + 0.25 * fr, -1.5, 1.5) * spd;
+    else if (ground) pm = clamp(p.yp, -1, 1) * clamp(p.ias / 45, 0, 1);
+    else pm = (p.aCmd - p.aoa) / 5 + p.gdotDeg / 5;
+    o.pitchMoment = clamp(pm, -1, 1);
+
+    // Yaw: rudder, left-turning tendency (P-factor + slipstream), adverse yaw (aileron drag + roll), weathercock.
+    var ym = (p.rud - pFactor - 0.35 * p.pN - 0.15 * p.yr) * spd;
+    if (tunnel) ym += 0.03 * p.beta * spd;
+    o.yawMoment = clamp(ym, -1, 1);
+
+    // Downwash behind the wing and the horizontal-tail force.
+    var eps = 5.2 * cl * (1 + 0.3 * fr);
+    o.downwashDeg = eps;
+    var aTail = (p.aoa - INCIDENCE) + TAIL_INC - eps;
+    var clT = clamp(0.06 * aTail + 0.03 * (p.elev - 0.4 * p.tab), -1.1, 1.1);
+    o.tailN = wind ? q * S_TAIL * clT : 0;
+
+    // Propeller slipstream (actuator disk): T = 2ρA·vi·(V + vi), the far wake is 2·vi faster.
+    var T = p.T;
+    if (T > 0) {
+      var vi = 0.5 * (-V + Math.sqrt(V * V + 2 * T / (RHO0 * p.sig * PROP_AREA)));
+      o.propWashMs = 2 * vi;
+    } else o.propWashMs = 0;
+    o.propSwirl = p.rpm > 100
+      ? clamp(0.12 * p.rpm / 2500 + 0.9 * Math.max(0, T) / 1900 * (1 - 0.45 * clamp(p.ias / 110, 0, 1)), 0, 1)
+      : 0;
+    o.groundEffect = tunnel ? 0 : clamp(1 - (Math.max(0, p.agl) * FT + WING_H) / SPAN, 0, 1);
+    return o;
+  }
+
+  /** Parameters for the tunnel / pure snapshot (no hysteresis, attitude held). */
+  function tunnelParams(ias, aoa, beta, flaps, alt) {
+    var p = AP;
+    p.mode = 'tunnel';
+    p.sig = sigmaAt(alt);
+    p.ias = Math.max(0, ias); p.tas = p.ias / Math.sqrt(p.sig);
+    p.aoa = aoa; p.beta = beta; p.flaps = clamp(flaps, 0, FLAP_MAX);
+    p.cl = clOf(aoa, p.flaps); p.cd = cdOf(p.cl, aoa, p.flaps); p.sep = sepOf(aoa, p.flaps);
+    p.pN = 0; p.gdotDeg = 0; p.slip = 0; p.agl = 1e4;
+    p.stalled = p.ias > 15 && aoa > alphaStall(p.flaps);
+    return p;
   }
 
   /* ------------------------------------------------------------ electrical */
@@ -764,6 +941,82 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     air.indicatedAlt = air.altitude + (num(s.altimeterSetting, 29.92) - 29.92) * 1000;
     air.oatC = 20 - 2 * Math.max(0, air.altitude) / 1000;
     if (!air.onGround) air.pitch = sim.gamma * RAD + sim.alpha - INCIDENCE;
+    if (s.tunnel && s.tunnel.on) {
+      // Held still in the wind: no motion over the ground; the wind is horizontal so pitch = aoa.
+      air.vs = 0; air.groundSpeed = 0; air.rollRate = 0; air.pitch = sim.alpha;
+    }
+  }
+
+  /* ---------------------------------------------------------- wind tunnel */
+
+  /** Tunnel mode: the airplane is held still, the wind comes from the tunnel inputs. */
+  function stepTunnel(s, sim, h) {
+    var t = s.tunnel, air = s.air;
+    var ias = clamp(num(t.ias, 0), 0, 200);
+    var aoa = clamp(num(t.aoa, 0), -20, 30);
+    var sig = sigmaAt(air.altitude);
+    sim.V = ias * KT / Math.sqrt(sig);
+    sim.gamma = 0; sim.p = 0; sim.thetaG = 0; sim.alpha = aoa;
+    var aS = alphaStall(s.flaps);
+    sim.stalled = ias > 15 && aoa > aS;
+    air.onGround = false;
+    air.bank = 0; air.turnRate = 0; air.gLoad = 1;
+    air.slip += (0 - air.slip) * Math.min(1, h / 0.3);
+    s.noseWheelAngle = 8.5 * clamp(num(s.rudder, 0), -1, 1);
+    writeAirOutputs(s, sim);
+    air.stallWarning = ias > 20 && aoa > aS - HORN_MARGIN;
+    air.stalled = sim.stalled;
+  }
+
+  /** state.aero from the current state (called at the end of every step and by applyPreset). */
+  function writeAero(s, sim, dt) {
+    var o = s.aero;
+    if (!o || typeof o !== 'object') o = s.aero = newAero();
+    var air = s.air, e = s.engine, sf = s.surfaces;
+    var thrEff = e.running ? clamp(num(s.throttle, 0), 0, 1) : 0;
+    var flaps = s.flaps, aS = alphaStall(flaps);
+    var p, blendTarget;
+    if (s.tunnel && s.tunnel.on) {
+      p = tunnelParams(air.ias, sim.alpha, clamp(num(s.tunnel.beta, 0), -30, 30), flaps, air.altitude);
+      blendTarget = p.ias > 15 ? stallBlendOf(sim.alpha, flaps) : 0;
+    } else {
+      p = AP;
+      p.sig = sigmaAt(air.altitude);
+      p.tas = sim.V / KT; p.ias = p.tas * Math.sqrt(p.sig);
+      p.aoa = sim.alpha; p.flaps = flaps;
+      var dCLf = FLAP_DCL * flaps / FLAP_MAX;
+      // Same CL / CD as stepFlight (stall hysteresis included).
+      p.cl = (!air.onGround && sim.stalled) ? STALL_LIFT * (CLA * aS + dCLf) : CLA * sim.alpha + dCLf;
+      p.cd = CD0 + FLAP_DCD * flaps / FLAP_MAX + K_IND * p.cl * p.cl + (!air.onGround && sim.stalled ? STALL_DRAG : 0);
+      p.sep = (!air.onGround && sim.stalled) ? 1 : 0;
+      p.stalled = !air.onGround && sim.stalled;
+      p.mode = air.onGround ? 'ground' : 'air';
+      p.beta = air.onGround ? 0 : 6 * air.slip;
+      p.slip = air.slip;
+      p.pN = air.onGround ? 0 : clamp(sim.p / (MAX_ROLL_RATE * Math.max(0.25, p.ias / 80)), -1.5, 1.5);
+      var Vs = Math.max(sim.V, 8);
+      var L = 0.5 * RHO0 * p.sig * sim.V * sim.V * S_WING * p.cl;
+      p.gdotDeg = air.onGround ? 0
+        : clamp((L * Math.cos(air.bank * DEG) - WEIGHT * Math.cos(sim.gamma)) / (MASS * Vs) * RAD, -30, 30);
+      p.agl = air.altitude - s.fieldElevation;
+      blendTarget = (air.onGround || p.ias < 15) ? 0 : (sim.stalled ? 1 : stallBlendOf(sim.alpha, flaps));
+    }
+    p.thrEff = thrEff;
+    p.rpm = e.rpm;
+    p.T = thrustN(sim.rpmS, p.tas, p.sig);
+    if (p.rpm < 1 && p.T > 0) p.T = 0;
+    p.Dwm = windmillDrag(0.5 * RHO0 * p.sig * Math.pow(p.tas * KT, 2), thrEff);
+    p.yr = s.controlLock ? 0 : clamp(num(s.yokeRoll, 0), -1, 1);
+    p.yp = s.controlLock ? 0 : clamp(num(s.yokePitch, 0), -1, 1);
+    p.rud = clamp(num(s.rudder, 0), -1, 1);
+    p.elev = sf.elevator; p.tab = sf.trimTab;
+    p.aCmd = alphaCommand(s, thrEff, flaps);
+    fillAero(o, p);
+    // Smooth the visual separation so the stall hysteresis never makes it jump.
+    if (dt > 0) sim.stallBlend += (blendTarget - sim.stallBlend) * Math.min(1, dt / 0.25);
+    else sim.stallBlend = blendTarget;
+    o.stallBlend = sim.stallBlend;
+    return o;
   }
 
   /* --------------------------------------------------------- warnings/outputs */
@@ -822,7 +1075,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     stepElectrical(s, sim, h);
     stepVacuum(s, sim, h);
     stepFlaps(s, sim, h);
-    stepFlight(s, sim, h);
+    if (s.tunnel && s.tunnel.on) stepTunnel(s, sim, h);
+    else stepFlight(s, sim, h);
     updateHeadingIndicator(s, sim, h);
     stepWarnings(s, sim, h);
     s.time += h;
@@ -848,6 +1102,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     var h = dt / n;
     for (var i = 0; i < n; i++) substep(s, sim, h);
     updateSurfaces(s);
+    writeAero(s, sim, dt);
   };
 
   /* --------------------------------------------------------------- actions */
@@ -906,6 +1161,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       hiDrift: 0, prevHiCorr: 0,
       cdStall: 0, cdStallRec: 0, cdHorn: 0, cdAir: 0, cdLock: 0, cdG: 0,
       vneOn: false, flapsOver: false, revOn: false,
+      stallBlend: 0,
       seed: 20260614
     };
   }
@@ -927,6 +1183,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     s.altimeterSetting = 29.92; s.hiCorrection = 0;
     s.doorLeftOpen = false; s.doorRightOpen = false; s.windowLeftOpen = false;
     s.carbIceEnabled = false;          // scenario switch: missions set it AFTER applyPreset
+    if (!s.tunnel || typeof s.tunnel !== 'object') s.tunnel = { on: false, ias: 80, aoa: 4, beta: 0 };
+    s.tunnel.on = false; s.tunnel.ias = 80; s.tunnel.aoa = 4; s.tunnel.beta = 0;
   }
 
   function resetOutputs(s) {
@@ -997,6 +1255,27 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     sim.rpmS = engineTargetRpm(s, iasKt, alt);
     s.air.onGround = false;
     s.air.vs = vsFpm;
+  }
+
+  /** Tunnel preset: throttle so that thrust ≈ drag and trim so that the hands-off pitch tendency is 0. */
+  function setupTunnel(s, ias, aoa) {
+    var sim = s._sim, alt = s.air.altitude;
+    var sig = sigmaAt(alt), tasKt = ias / Math.sqrt(sig), V = tasKt * KT;
+    var q = 0.5 * RHO0 * sig * V * V;
+    var cl = clOf(aoa, s.flaps);
+    var Daero = q * S_WING * cdOf(cl, aoa, s.flaps);
+    var rpmMin = Math.max(300, C_J * tasKt / 2 * 2550 + 1);
+    var thr = 0.5;
+    for (var it = 0; it < 8; it++) {
+      var Treq = Daero + windmillDrag(q, thr);
+      var rpm = thrustN(rpmMin, tasKt, sig) >= Treq ? rpmMin
+        : bisect(function (r) { return thrustN(r, tasKt, sig) - Treq; }, rpmMin, 3400, 50);
+      thr = throttleForRpm(s, rpm, ias, alt);
+    }
+    s.throttle = thr;
+    s.trim = bisect(function (t) { s.trim = t; return alphaCommand(s, thr, s.flaps) - aoa; }, -1, 1, 50);
+    sim.V = V; sim.gamma = 0; sim.alpha = aoa; sim.p = 0; sim.thetaG = 0;
+    sim.rpmS = engineTargetRpm(s, ias, alt);
   }
 
   /** IAS where the given RPM holds level flight (clean) at the current altitude. */
@@ -1086,6 +1365,15 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       s.flaps = 20; s.carbHeat = 1;
       s.lights.landing = true; s.lights.strobe = true; s.radio.xpdrMode = 'ALT';
       solveSteady(s, 65, -450);
+    } else if (name === 'tunnel') {
+      // Held still on the runway centreline facing the wind (sea-level air: IAS ≈ TAS).
+      placeAt(s, A.spots.runway);
+      engineRunningSetup(s, 170);
+      s.lights.strobe = true; s.radio.xpdrMode = 'SBY';
+      var tn = s.tunnel;
+      tn.on = true; tn.ias = 80; tn.aoa = 4; tn.beta = 0;
+      air.onGround = false; air.altitude = s.fieldElevation;
+      setupTunnel(s, tn.ias, tn.aoa);
     }
     if (air.onGround) { sim.alpha = INCIDENCE; air.altitude = s.fieldElevation; }
     sim.prevHiCorr = s.hiCorrection;
@@ -1094,10 +1382,12 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     if (!air.onGround) air.vs = sim.V * Math.sin(sim.gamma) * FPM;
     air.hiHeading = air.heading;
     updateSurfaces(s);
+    if (s.tunnel.on) { stepTunnel(s, sim, 0); updateSurfaces(s); }
+    writeAero(s, sim, 0);
     return s;
   };
 
-  /** New state object for a preset ('parked' | 'runup' | 'runway' | 'cruise' | 'approach'). */
+  /** New state object for a preset ('parked' | 'runup' | 'runway' | 'cruise' | 'approach' | 'tunnel'). */
   Sim.createState = function (preset) {
     var s = {
       variant: '150M',
@@ -1112,6 +1402,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       altimeterSetting: 29.92, hiCorrection: 0,
       doorLeftOpen: false, doorRightOpen: false, windowLeftOpen: false,
       paused: false, carbIceEnabled: false,
+      tunnel: { on: false, ias: 80, aoa: 4, beta: 0 },
       engine: { running: false, cranking: false, rpm: 0, oilTempF: 68, oilPressPsi: 0, primeCharges: 0,
                 flooded: false, carbIce: 0, startAttemptTime: 0, roughness: 0 },
       elec: { busVolts: 0, ammeterAmps: 0, batteryPct: 100, highVoltageLight: false },
@@ -1125,6 +1416,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       pos: { x: 0, z: 0 },
       surfaces: { aileronL: 0, aileronR: 0, elevator: 0, rudder: 0, trimTab: 0, flaps: 0 },
       propRpm: 0, noseWheelAngle: 0,
+      aero: newAero(),
       events: [],
       time: 0, fieldElevation: 100,
       _sim: null
@@ -1132,6 +1424,50 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     Sim.applyPreset(s, preset || 'parked');
     return s;
   };
+
+  /* ------------------------------------------------- pure aerodynamics API */
+
+  /**
+   * Aerodynamic snapshot for a hypothetical condition (same formulas as the tunnel / state.aero).
+   * input { ias kt, aoa deg, beta deg, flaps deg, rpm, yokeRoll, yokePitch, rudder, trim, altitude ft, throttle }
+   * (all optional). `out` (optional) is filled instead of allocating a new object.
+   */
+  Sim.aero = function (input, out) {
+    var i = input || {};
+    var flaps = clamp(num(i.flaps, 0), 0, FLAP_MAX);
+    var p = tunnelParams(clamp(num(i.ias, 0), 0, 250), clamp(num(i.aoa, 0), -30, 30),
+      clamp(num(i.beta, 0), -30, 30), flaps, num(i.altitude, 0));
+    var rpm = Math.max(0, num(i.rpm, 0));
+    p.rpm = rpm;
+    p.thrEff = clamp(num(i.throttle, rpm > 0 ? clamp((rpm - IDLE_RPM) / (STATIC_RPM - IDLE_RPM), 0, 1) : 0), 0, 1);
+    p.T = rpm > 0 ? thrustN(rpm, p.tas, p.sig) : 0;
+    p.Dwm = windmillDrag(0.5 * RHO0 * p.sig * Math.pow(p.tas * KT, 2), p.thrEff);
+    p.yr = clamp(num(i.yokeRoll, 0), -1, 1);
+    p.yp = clamp(num(i.yokePitch, 0), -1, 1);
+    p.rud = clamp(num(i.rudder, 0), -1, 1);
+    var trim = clamp(num(i.trim, 0), -1, 1);
+    p.elev = surfaceElevator(p.yp, '150M');
+    p.tab = surfaceTrimTab(trim);
+    var at = alphaTrim(trim);
+    p.aCmd = (p.yp >= 0 ? at + (ALPHA_FULL_AFT - at) * p.yp : at + ALPHA_PUSH * p.yp) +
+      ALPHA_POWER * (p.thrEff - 0.55) + BALLOON * flaps;
+    var o = fillAero(out && typeof out === 'object' ? out : newAero(), p);
+    o.stallBlend = p.ias > 15 ? stallBlendOf(p.aoa, flaps) : 0;
+    return o;
+  };
+
+  /** Wing lift curve for charts: [{aoa, cl}] from −8° to +22° every 0.5° (the post-stall part drops). */
+  Sim.clCurve = function (flaps) {
+    var f = clamp(num(flaps, 0), 0, FLAP_MAX), pts = [];
+    for (var k = 0; k <= 60; k++) {
+      var a = -8 + 0.5 * k;
+      pts.push({ aoa: a, cl: clOf(a, f) });
+    }
+    return pts;
+  };
+
+  /** Stall (critical) angle of attack in degrees for a flap setting. */
+  Sim.stallAoa = function (flaps) { return alphaStall(clamp(num(flaps, 0), 0, FLAP_MAX)); };
 
   // Internal helpers exposed for tests and tuning only (not part of the public contract).
   Sim._internal = {

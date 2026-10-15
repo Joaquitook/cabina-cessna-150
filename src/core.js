@@ -25,6 +25,11 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
  *   *C150.Core.configureRenderer(renderer, level) · *C150.Core.createEnvironment(renderer, {cabin, studio, size}) → env
  *     (env.texture = PMREM texture for scene.environment; env.update(sunLocal, upLocal); env.dispose())
  *   *tick(dt) — run one frame by hand (tests, or hosts whose requestAnimationFrame is paused)
+ *   Air lab (contract v2 §3): *airflow (C150.Airflow on the exterior, created after it when airflow.js is loaded; null
+ *     otherwise) · *setAirflow(opts) → settings|null (flow.set: enabled, streamlines, propwash, vortices, pressure,
+ *     forces, moments, trails, density, slowmo) · *getAirflow() · *setBackdrop('estudio'|'cielo'|'tunel') → bool ·
+ *     *getBackdrop() · *setExteriorView(name | airflow region | {pos, target}) → bool. The flow is updated every frame
+ *     while the exterior is on screen (main view, or the inset at density 'baja'), capped by the render quality.
  *   *cockpit, *world, *exterior, *renderer, *camera, *controls (read-only references, for the UI and debugging)
  *
  * Decisions where the contract leaves room (other agents: please read):
@@ -252,6 +257,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   var container = null, canvas = null, renderer = null, ro = null, toneMode = 'none';
   var state = null;
   var scene = null, camera = null, controls = null, world = null, cockpit = null, ext = null, extControls = null;
+  var flow = null;   // C150.Airflow on the exterior (airflow.js, optional)
   var hemi = null, sun = null, bounce = null;
   var shadowSun = null, shadowMotion = -1;
   var envCabin = null, envOutdoor = null, envAge = 1e9, envSun = null, envUp = null, envUpNow = null;
@@ -1575,6 +1581,10 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       var playing = ext.playing || null;
       if (prevPlaying && !playing) emit('animend', prevPlaying);
       prevPlaying = playing;
+      // the air around the airplane: only while the exterior is on screen (main view or inset; the inset is 'baja')
+      if (flow && (mainView === 'exterior' || insetRect)) {
+        try { flow.update(state, dt, { inset: mainView !== 'exterior', quality: quality }); } catch (e) { reportOnce('airflow.update', e); }
+      }
     }
     updateLights(dt);
     updateCameras(dt);
@@ -1695,6 +1705,13 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       console.error('[C150.Core] Exterior module unavailable, continuing without the exterior view:', e);
       ext = null;
     }
+    flow = null;
+    if (ext && C150.Airflow && C150.Airflow.create) {
+      try { flow = C150.Airflow.create(T, ext, {}); } catch (e) {
+        console.error('[C150.Core] Airflow module unavailable, continuing without the air visualisation:', e);
+        flow = null;
+      }
+    }
     // quality (pixel ratio, shadows, environment maps, module detail) — see RENDERING NOTES
     quality = qualitySetting === 'auto' ? pickAutoQuality() : (QUALITY[qualitySetting] ? qualitySetting : 'alta');
 
@@ -1767,6 +1784,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     domHandlers = [];
     if (controls) controls.dispose();
     if (extControls) extControls.dispose();
+    if (flow) { try { flow.dispose(); } catch (e) { /* ignore */ } }
+    flow = null;
     if (envCabin) envCabin.dispose();
     if (envOutdoor) envOutdoor.dispose();
     envCabin = envOutdoor = null;
@@ -1779,7 +1798,30 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     selected = null; hovered = { id: null, sub: null }; targets = {}; pickFn = null; fly = null; ptr = null;
     pointersDown = {}; pointerCount = 0; mainView = 'cockpit'; enlargeRestore = null; insetRect = null;
     cancelMomentary(); keys = {};
-    Core.cockpit = Core.world = Core.exterior = Core.renderer = Core.camera = Core.controls = null;
+    Core.cockpit = Core.world = Core.exterior = Core.renderer = Core.camera = Core.controls = Core.airflow = null;
+  }
+
+  /* ------------------------------------------------------------------ air lab hooks (airflow.js, exterior backdrops) */
+  /** flow.set(opts) on the exterior airflow → its settings, or null without the module. */
+  function setAirflow(o) {
+    if (!flow) return null;
+    try { return flow.set(o || {}); } catch (e) { reportOnce('airflow.set', e); return null; }
+  }
+  /** 'estudio' | 'cielo' | 'tunel' → true if applied. */
+  function setBackdrop(name) {
+    if (!ext || !ext.setBackdrop) return false;
+    try { return ext.setBackdrop(name) !== false; } catch (e) { reportOnce('exterior.setBackdrop', e); return false; }
+  }
+  /**
+   * Exterior camera view: an exterior view name ('lado', 'frente', 'arriba', 'tres-cuartos', 'persecucion', 'rear34'…),
+   * an airflow focus region ('flaps', 'ailerons', 'elevator', 'rudder', 'prop', 'wingtips', 'stall', 'tail', 'wing')
+   * or {pos, target}. Eases there (instant with prefers-reduced-motion); the orbit pivot follows when it ends.
+   */
+  function setExteriorView(name) {
+    if (!ext || !ext.setView) return false;
+    var v = name;
+    if (typeof name === 'string' && flow && flow.views && flow.views[name] && (!ext.VIEWS || ext.VIEWS.indexOf(name) < 0)) v = flow.views[name];
+    try { return ext.setView(v) !== false; } catch (e) { reportOnce('exterior.setView', e); return false; }
   }
 
   /* ------------------------------------------------------------------ public object */
@@ -1788,8 +1830,14 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       var ok = init(opts);
       Core.cockpit = cockpit; Core.world = world; Core.exterior = ext;
       Core.renderer = renderer; Core.camera = camera; Core.controls = controls;
+      Core.airflow = flow;
       return ok;
     },
+    setAirflow: setAirflow,
+    getAirflow: function () { return flow ? flow.get() : null; },
+    setBackdrop: setBackdrop,
+    getBackdrop: function () { return ext ? (ext.backdrop || 'estudio') : null; },
+    setExteriorView: setExteriorView,
     on: on,
     off: off,
     select: select,
@@ -1822,7 +1870,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     tick: function (dt) { tick(num(dt, 1 / 60)); },
     dispose: dispose,
     state: null,
-    cockpit: null, world: null, exterior: null, renderer: null, camera: null, controls: null
+    cockpit: null, world: null, exterior: null, renderer: null, camera: null, controls: null, airflow: null
   };
 
   C150.Core = Core;

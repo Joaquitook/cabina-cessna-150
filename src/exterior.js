@@ -34,6 +34,19 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
  *    Floor: light concrete slabs fading into the backdrop gradient (seamless cyclorama) + painted ambient-contact
  *    blobs under the tyres/fuselage; with shadow maps off ('baja') a painted planform shadow is pushed along the sun.
  *    The lights demo (dusk) dims lights, backdrop, floor, shadows and the environment reflections (setEnvDim).
+ *  - Backdrops (contract v2 §3): ext.setBackdrop('estudio' (default, the configurator) | 'cielo' (open sky: deep blue,
+ *    hazy horizon, ground below it, cloud puffs streaming past in flight) | 'tunel' (dark blue wind-tunnel stage:
+ *    ring-grid platform with an orange inlet mark, light pool and soft shadow, sting mount, test-section hoops, light
+ *    shafts, faint wind reference lines whose dashes move downstream at ext.visWindSpeed(ias) and a "Viento relativo
+ *    N kt" label)). Every value (sky, light levels, rim colour, environment reflections) blends in ≈ 0.4 s; ext.backdrop.
+ *  - Wind tunnel (sim state.tunnel.on): the airplane is drawn pitched by the AoA (state.aero.aoa, else tunnel.aoa) in a
+ *    horizontal wind, yawed by the sideslip, wings level, no ground stance.
+ *  - Air-lab views: 'lado', 'frente', 'arriba', 'tres-cuartos', 'persecucion' (chase: behind and above, the horizon
+ *    stays level because the heading is fixed here). setView() also takes a custom {pos, target, up?} (airflow focus).
+ *  - Hooks for airflow.js: ext.body (attitude group = body frame, CG at the origin), ext.model, ext.surfaces (hinge
+ *    groups), ext.disp (displayed surfaces/attitude), ext.geom (wing/tail/fin/prop geometry in the body frame),
+ *    ext.makeLabel(text, style, k, dotColour) / ext.setLabelText (clamped/de-overlapped labels), ext.glowTexture,
+ *    ext.visWindSpeed(kt), ext.flowTimeScale (slow motion also slows the wind lines/clouds), ext.showInputArrows.
  *  - Labels: rounded pills (dark with an accent dot / accent / light), white text with a dark halo. Every frame
  *    (Scene.onBeforeRender, per viewport) they are clamped inside the view, de-overlapped and kept clear of
  *    ext.setOccluder(rect) (core: the cockpit inset over the exterior main view); small viewports show only the
@@ -64,9 +77,15 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     aoa: { pos: [-11.0, 0.75, -0.3], target: [-5.0, 0.55, -0.15] },
     front34: { pos: [-5.2, 1.7, -7.6], target: [0, 0.1, -0.6] },
     rearHigh: { pos: [0, 5.2, 11.0], target: [0, 0.2, -1.2] },
-    forces: { pos: [-12.8, 1.3, 0.3], target: [0, 0.2, 0.2] }
+    forces: { pos: [-12.8, 1.3, 0.3], target: [0, 0.2, 0.2] },
+    // views of the air lab (airflow.js): framed wide enough for the flow ahead of and behind the airplane
+    lado: { pos: [-14.2, 0.9, 1.2], target: [0, 0.05, 1.2] },
+    frente: { pos: [2.4, 1.7, -13.6], target: [0, 0.15, 0.4] },
+    arriba: { pos: [0, 17.5, 1.6], target: [0, 0, 1.6], up: [0, 0, -1] },
+    'tres-cuartos': { pos: [-9.4, 4.6, -7.9], target: [0, 0.05, 0.9] },
+    persecucion: { pos: [0, 2.7, 14.8], target: [0, 0.45, -0.6] }
   };
-  var PUBLIC_VIEWS = ['rear34', 'side', 'top', 'front', 'rear', 'pitot'];
+  var PUBLIC_VIEWS = ['rear34', 'side', 'top', 'front', 'rear', 'pitot', 'lado', 'frente', 'arriba', 'tres-cuartos', 'persecucion'];
   var ANIM_NAMES = ['axes-roll', 'axes-pitch', 'axes-yaw', 'four-forces', 'aoa-stall', 'flaps-extend', 'trim-tab',
     'adverse-yaw', 'left-turning', 'coordinated-turn', 'ground-steering', 'propeller-throttle', 'lights-demo',
     'controls-check', 'carb-ice', 'pitot-static'];
@@ -219,8 +238,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       rim.position.set(-_camDir.x * 10 + _camDir.z * 3, 7, -_camDir.z * 10 - _camDir.x * 3);
       var sh = Math.hypot(sunScene.x, sunScene.z) || 1;
       var front = Math.max(0, (sunScene.x * _camDir.x + sunScene.z * _camDir.z) / sh);
-      fill.intensity = (1 - 0.55 * dusk) * LIGHTS.fill * (1 - 0.6 * front);
-      rim.intensity = (1 - 0.7 * dusk) * LIGHTS.rim * (1 + 0.5 * front);
+      fill.intensity = (1 - 0.55 * dusk) * LIGHTS.fill * (1 - 0.6 * front) * bd.k.fill;
+      rim.intensity = (1 - 0.7 * dusk) * LIGHTS.rim * (1 + 0.5 * front) * bd.k.rim;
     }
 
     /* ----------------------------------------------------------- sky dome */
@@ -387,6 +406,223 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     })();
     horizonRing.visible = false;
     scene.add(horizonRing);
+
+    /* --------------------------------------------------- backdrops: 'estudio' | 'cielo' | 'tunel' */
+    // 'estudio' = the configurator above. 'cielo' = open sky (deep blue, hazy horizon, ground below it) with cloud
+    // puffs streaming past in flight. 'tunel' = a dark blue wind-tunnel stage: ring-grid platform, light pool, sting
+    // mount, faint wind reference lines with dashes moving downstream, test-section hoops and soft light shafts, where
+    // the glowing airflow (airflow.js) reads best. Every value blends smoothly (≈ 0.4 s) when the backdrop changes.
+    var STAGE_Y = -2.35;
+    var BACKDROPS = {
+      estudio: { sky: [0x7eaedb, 0xdde7ee, 0xd0d4d1], rimCol: 0xeef3ff,
+        k: { hemi: 1, key: 1, fill: 1, rim: 1, env: 1, glow: 1, stage: 0, ground: 1, clouds: 0, horizon: 1 } },
+      cielo: { sky: [0x2a66b8, 0xcfe1f0, 0x6e7d63], rimCol: 0xeef3ff,
+        k: { hemi: 1.1, key: 1, fill: 1, rim: 1, env: 1, glow: 1.3, stage: 0, ground: 1, clouds: 1, horizon: 0 } },
+      tunel: { sky: [0x07142a, 0x14305a, 0x050b16], rimCol: 0x8ec9ff,
+        k: { hemi: 0.55, key: 0.85, fill: 0.9, rim: 2.3, env: 0.5, glow: 0, stage: 1, ground: 0, clouds: 0, horizon: 0 } }
+    };
+    var bd = { name: 'estudio', k: {}, sky: [new THREE.Color(), new THREE.Color(), new THREE.Color()], rimCol: new THREE.Color(0xeef3ff),
+      tSky: [new THREE.Color(), new THREE.Color(), new THREE.Color()], tRim: new THREE.Color(), windT: 0, init: false };
+    (function () { var b = BACKDROPS.estudio; for (var key in b.k) bd.k[key] = b.k[key]; b.sky.forEach(function (h, i) { bd.sky[i].setHex(h); }); })();
+    /** Visual speed (m/s in the scene) of air moving at iasKt: the flow is slowed down so the eye can follow it. */
+    function visWindSpeed(iasKt) { return iasKt > 0.5 ? (1.6 + 0.032 * Math.min(iasKt, 160)) * clamp(iasKt / 6, 0, 1) : 0; }
+
+    var stage = new THREE.Group();
+    stage.name = 'tunnelStage';
+    stage.visible = false;
+    scene.add(stage);
+    var stageMats = [];
+    function stageMat(m, op) { m.userData.baseOpacity = op; m.opacity = 0; m.transparent = true; m.depthWrite = false; stageMats.push(m); return m; }
+    (function buildStage() {
+      var R = 10;
+      // ring-grid platform: concentric rings every 0.5 m (brighter every 2 m), radial spokes every 15°, outer ticks
+      var size = 1024, c = makeCanvas(size, size), g = c.getContext('2d'), cx = size / 2, S = size / 2 / R;
+      var gr = g.createRadialGradient(cx, cx, 0, cx, cx, cx);
+      gr.addColorStop(0, 'rgba(34,70,118,0.95)'); gr.addColorStop(0.35, 'rgba(18,40,74,0.92)');
+      gr.addColorStop(0.8, 'rgba(10,22,42,0.55)'); gr.addColorStop(1, 'rgba(10,22,42,0)');
+      g.fillStyle = gr; g.fillRect(0, 0, size, size);
+      var r, a;
+      for (r = 0.5; r <= 9.51; r += 0.5) {
+        var major = Math.abs(r / 2 - Math.round(r / 2)) < 1e-6;
+        g.strokeStyle = major ? 'rgba(130,205,255,0.50)' : 'rgba(110,180,240,0.17)';
+        g.lineWidth = major ? 2.4 : 1.2;
+        g.beginPath(); g.arc(cx, cx, r * S, 0, Math.PI * 2); g.stroke();
+      }
+      g.strokeStyle = 'rgba(110,185,245,0.16)'; g.lineWidth = 1.2;
+      for (a = 0; a < 24; a++) {
+        var an = a / 24 * Math.PI * 2;
+        g.beginPath(); g.moveTo(cx + Math.cos(an) * 1.0 * S, cx + Math.sin(an) * 1.0 * S);
+        g.lineTo(cx + Math.cos(an) * 9.5 * S, cx + Math.sin(an) * 9.5 * S); g.stroke();
+      }
+      g.strokeStyle = 'rgba(150,215,255,0.45)'; g.lineWidth = 2;
+      for (a = 0; a < 144; a++) {
+        var at = a / 144 * Math.PI * 2, l = a % 6 === 0 ? 0.42 : 0.18;
+        g.beginPath(); g.moveTo(cx + Math.cos(at) * 9.5 * S, cx + Math.sin(at) * 9.5 * S);
+        g.lineTo(cx + Math.cos(at) * (9.5 - l) * S, cx + Math.sin(at) * (9.5 - l) * S); g.stroke();
+      }
+      // the wind axis drawn on the floor (nose → tail), with the 1970s orange accent at the inlet side
+      g.strokeStyle = 'rgba(130,205,255,0.35)'; g.lineWidth = 2; g.setLineDash([18, 14]);
+      g.beginPath(); g.moveTo(cx, cx - 9.5 * S); g.lineTo(cx, cx + 9.5 * S); g.stroke();
+      g.setLineDash([]);
+      g.strokeStyle = 'rgba(240,138,60,0.85)'; g.lineWidth = 5;
+      g.beginPath(); g.arc(cx, cx, 9.5 * S, -Math.PI / 2 - 0.22, -Math.PI / 2 + 0.22); g.stroke();
+      var platform = new THREE.Mesh(new THREE.CircleGeometry(R, 96), stageMat(new THREE.MeshBasicMaterial({ map: ctex(c) }), 1));
+      platform.material.map.anisotropy = 8;
+      platform.rotation.x = -Math.PI / 2;
+      platform.position.y = STAGE_Y;
+      platform.renderOrder = -5;
+      stage.add(platform);
+      // light pool under the airplane + soft shadow of the airplane on the platform
+      var pc = makeCanvas(256, 256), pg = pc.getContext('2d');
+      var pgr = pg.createRadialGradient(128, 128, 0, 128, 128, 128);
+      pgr.addColorStop(0, 'rgba(150,210,255,0.55)'); pgr.addColorStop(0.4, 'rgba(90,160,235,0.22)'); pgr.addColorStop(1, 'rgba(60,120,200,0)');
+      pg.fillStyle = pgr; pg.fillRect(0, 0, 256, 256);
+      var pool = new THREE.Mesh(new THREE.PlaneGeometry(13, 13), stageMat(new THREE.MeshBasicMaterial({ map: ctex(pc), blending: THREE.AdditiveBlending }), 0.8));
+      pool.rotation.x = -Math.PI / 2; pool.position.y = STAGE_Y + 0.004; pool.renderOrder = -4;
+      stage.add(pool);
+      var shade = new THREE.Mesh(new THREE.PlaneGeometry(12, 12), stageMat(new THREE.MeshBasicMaterial({ map: ctex(planCanvas), color: 0x02060c }), 0.85));
+      shade.rotation.x = -Math.PI / 2; shade.position.set(0, STAGE_Y + 0.008, 0); shade.renderOrder = -3;
+      stage.add(shade);
+      // glowing rings: the platform edge and a small ring around the sting base
+      [[9.55, 9.66, 0.65], [0.55, 0.6, 0.8], [3.0, 3.03, 0.35]].forEach(function (d) {
+        var ring = new THREE.Mesh(new THREE.RingGeometry(d[0], d[1], 128),
+          stageMat(new THREE.MeshBasicMaterial({ color: 0x6fd0ff, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }), d[2]));
+        ring.rotation.x = -Math.PI / 2; ring.position.y = STAGE_Y + 0.01; ring.renderOrder = -2;
+        stage.add(ring);
+      });
+      // sting mount (a slim faired post from the floor into the belly at the centre of gravity)
+      var stingMat = new THREE.MeshStandardMaterial({ color: 0x2a3644, roughness: 0.35, metalness: 0.8 });
+      var stingH = -0.42 - STAGE_Y;
+      var sting = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.07, stingH, 20), stingMat);
+      sting.position.y = STAGE_Y + stingH / 2;
+      stage.add(sting);
+      var base = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.5, 0.08, 40), stingMat);
+      base.position.y = STAGE_Y + 0.04;
+      stage.add(base);
+      // test-section hoops across the wind (faint) and two soft light shafts from above
+      [-10.5, 12.5].forEach(function (z) {
+        var hoop = new THREE.Mesh(new THREE.TorusGeometry(9.2, 0.025, 6, 120, Math.PI),
+          stageMat(new THREE.MeshBasicMaterial({ color: 0x5fb4f0, blending: THREE.AdditiveBlending }), 0.35));
+        hoop.position.set(0, STAGE_Y, z);
+        stage.add(hoop);
+      });
+      [-3.6, 3.6].forEach(function (x) {
+        var cone = new THREE.Mesh(new THREE.ConeGeometry(3.2, 11, 32, 1, true),
+          stageMat(new THREE.MeshBasicMaterial({ color: 0x9fd2ff, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }), 0.028));
+        cone.position.set(x, STAGE_Y + 5.5, 0.6);
+        cone.renderOrder = -1;
+        stage.add(cone);
+      });
+    })();
+    // wind reference lines: long faint lines along the wind with dashes moving downstream (+Z) at the wind speed
+    var windLineMat = new THREE.ShaderMaterial({
+      uniforms: { uT: { value: 0 }, uOp: { value: 0 }, uCol: { value: new THREE.Color(0x8fd3ff) } },
+      vertexShader: 'attribute float zc; varying float vZ; void main(){ vZ = zc; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: [
+        'uniform float uT; uniform float uOp; uniform vec3 uCol; varying float vZ;',
+        'void main(){ float d = fract((vZ - uT) / 2.4); float dash = smoothstep(0.0, 0.08, d) * (1.0 - smoothstep(0.35, 0.5, d));',
+        '  float fade = 1.0 - smoothstep(9.0, 17.0, abs(vZ - 1.0));',
+        '  gl_FragColor = vec4(uCol, uOp * fade * (0.22 + 0.78 * dash));',
+        '  #include <encodings_fragment>',
+        '}'
+      ].join('\n'),
+      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending
+    });
+    (function buildWindLines() {
+      var pos = [], zc = [];
+      var spots = [[-9.2, -1.4], [-7.0, 0.3], [-9.4, 2.4], [-6.8, 4.0], [9.2, -1.4], [7.0, 0.3], [9.4, 2.4], [6.8, 4.0],
+        [-3.0, 5.2], [3.0, 5.2], [0, 6.0], [-4.5, -2.0], [4.5, -2.0], [0, -1.95]];
+      spots.forEach(function (p) {
+        for (var i = 0; i < 24; i++) {
+          var z0 = -16 + i * 34 / 24, z1 = -16 + (i + 1) * 34 / 24;
+          pos.push(p[0], p[1], z0, p[0], p[1], z1); zc.push(z0, z1);
+        }
+      });
+      var g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      g.setAttribute('zc', new THREE.Float32BufferAttribute(zc, 1));
+      var lines = new THREE.LineSegments(g, windLineMat);
+      lines.renderOrder = -1;
+      lines.frustumCulled = false;
+      stage.add(lines);
+    })();
+    var windLabel = null;   // built after the label helpers exist (see LABELS)
+
+    // clouds streaming past in flight ('cielo')
+    var cloudGroup = new THREE.Group();
+    cloudGroup.visible = false;
+    scene.add(cloudGroup);
+    var clouds = [];
+    (function buildClouds() {
+      var c = makeCanvas(256, 128), g = c.getContext('2d');
+      var seed = 11;
+      function rnd() { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }
+      for (var i = 0; i < 26; i++) {
+        var x = 40 + rnd() * 176, y = 58 + (rnd() - 0.5) * 34 - Math.sin((x - 40) / 176 * Math.PI) * 18, r = 16 + rnd() * 26;
+        var gr = g.createRadialGradient(x, y, 0, x, y, r);
+        gr.addColorStop(0, 'rgba(255,255,255,0.55)'); gr.addColorStop(0.6, 'rgba(250,252,255,0.25)'); gr.addColorStop(1, 'rgba(240,246,255,0)');
+        g.fillStyle = gr; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
+      }
+      var tex = ctex(c);
+      for (var k2 = 0; k2 < 16; k2++) {
+        var m = new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0, depthWrite: false, fog: false });
+        var sp = new THREE.Sprite(m);
+        var side = k2 % 2 ? 1 : -1;
+        sp.position.set(side * (11 + rnd() * 30), -9 + rnd() * 26, -90 + rnd() * 130);
+        var sc = 9 + rnd() * 14;
+        sp.scale.set(sc * 2, sc, 1);
+        sp.renderOrder = -6;
+        sp.userData.base = 0.55 + rnd() * 0.35;
+        cloudGroup.add(sp);
+        clouds.push(sp);
+      }
+    })();
+
+    function setBackdrop(name) {
+      if (!BACKDROPS[name]) return false;
+      bd.name = name;
+      ext.backdrop = name;
+      return true;
+    }
+    function updateBackdrop(state, dt, airborneVis) {
+      var b = BACKDROPS[bd.name], kk = dt > 0 ? 1 - Math.exp(-dt / 0.35) : 1;
+      if (!bd.init) { kk = 1; bd.init = true; }
+      for (var key in b.k) bd.k[key] += (b.k[key] - bd.k[key]) * kk;
+      for (var i = 0; i < 3; i++) { bd.tSky[i].setHex(b.sky[i]); bd.sky[i].lerp(bd.tSky[i], kk); }
+      bd.tRim.setHex(b.rimCol); bd.rimCol.lerp(bd.tRim, kk);
+      rim.color.copy(bd.rimCol);
+      var tun = state && state.tunnel && state.tunnel.on;
+      var ias = tun ? num(state.tunnel.ias, 0) : num(state.air && state.air.ias, 0);
+      var ts = clamp(num(ext.flowTimeScale, 1), 0, 1);
+      // stage
+      var ks = bd.k.stage;
+      stage.visible = ks > 0.01;
+      if (stage.visible) {
+        for (var m = 0; m < stageMats.length; m++) stageMats[m].opacity = stageMats[m].userData.baseOpacity * ks;
+        bd.windT += visWindSpeed(ias) * dt * ts;
+        if (bd.windT > 2400) bd.windT -= 2400;
+        windLineMat.uniforms.uT.value = bd.windT;
+        windLineMat.uniforms.uOp.value = 0.55 * ks * (ias > 1 ? 1 : 0.45);
+        if (windLabel) {
+          windLabel.visible = ks > 0.5 && !ext.playing;
+          setLabelText(windLabel, ias > 1 ? 'Viento relativo ' + Math.round(ias) + ' kt' : 'Sin viento');
+        }
+      } else if (windLabel) windLabel.visible = false;
+      // clouds (flight)
+      var kc = bd.k.clouds * airborneVis;
+      cloudGroup.visible = kc > 0.01;
+      if (cloudGroup.visible) {
+        var v = visWindSpeed(ias) * 3.2 * ts, climb = num(state && state.air && state.air.vs, 0) / 196.85 * 0.15 * ts;
+        for (var c2 = 0; c2 < clouds.length; c2++) {
+          var cl = clouds[c2];
+          cl.position.z += v * dt;
+          cl.position.y -= climb * dt;
+          if (cl.position.z > 45) { cl.position.z -= 135; cl.position.y = -9 + ((c2 * 7.31) % 26); }
+          if (cl.position.y < -16) cl.position.y += 30; else if (cl.position.y > 22) cl.position.y -= 30;
+          cl.material.opacity = cl.userData.base * kc * clamp((45 - cl.position.z) / 12, 0, 1) * clamp((cl.position.z + 90) / 15, 0, 1);
+        }
+      }
+    }
 
     /* ------------------------------------------------------- airplane groups */
     var rootGroup = new THREE.Group();     // ext.root
@@ -1466,13 +1702,16 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       g.lineTo(x + w, y + h - r); g.quadraticCurveTo(x + w, y + h, x + w - r, y + h); g.lineTo(x + r, y + h);
       g.quadraticCurveTo(x, y + h, x, y + h - r); g.lineTo(x, y + r); g.quadraticCurveTo(x, y, x + r, y); g.closePath();
     }
-    /** Screen-sized text label (sprite). style: 'dark' (default), 'accent', 'light'. scaleK multiplies size. */
-    function makeLabel(text, style, scaleK) {
+    /**
+     * Screen-sized text label (sprite). style: 'dark' (default), 'accent', 'light'. scaleK multiplies size.
+     * dot: CSS colour of the small dot of a 'dark' or 'light' label (default accent orange on 'dark', none on 'light').
+     */
+    function makeLabel(text, style, scaleK, dot) {
       var c = makeCanvas(16, 16);
       var mat = new THREE.SpriteMaterial({ map: ctex(c), transparent: true, depthTest: false, depthWrite: false, sizeAttenuation: false });
       var sp = new THREE.Sprite(mat);
       sp.renderOrder = 30;
-      sp.userData = { text: null, style: style || 'dark', k: scaleK || 1, canvas: c, aspect: 1 };
+      sp.userData = { text: null, style: style || 'dark', k: scaleK || 1, canvas: c, aspect: 1, dot: dot || null };
       setLabelText(sp, text);
       allLabels.push(sp);
       return sp;
@@ -1486,7 +1725,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       lines.forEach(function (l) { w = Math.max(w, g.measureText(l).width); });
       // modern pill: rounded, translucent dark (or accent / light), hairline border, soft drop shadow, white text
       // with a dark halo; 'dark' labels carry a small accent dot. M = transparent margin for the drop shadow.
-      var st = sp.userData.style, pad = 16, lh = fs * 1.12, M = 10, dot = st === 'dark' ? 24 : 0;
+      var st = sp.userData.style, pad = 16, lh = fs * 1.12, M = 10, dot = (st === 'dark' || sp.userData.dot) && st !== 'accent' ? 24 : 0;
       var ph = Math.ceil(lh * lines.length + pad * 1.2);
       c.width = Math.ceil(w + pad * 2 + 8 + dot + 2 * M); c.height = ph + 2 * M;
       g = c.getContext('2d');
@@ -1499,8 +1738,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       g.strokeStyle = st === 'light' ? 'rgba(19,32,43,0.14)' : 'rgba(255,255,255,0.24)'; g.lineWidth = 2;
       roundRect(g, M + 1, M + 1, pw - 2, ph - 2, rr - 1); g.stroke();
       if (dot) {
-        g.fillStyle = '#F08A3C';
-        g.beginPath(); g.arc(M + pad + 8, M + pad * 0.6 + lh * 0.5, 7, 0, Math.PI * 2); g.fill();
+        g.fillStyle = sp.userData.dot || '#F08A3C';
+        g.beginPath(); g.arc(M + pad + 8, M + pad * 0.6 + lh * 0.5, 9, 0, Math.PI * 2); g.fill();
       }
       g.font = '600 ' + fs + 'px ' + FONT_DISPLAY;
       g.textBaseline = 'middle';
@@ -1928,13 +2167,14 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
 
     /* =========================================================== CAMERA */
     var cam = { from: { pos: new V3(), target: new V3(), up: new V3(0, 1, 0) }, to: { pos: new V3(), target: new V3(), up: new V3(0, 1, 0) }, t: 1, dur: 0.9, view: 'rear34' };
+    /** name = a VIEWS key, or a custom {pos:[x,y,z], target:[x,y,z], up?} in scene coordinates (airflow focus views). */
     function setView(name, instant) {
-      var v = VIEWS[name];
-      if (!v) return false;
+      var v = (name && typeof name === 'object') ? name : VIEWS[name];
+      if (!v || !v.pos || !v.target) return false;
       cam.from.pos.copy(camera.position); cam.from.target.copy(target); cam.from.up.copy(camera.up);
       cam.to.pos.fromArray(v.pos); cam.to.target.fromArray(v.target); cam.to.up.fromArray(v.up || [0, 1, 0]);
       cam.view = name;
-      ext.view = name;
+      ext.view = typeof name === 'string' ? name : (v.name || 'custom');
       cam.t = (instant || reducedMotion()) ? 1 : 0;
       if (cam.t >= 1) applyCam(1);
       ext.cameraBusy = cam.t < 1;
@@ -2498,6 +2738,15 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         target.trimTab = num(sf.trimTab, 0); target.flaps = num(sf.flaps, num(state.flaps, 0));
         ground = air.onGround !== false;
         if (ext.followAttitude && !ground) { target.pitch = num(air.pitch, 0); target.bank = num(air.bank, 0); }
+        // wind tunnel (sim state.tunnel): the airplane is held still, pitched to the angle of attack relative to the
+        // horizontal wind (and yawed by the sideslip, wind from the right = nose right of the wind)
+        if (state.tunnel && state.tunnel.on) {
+          var ae = state.aero || {};
+          ground = false;
+          target.pitch = num(ae.aoa, num(state.tunnel.aoa, 0));
+          target.bank = 0;
+          target.yaw = num(ae.beta, num(state.tunnel.beta, 0));
+        }
         target.nose = num(state.noseWheelAngle, 0);
         target.rpm = num(state.propRpm, 0);
         var powered = !state.elec || num(state.elec.busVolts, 12) > 8;
@@ -2587,7 +2836,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       tmpE.set((disp.pitch + disp.stance) * DEG, -disp.yaw * DEG, -disp.bank * DEG, 'YXZ');
       attitude.quaternion.setFromEuler(tmpE);
       var airborneVis = 1 - clamp(disp.stance / STANCE, 0, 1);
-      var groundVis = 1 - airborneVis;
+      updateBackdrop(state, dt, airborneVis);
+      var groundVis = (1 - airborneVis) * bd.k.ground;
       disk.material.opacity = groundVis;
       shadow.material.opacity = groundVis * (1 - 0.5 * disp.dusk);
       catcher.visible = shadowsOn;
@@ -2596,9 +2846,10 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       planShadow.material.opacity = groundVis * (1 - 0.8 * disp.dusk);
       planShadow.position.x = -sunScene.x / sunScene.y * 1.3;
       planShadow.position.z = -sunScene.z / sunScene.y * 1.3;
-      groundGroup.visible = airborneVis < 0.99;
-      horizonRing.visible = airborneVis > 0.02;
-      horizonRing.children.forEach(function (c) { c.material.opacity = (c.isLine ? 0.55 : 0.12) * airborneVis; });
+      groundGroup.visible = groundVis > 0.01;
+      var horizonVis = airborneVis * bd.k.horizon;
+      horizonRing.visible = horizonVis > 0.02;
+      horizonRing.children.forEach(function (c) { c.material.opacity = (c.isLine ? 0.55 : 0.12) * horizonVis; });
 
       // ----- lights
       var blink = clock % 1.0;
@@ -2618,11 +2869,11 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
 
       // ----- dusk (lights demo)
       var dk = disp.dusk;
-      ['uTop', 'uMid', 'uBottom'].forEach(function (u, i) { skyMat.uniforms[u].value.copy(SKY_DAY[i]).lerp(SKY_DUSK[i], dk); });
-      hemi.intensity = (1 - 0.6 * dk) * LIGHTS.hemi; sun.intensity = (1 - 0.85 * dk) * LIGHTS.key;
-      skyMat.uniforms.uGlowAmt.value = 1 - dk;
+      ['uTop', 'uMid', 'uBottom'].forEach(function (u, i) { skyMat.uniforms[u].value.copy(bd.sky[i]).lerp(SKY_DUSK[i], dk); });
+      hemi.intensity = (1 - 0.6 * dk) * LIGHTS.hemi * bd.k.hemi; sun.intensity = (1 - 0.85 * dk) * LIGHTS.key * bd.k.key;
+      skyMat.uniforms.uGlowAmt.value = (1 - dk) * bd.k.glow;
       diskMat.color.setScalar(1 - 0.65 * dk);
-      setEnvDim(1 - 0.78 * dk);   // the studio reflections dim with the light (paint, glass, metal)
+      setEnvDim((1 - 0.78 * dk) * bd.k.env);   // the studio reflections dim with the light (paint, glass, metal)
 
       // ----- key light = world sun (turns with the heading), camera-relative fill/rim, shadow map refresh
       aimKey(air.heading);
@@ -2630,6 +2881,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       refreshShadow(blur);
 
       // ----- arrows
+      // (the air lab shows its own moment arcs: ext.showInputArrows = false hides these input arrows)
+      if (ext.showInputArrows === false && !playing) arrowsV = { roll: 0, pitch: 0, yaw: 0 };
       setArrow('roll', arrowsV.roll); setArrow('pitch', arrowsV.pitch); setArrow('yaw', arrowsV.yaw);
 
       // ----- highlights (user + animation emphasis)
@@ -2971,6 +3224,43 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     ext.ANIMATIONS = ANIM_NAMES.slice();
     ext.PARTS = PART_IDS.slice();
     ext._parts = parts;
+
+    /* ---------------------------------------------- backdrops + hooks for the air lab (airflow.js) */
+    windLabel = makeLabel('Viento relativo', 'light', 0.95);
+    windLabel.position.set(-7.0, 0.85, -10.5);
+    windLabel.visible = false;
+    stage.add(windLabel);
+    /** 'estudio' (configurator, default) | 'cielo' (open sky, clouds in flight) | 'tunel' (dark wind-tunnel stage). */
+    ext.setBackdrop = setBackdrop;
+    ext.backdrop = 'estudio';
+    ext.BACKDROPS = Object.keys(BACKDROPS);
+    ext.STAGE_Y = STAGE_Y;
+    /** Visual speed (scene m/s) used for air moving at iasKt (the flow is slowed so the eye can follow it). */
+    ext.visWindSpeed = visWindSpeed;
+    ext.flowTimeScale = 1;          // airflow.js 'cámara lenta' also slows the tunnel wind lines and the clouds
+    ext.showInputArrows = true;     // false: the yoke/pedal input arcs stay hidden (airflow.js draws moment arcs)
+    // airplane body frame: CG at the origin, x right, y up, z aft (nose toward -Z); rotates with the attitude
+    ext.body = attitude;
+    ext.model = model;
+    ext.surfaces = surfaces;        // hinge groups: aileronL/R, flapL/R, elevator, trimTab, rudder
+    ext.disp = disp;                // displayed (smoothed) surfaces in degrees + pitch/bank/yaw
+    ext.makeLabel = makeLabel;      // labels made here are clamped/de-overlapped with the part labels
+    ext.setLabelText = setLabelText;
+    ext.glowTexture = glowTex;
+    var cgV = new V3(CG.x, CG.y, CG.z);
+    /** Geometry for the airflow model, in the BODY frame (model frame minus the CG) unless noted. */
+    ext.geom = {
+      CG: [CG.x, CG.y, CG.z], WING_HALF: WING_HALF, FLAP_IN: FLAP_IN, BREAK: BREAK, AIL_OUT: AIL_OUT, FLAP_F: FLAP_F, AIL_F: AIL_F,
+      wingPlan: wingPlan,                                   // (span s ≥ 0) → {le: model z of the LE, c: chord}
+      wingPoint: function (sx, s, xc, yc, out) { return wingPoint(sx, s, xc, yc, out).sub(cgV); },
+      foil: foil2412,
+      HT_Y: HT_Y - CG.y, HINGE_Z: HINGE_Z - CG.z, HT_HALF: HT_HALF,
+      htLE: function (s) { return htLE(s) - CG.z; }, htTE: function (s) { return htTE(s) - CG.z; },
+      FIN_ROOT: FIN_ROOT - CG.y, FIN_TIP: FIN_TIP - CG.y,
+      finLE: function (yb) { return finLE(yb + CG.y) - CG.z; }, rudTE: function (yb) { return rudTE(yb + CG.y) - CG.z; },
+      propHub: [0, 0.49 - CG.y, -0.905 - CG.z], propR: 0.876,
+      FUS: FUS                                              // model frame: [z, half width, top y, bottom y, exponent]
+    };
     setView('rear34', true);
     update({}, 0);
     return ext;

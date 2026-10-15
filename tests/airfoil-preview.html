@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Perfil del ala — vista previa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=B612+Mono:wght@400;700&family=Barlow+Condensed:wght@500;600;700&display=swap">
+<style>
+  :root { --bg: #0D1318; --surface: #151D24; --line: #2C3944; --fg: #E4EAEE; --soft: #9AA9B5; --accent: #F08A3C; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font-family: 'Atkinson Hyperlegible', system-ui, sans-serif; padding: 16px; }
+  h1 { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; font-size: 22px; margin: 0 0 12px; }
+  .wrap { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 8px; }
+  canvas { display: block; border-radius: 8px; }
+  #big { width: 800px; height: 450px; max-width: calc(100vw - 50px); aspect-ratio: 16 / 9; height: auto; }
+  #mid { width: 480px; height: 270px; }
+  #small { width: 320px; height: 180px; }
+  .ctl { display: grid; grid-template-columns: 120px 1fr 64px; gap: 6px 10px; align-items: center; min-width: 320px; }
+  .ctl label { font-family: 'Barlow Condensed', sans-serif; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--soft); }
+  .ctl output { font-family: 'B612 Mono', monospace; font-size: 13px; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 10px; font-size: 14px; }
+  #stats { font-family: 'B612 Mono', monospace; font-size: 12px; color: var(--soft); margin-top: 8px; }
+</style>
+</head>
+<body>
+<h1>Perfil del ala — laboratorio 2D (airfoil.js)</h1>
+<div class="wrap">
+  <div class="card"><canvas id="big"></canvas></div>
+  <div>
+    <div class="card ctl">
+      <label for="aoa">Ángulo de ataque</label><input id="aoa" type="range" min="-6" max="22" step="0.5" value="4"><output id="aoaV">4°</output>
+      <label for="flaps">Flaps</label><input id="flaps" type="range" min="0" max="40" step="1" value="0"><output id="flapsV">0°</output>
+      <label for="ias">Viento</label><input id="ias" type="range" min="0" max="140" step="1" value="80"><output id="iasV">80 kt</output>
+      <label for="sb">Desprend.</label><input id="sb" type="range" min="-0.05" max="1" step="0.05" value="-0.05"><output id="sbV">auto</output>
+    </div>
+    <div class="row">
+      <label><input type="checkbox" id="pressure" checked> presión</label>
+      <label><input type="checkbox" id="streamlines" checked> flujo</label>
+      <label><input type="checkbox" id="labels" checked> rótulos</label>
+      <label><input type="checkbox" id="forces" checked> fuerzas</label>
+      <label><input type="checkbox" id="timelines" checked> pulsos</label>
+      <label><input type="checkbox" id="run" checked> animar</label>
+    </div>
+    <div id="stats"></div>
+    <div class="card" style="margin-top:12px"><canvas id="mid"></canvas></div>
+    <div class="card" style="margin-top:12px; display:inline-block"><canvas id="small"></canvas></div>
+  </div>
+</div>
+<script src="../src/sim.js"></script>
+<script src="../src/airfoil.js"></script>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  // ?solo → compact page for 1:1 screenshots of the big canvas
+  if (/solo/.test(location.search)) {
+    document.querySelector('h1').style.display = 'none';
+    document.body.style.padding = '0';
+    document.querySelector('.card').style.padding = '0';
+    var mw = /[?&]w=(\d+)/.exec(location.search), mh = /[?&]h=(\d+)/.exec(location.search);
+    if (mw && mh) {
+      var bc = $('big');
+      bc.style.width = mw[1] + 'px'; bc.style.height = mh[1] + 'px'; bc.style.aspectRatio = 'auto';
+    }
+  }
+  /** Debug helper: setP({aoa, flaps, ias, sb}) moves the sliders and syncs. */
+  window.setP = function (o) {
+    ['aoa', 'flaps', 'ias', 'sb'].forEach(function (k) { if (o[k] !== undefined) $(k).value = o[k]; });
+    sync();
+  };
+  /** Debug helper: run n frames of dt seconds. */
+  window.runFrames = function (n, dt) { for (var i = 0; i < n; i++) afs.forEach(function (af) { af.frame(dt || 1 / 30); }); };
+  function onDrag(a) { $('aoa').value = a; sync(); }
+  var afs = [
+    C150.Airfoil.create($('big'), { onDrag: onDrag }),
+    C150.Airfoil.create($('mid'), { onDrag: onDrag }),
+    C150.Airfoil.create($('small'), {})
+  ];
+  window.afs = afs;
+  function sync() {
+    var aoa = +$('aoa').value, flaps = +$('flaps').value, ias = +$('ias').value, sb = +$('sb').value;
+    $('aoaV').textContent = aoa + '°'; $('flapsV').textContent = flaps + '°'; $('iasV').textContent = ias + ' kt';
+    $('sbV').textContent = sb < 0 ? 'auto' : sb.toFixed(2);
+    var a = C150.Sim.aero({ ias: ias, aoa: aoa, flaps: flaps, rpm: 2300, throttle: 0.7 });
+    var o = { aoa: aoa, flaps: flaps, ias: ias, stallBlend: sb < 0 ? a.stallBlend : sb, liftN: a.liftN, dragN: a.dragN, cl: a.cl, cd: a.cd };
+    ['pressure', 'streamlines', 'labels', 'forces', 'timelines'].forEach(function (k) { o[k] = $(k).checked; });
+    afs.forEach(function (af) { af.set(o); });
+  }
+  ['aoa', 'flaps', 'ias', 'sb', 'pressure', 'streamlines', 'labels', 'forces', 'timelines'].forEach(function (id) {
+    $(id).addEventListener('input', sync); $(id).addEventListener('change', sync);
+  });
+  sync();
+  var last = performance.now(), frames = 0, acc = 0, worst = 0;
+  function tick() {
+    var now = performance.now(), dt = Math.min(0.1, (now - last) / 1000); last = now;
+    if (!$('run').checked) dt = 0;
+    var t0 = performance.now();
+    afs.forEach(function (af) { af.frame(dt); });
+    var ms = performance.now() - t0; acc += ms; frames++; worst = Math.max(worst, ms);
+    if (frames % 30 === 0) {
+      $('stats').textContent = 'frame (3 lienzos) ' + (acc / frames).toFixed(2) + ' ms (peor ' + worst.toFixed(1) + ') · solve ' +
+        afs[0].stats.solveMs.toFixed(1) + ' ms · líneas ' + afs[0].stats.lines;
+    }
+  }
+  window.tickAirfoil = tick;
+  var rafOK = false;
+  function loop() { rafOK = true; tick(); requestAnimationFrame(loop); }
+  requestAnimationFrame(loop);
+  setInterval(function () { if (!rafOK) tick(); rafOK = false; }, 33);
+  window.addEventListener('resize', function () { afs.forEach(function (af) { af.resize(); }); });
+})();
+</script>
+</body>
+</html>

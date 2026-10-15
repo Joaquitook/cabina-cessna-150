@@ -41,10 +41,12 @@ var ALLOWED = {
   doorLeftOpen: 1, doorRightOpen: 1, windowLeftOpen: 1,
   'lights.dome': 1, 'lights.nav': 1, 'lights.strobe': 1, 'lights.beacon': 1, 'lights.taxi': 1, 'lights.landing': 1,
   'radio.comOn': 1, 'radio.comFreq': 1, 'radio.comStby': 1, 'radio.navFreq': 1, 'radio.navStby': 1,
-  'radio.obs': 1, 'radio.xpdrMode': 1, 'radio.xpdrCode': 1
+  'radio.obs': 1, 'radio.xpdrMode': 1, 'radio.xpdrCode': 1,
+  'tunnel.on': 1, 'tunnel.ias': 1, 'tunnel.aoa': 1, 'tunnel.beta': 1      // laboratorio del aire (v2 §1)
   // ignition / masterBat / masterAlt / flapSwitch: sólo a través de Sim.actions (como la UI)
 };
-var RANGES = { yokeRoll: [-1, 1], yokePitch: [-1, 1], rudder: [-1, 1], trim: [-1, 1] };
+var RANGES = { yokeRoll: [-1, 1], yokePitch: [-1, 1], rudder: [-1, 1], trim: [-1, 1],
+  'tunnel.ias': [0, 140], 'tunnel.aoa': [-6, 22], 'tunnel.beta': [-15, 15] };
 
 function set(s, key, v) {
   if (!ALLOWED[key]) throw new Error('el piloto intentó escribir un campo que no es de entrada: ' + key);
@@ -304,6 +306,90 @@ function runMission(m) {
   return { ok: p >= 1, msg: (p >= 1 ? 'progreso 1 en ' : 'llegó a ' + best.toFixed(2) + ' en ') + ctx.t.toFixed(1) + ' s', s: s };
 }
 
+/* ─────────────────────── laboratorio del aire: túnel y vuelo (state.aero) ─────────────────────── */
+// Cada experimento arranca del preset 'tunnel' (o 'cruise'), mueve SÓLO entradas de alumno a velocidad de
+// mano/tecla y comprueba que state.aero cuente la física que la UI va a mostrar.
+function advance(s, sec, each) { for (var t = 0; t < sec; t += DT) { if (each) each(s, t); Sim.step(s, DT); } }
+function expect(c, m) { if (!c) throw new Error(m); }
+function kg(n) { return Math.round(n / 9.81) + ' kg'; }
+function runLab(preset, fn) {
+  var s = Sim.createState('parked');
+  Sim.applyPreset(s, preset);
+  try { return { ok: true, msg: fn(s) }; } catch (e) { return { ok: false, msg: e.message }; }
+}
+var LAB = {
+  'flaps': function (s) {
+    var a0 = { L: s.aero.liftN, D: s.aero.dragN, pm: s.aero.pitchMoment };
+    A.setFlapSwitch(s, 'DOWN');
+    advance(s, 2.3);                       // ≈ 10°
+    A.setFlapSwitch(s, 'OFF');
+    var f10 = s.flaps;
+    A.setFlapSwitch(s, 'DOWN');
+    advance(s, 8);
+    A.setFlapSwitch(s, 'OFF');
+    expect(f10 > 7 && f10 < 13 && s.flaps > 39, 'flaps no bajaron (' + f10.toFixed(1) + ', ' + s.flaps.toFixed(1) + ')');
+    expect(s.aero.liftN > a0.L * 1.4 && s.aero.dragN > a0.D * 1.4, 'flaps sin + sustentación y + resistencia');
+    expect(s.aero.pitchMoment > a0.pm + 0.1, 'flaps sin tendencia a subir la nariz');
+    expect(s.aero.flapLiftN > 0 && s.aero.downwashDeg > 4, 'flaps sin aporte/downwash');
+    return 'sustentación ' + kg(a0.L) + ' → ' + kg(s.aero.liftN) + ', resistencia ' + kg(a0.D) + ' → ' + kg(s.aero.dragN);
+  },
+  'alerones': function (s) {
+    advance(s, 1, function (st) { ease(st, 'yokeRoll', 0.7, 2); });
+    expect(s.aero.liftLN > s.aero.liftRN && s.aero.rollMoment > 0.3, 'volante a la derecha: el ala izquierda no sube');
+    expect(s.aero.yawMoment < 0, 'sin guiñada adversa a la izquierda');
+    var d = s.aero.liftLN - s.aero.liftRN;
+    advance(s, 1.5, function (st) { ease(st, 'yokeRoll', 0, 2); ease(st, 'rudder', 0.6, 2); });
+    expect(s.aero.yawMoment > 0.3, 'pedal derecho: la nariz no va a la derecha');
+    return 'ala izq. − ala der. = ' + kg(d) + ', pedal derecho → guiñada ' + s.aero.yawMoment.toFixed(2);
+  },
+  'acelerador': function (s) {
+    advance(s, 2, function (st) { ease(st, 'tunnel.ias', 50, 30); ease(st, 'throttle', 0.2, 0.5); });
+    var lo = { T: s.aero.thrustN, w: s.aero.propWashMs };
+    advance(s, 4, function (st) { ease(st, 'throttle', 1, 0.5); });
+    expect(s.aero.thrustN > lo.T + 400 && s.aero.propWashMs > lo.w + 5, 'acelerador sin + empuje / + estela');
+    expect(s.aero.yawMoment < 0, 'a fondo y lento: la nariz no se va a la izquierda');
+    return 'empuje ' + kg(lo.T) + ' → ' + kg(s.aero.thrustN) + ', estela ' + s.aero.propWashMs.toFixed(0) + ' m/s';
+  },
+  'perdida': function (s) {
+    var maxSb = 0, warn = false;
+    advance(s, 8, function (st) {
+      ease(st, 'tunnel.aoa', 20, 3);
+      maxSb = Math.max(maxSb, st.aero.stallBlend);
+      if (st.air.stallWarning && !st.air.stalled) warn = true;
+    });
+    expect(warn, 'la bocina no sonó antes de la pérdida');
+    expect(s.air.stalled && s.aero.stallBlend > 0.95, 'sin pérdida a 20°');
+    var clStall = s.aero.cl;
+    advance(s, 6, function (st) { ease(st, 'tunnel.aoa', 4, 3); });
+    expect(!s.air.stalled && s.aero.stallBlend < 0.05, 'no se recupera al bajar el ángulo');
+    return 'cl en pérdida ' + clStall.toFixed(2) + ', recupera con ' + s.tunnel.aoa + '°';
+  },
+  'profundidad': function (s) {
+    advance(s, 1, function (st) { ease(st, 'yokePitch', 0.6, 2); });
+    expect(s.aero.pitchMoment > 0.3 && s.aero.tailN < 0, 'tirar: sin tendencia a subir la nariz');
+    var tail = s.aero.tailN;
+    advance(s, 1, function (st) { ease(st, 'yokePitch', -0.6, 2); });
+    expect(s.aero.pitchMoment < -0.3 && s.aero.tailN > tail, 'empujar: sin tendencia a bajar la nariz');
+    return 'cola ' + kg(tail) + ' → ' + kg(s.aero.tailN);
+  },
+  'vuelo-inclinar': function (s) {
+    var L0 = s.aero.liftN;
+    expect(Math.abs(L0 / s.aero.weightN - 1) < 0.03, 'crucero: sustentación ≠ peso');
+    advance(s, 3, function (st) { bankHold(st, 30); });
+    expect(s.air.bank > 20, 'no se inclinó (' + s.air.bank.toFixed(0) + '°)');
+    return 'sustentación = peso (' + kg(L0) + '), inclinado ' + s.air.bank.toFixed(0) + '°';
+  },
+  'vuelo-flaps': function (s) {
+    var p0 = s.air.pitch;
+    A.setFlapSwitch(s, 'DOWN');
+    advance(s, 2.5);
+    A.setFlapSwitch(s, 'OFF');
+    advance(s, 1.5);
+    expect(s.air.pitch > p0 + 0.5 && s.aero.pitchMoment > 0, 'flaps en vuelo: la nariz no sube (globo)');
+    return 'actitud ' + p0.toFixed(1) + '° → ' + s.air.pitch.toFixed(1) + '°';
+  }
+};
+
 /* ─────────────────────────────────────────── correr ─────────────────────────────────────────── */
 var rows = [], fails = 0;
 function row(kind, id, r) {
@@ -323,6 +409,9 @@ DATA.checklists.forEach(function (cl) {
   row('checklist', cl.id + ' (seguida de ' + cl.continuaDe + ')', runChecklist(cl, first));
 });
 DATA.missions.forEach(function (m) { row('misión', m.id, runMission(m)); });
+Object.keys(LAB).forEach(function (id) {
+  row('laboratorio', id, runLab(id.indexOf('vuelo') === 0 ? 'cruise' : 'tunnel', LAB[id]));
+});
 
 var w = [0, 0, 0, 0];
 rows.forEach(function (r) { r.forEach(function (c, i) { w[i] = Math.max(w[i], String(c).length); }); });

@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- ui-harness.html — page to check the UI shell (port 8704): same markup as src/index.html, plain script tags.
+<!-- ui-harness.html — page to check the UI shell (port 8743): same markup as src/index.html, plain script tags.
      Real modules are used when present; inline stubs fill in ONLY what is missing.
      ?nocore   simulates a failed 3D start (error overlay + local sim loop)
      ?fakecore forces the fake Core (canvas with "3D": left half = throttle, right half = yoke)
@@ -34,6 +34,7 @@
       <button type="button" class="tab" role="tab" id="tab-recorrido" data-mode="recorrido" aria-controls="panel-recorrido" aria-selected="false" tabindex="-1">Recorrido</button>
       <button type="button" class="tab" role="tab" id="tab-checklists" data-mode="checklists" aria-controls="panel-checklists" aria-selected="false" tabindex="-1">Checklists</button>
       <button type="button" class="tab" role="tab" id="tab-volar" data-mode="volar" aria-controls="panel-volar" aria-selected="false" tabindex="-1">Volar</button>
+      <button type="button" class="tab tab--aire" role="tab" id="tab-aire" data-mode="aire" aria-controls="panel-aire" aria-selected="false" tabindex="-1" title="Laboratorio del aire">Aire</button>
       <button type="button" class="tab" role="tab" id="tab-quiz" data-mode="quiz" aria-controls="panel-quiz" aria-selected="false" tabindex="-1">Quiz</button>
     </nav>
     <div class="topbar-actions">
@@ -107,6 +108,7 @@
       <section id="panel-checklists" class="mode" role="tabpanel" aria-labelledby="tab-checklists" tabindex="-1" hidden></section>
       <section id="panel-volar" class="mode" role="tabpanel" aria-labelledby="tab-volar" tabindex="-1" hidden></section>
       <section id="panel-quiz" class="mode" role="tabpanel" aria-labelledby="tab-quiz" tabindex="-1" hidden></section>
+      <section id="panel-aire" class="mode" role="tabpanel" aria-labelledby="tab-aire" tabindex="-1" hidden></section>
       <div id="peek" class="peek" hidden>
         <span class="peek-dot" aria-hidden="true"></span>
         <span class="peek-text"><span class="peek-kicker">Tocaste</span> <strong id="peek-name"></strong></span>
@@ -143,6 +145,7 @@
           <li><strong>Arrastrá</strong> las perillas (acelerador, mezcla, calefacción), el volante, la rueda del compensador y los pedales para moverlos.</li>
           <li>En cada ficha, la sección <strong>Probalo</strong> te deja mover el mismo control con botones grandes.</li>
           <li>En <strong>Volar</strong>, en el celular, el volante, los pedales, los frenos y el acelerador aparecen sobre la vista 3D, abajo.</li>
+          <li>En <strong>Aire</strong> (laboratorio del aire) ves cómo se mueve el aire alrededor del avión: elegí un experimento guiado o mové los mandos y mirá las fuerzas, el ala por dentro y la curva de sustentación.</li>
         </ul>
         <h3 class="placard placard--small" id="quality-title">Calidad gráfica</h3>
         <div class="seg seg--quality" role="group" aria-labelledby="quality-title" id="quality-seg">
@@ -166,6 +169,7 @@
 <script src="../src/data/controls-a.js"></script>
 <script src="../src/data/controls-b.js"></script>
 <script src="../src/data/learning.js"></script>
+<script src="../src/data/lab.js"></script>
 <script>
 /* Harness stubs — used ONLY when a real module is missing. */
 (function () {
@@ -206,9 +210,11 @@
 </script>
 <script src="../src/sim.js"></script>
 <script src="../src/gauges.js"></script>
+<script src="../src/airfoil.js"></script>
 <script src="../src/world.js"></script>
 <script src="../src/cockpit.js"></script>
 <script src="../src/exterior.js"></script>
+<script src="../src/airflow.js"></script>
 <script src="../src/core.js"></script>
 <script>
 /* Harness: ?nocore simulates a missing/failed 3D module; a fake Core is used only if core.js did not load. */
@@ -259,6 +265,7 @@
   };
 })();
 </script>
+<script src="../src/lab.js"></script>
 <script src="../src/ui.js"></script>
 
 </body>

@@ -68,8 +68,9 @@ const ANIMS = ['axes-roll', 'axes-pitch', 'axes-yaw', 'four-forces', 'aoa-stall'
 const SIM_PRESETS = ['parked', 'runup', 'runway', 'cruise', 'approach'];
 const CAM_PRESETS = ['pilot', 'panel', 'left', 'center', 'right', 'floor', 'overhead', 'copilot', 'door'];
 const PROBAR_TIPOS = ['yoke', 'pedales', 'slider', 'toggle', 'opciones', 'master', 'flaps', 'accion', 'luces', 'radio', 'perilla', 'puertas'];
-const SCRIPT_ORDER = ['data/controls-a.js', 'data/controls-b.js', 'data/learning.js', 'sim.js', 'gauges.js', 'world.js',
-  'cockpit.js', 'exterior.js', 'core.js', 'ui.js'];
+// contrato §1 + contrato v2 §4 (laboratorio del aire: data/lab.js, airfoil.js, airflow.js, lab.js)
+const SCRIPT_ORDER = ['data/controls-a.js', 'data/controls-b.js', 'data/learning.js', 'data/lab.js', 'sim.js', 'gauges.js',
+  'airfoil.js', 'world.js', 'cockpit.js', 'exterior.js', 'airflow.js', 'core.js', 'lab.js', 'ui.js'];
 
 /* ───────────── Carga (global falso, sin DOM) ───────────── */
 
@@ -307,7 +308,7 @@ const three = html.indexOf('three@0.147.0/build/three.min.js'), orbit = html.ind
 ok(three > 0 && three < orbit && orbit < rbox && rbox < first, 'index.html: three → OrbitControls → RoundedBoxGeometry antes de los módulos');
 ok(/^<title>[^<]+<\/title>/.test(html.trim()), 'index.html empieza con <title>');
 ok(!/<!doctype|<html[\s>]|<head[\s>]|<body[\s>]/i.test(html), 'index.html sin doctype/html/head/body (los agrega build.js)');
-['explorar', 'basico', 'recorrido', 'checklists', 'volar', 'quiz'].forEach((m) => ok(new RegExp('data-mode="' + m + '"').test(html), 'index.html: pestaña ' + m));
+['explorar', 'basico', 'recorrido', 'checklists', 'volar', 'quiz', 'aire'].forEach((m) => ok(new RegExp('data-mode="' + m + '"').test(html), 'index.html: pestaña ' + m));
 
 /* ───────────── Resultado ───────────── */
 warnings.forEach((w) => console.warn('  AVISO: ' + w));

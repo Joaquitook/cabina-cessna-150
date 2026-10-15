@@ -22,6 +22,7 @@
       <button type="button" class="tab" role="tab" id="tab-recorrido" data-mode="recorrido" aria-controls="panel-recorrido" aria-selected="false" tabindex="-1">Recorrido</button>
       <button type="button" class="tab" role="tab" id="tab-checklists" data-mode="checklists" aria-controls="panel-checklists" aria-selected="false" tabindex="-1">Checklists</button>
       <button type="button" class="tab" role="tab" id="tab-volar" data-mode="volar" aria-controls="panel-volar" aria-selected="false" tabindex="-1">Volar</button>
+      <button type="button" class="tab tab--aire" role="tab" id="tab-aire" data-mode="aire" aria-controls="panel-aire" aria-selected="false" tabindex="-1" title="Laboratorio del aire">Aire</button>
       <button type="button" class="tab" role="tab" id="tab-quiz" data-mode="quiz" aria-controls="panel-quiz" aria-selected="false" tabindex="-1">Quiz</button>
     </nav>
     <div class="topbar-actions">
@@ -95,6 +96,7 @@
       <section id="panel-checklists" class="mode" role="tabpanel" aria-labelledby="tab-checklists" tabindex="-1" hidden></section>
       <section id="panel-volar" class="mode" role="tabpanel" aria-labelledby="tab-volar" tabindex="-1" hidden></section>
       <section id="panel-quiz" class="mode" role="tabpanel" aria-labelledby="tab-quiz" tabindex="-1" hidden></section>
+      <section id="panel-aire" class="mode" role="tabpanel" aria-labelledby="tab-aire" tabindex="-1" hidden></section>
       <div id="peek" class="peek" hidden>
         <span class="peek-dot" aria-hidden="true"></span>
         <span class="peek-text"><span class="peek-kicker">Tocaste</span> <strong id="peek-name"></strong></span>
@@ -131,6 +133,7 @@
           <li><strong>Arrastrá</strong> las perillas (acelerador, mezcla, calefacción), el volante, la rueda del compensador y los pedales para moverlos.</li>
           <li>En cada ficha, la sección <strong>Probalo</strong> te deja mover el mismo control con botones grandes.</li>
           <li>En <strong>Volar</strong>, en el celular, el volante, los pedales, los frenos y el acelerador aparecen sobre la vista 3D, abajo.</li>
+          <li>En <strong>Aire</strong> (laboratorio del aire) ves cómo se mueve el aire alrededor del avión: elegí un experimento guiado o mové los mandos y mirá las fuerzas, el ala por dentro y la curva de sustentación.</li>
         </ul>
         <h3 class="placard placard--small" id="quality-title">Calidad gráfica</h3>
         <div class="seg seg--quality" role="group" aria-labelledby="quality-title" id="quality-seg">
@@ -154,10 +157,14 @@
 <script data-inline="data/controls-a.js"></script>
 <script data-inline="data/controls-b.js"></script>
 <script data-inline="data/learning.js"></script>
+<script data-inline="data/lab.js"></script>
 <script data-inline="sim.js"></script>
 <script data-inline="gauges.js"></script>
+<script data-inline="airfoil.js"></script>
 <script data-inline="world.js"></script>
 <script data-inline="cockpit.js"></script>
 <script data-inline="exterior.js"></script>
+<script data-inline="airflow.js"></script>
 <script data-inline="core.js"></script>
+<script data-inline="lab.js"></script>
 <script data-inline="ui.js"></script>
