@@ -1,0 +1,576 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Core Harness</title>
+<!--
+  tests/core-harness.html — standalone test page for src/core.js (C150.Core).
+  Serve the project root (e.g. `python -m http.server 8705`) and open /tests/core-harness.html.
+  Uses the REAL modules from src/; small inline stubs are installed only for modules that failed to load.
+  "Correr pruebas" (or ?autotest=1) runs scripted checks with synthetic pointer/keyboard events:
+  picking, select + fly-to, operate, drags (throttle, yoke, trim, pedals, toe brakes), control lock, keyboard,
+  swap/inset, holds, momentary switches, pickMode, exterior enlarge, dot-path inputs, resize and frame rate.
+  Results: on the page, in the console and in window.__coreTestResults.
+-->
+<style>
+  :root { --bg:#0D1318; --surface:#151D24; --line:#2C3944; --fg:#E4EAEE; --soft:#9AA9B5; --accent:#F08A3C; --good:#2E9A4E; --bad:#C7362B; }
+  html, body { height: 100%; }
+  body { margin: 0; display: flex; background: var(--bg); color: var(--fg); font: 13px/1.45 system-ui, sans-serif; overflow: hidden; }
+  #view { position: relative; flex: 1; min-width: 0; height: 100%; }
+  #side { width: 380px; height: 100%; overflow: auto; padding: 10px 12px; box-sizing: border-box; border-left: 1px solid var(--line); background: var(--surface); }
+  h1 { font-size: 15px; margin: 0 0 6px; letter-spacing: .04em; text-transform: uppercase; }
+  h2 { font-size: 12px; margin: 12px 0 4px; color: var(--soft); text-transform: uppercase; letter-spacing: .06em; }
+  .row { display: flex; flex-wrap: wrap; gap: 4px; }
+  button, select { font: inherit; color: var(--fg); background: #1D2730; border: 1px solid var(--line); border-radius: 4px; padding: 3px 7px; cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button:focus-visible, select:focus-visible { outline: 2px solid #6FA8DC; outline-offset: 1px; }
+  #status { font-family: ui-monospace, monospace; font-size: 11px; color: var(--soft); white-space: pre-wrap; margin-top: 6px; }
+  #log { font-family: ui-monospace, monospace; font-size: 11px; white-space: pre-wrap; max-height: 28vh; overflow: auto; border-top: 1px solid var(--line); padding-top: 4px; }
+  #tests { font-family: ui-monospace, monospace; font-size: 11px; }
+  #tests .pass { color: #6fd28a; } #tests .fail { color: #ff7a6e; } #tests .sum { font-weight: bold; margin-top: 4px; }
+  #insetLabel { position: absolute; pointer-events: none; font: 600 11px/1 'Arial Narrow', sans-serif; letter-spacing: .05em; text-transform: uppercase;
+    background: rgba(13,19,24,.72); color: #E4EAEE; padding: 3px 6px; border-radius: 0 0 4px 0; display: none; z-index: 2; }
+  #tip { position: absolute; pointer-events: none; background: rgba(13,19,24,.85); color: #fff; padding: 3px 7px; border-radius: 4px; font-size: 12px; z-index: 3; display: none; }
+  #err { position: absolute; inset: 20px; display: none; align-items: center; justify-content: center; text-align: center; color: #ffb4ab; z-index: 4; }
+  @media (max-width: 760px) { body { flex-direction: column; } #view { height: 56%; flex: none; } #side { width: auto; height: 44%; border-left: 0; border-top: 1px solid var(--line); } }
+</style>
+</head>
+<body>
+<div id="view"><div id="insetLabel"></div><div id="tip"></div><div id="err"></div></div>
+<div id="side">
+  <h1>C150.Core — banco de pruebas</h1>
+  <div class="row">
+    <button id="runTests">Correr pruebas</button>
+    <button id="swap">Cambiar vista (C)</button>
+    <button id="pause">Pausa (P)</button>
+    <button id="insetToggle">Inset on/off</button>
+    <button id="narrow">Ancho 600 px</button>
+  </div>
+  <h2>Cámara</h2>
+  <div class="row" id="presets"></div>
+  <h2>Simulación y exterior</h2>
+  <div class="row">
+    <select id="simPreset" aria-label="Preset de simulación"></select>
+    <select id="anim" aria-label="Animación exterior"><option value="">(animación)</option></select>
+    <button id="enlarge">Agrandar</button>
+    <button id="stopAnim">Parar</button>
+  </div>
+  <div class="row" style="margin-top:4px">
+    <select id="target" aria-label="Resaltar objetivo"><option value="">(objetivo)</option></select>
+    <button id="pickBtn">Modo "¿dónde está?"</button>
+    <button id="holdStart">Mantener START</button>
+    <button id="holdFlaps">Mantener flaps DOWN</button>
+  </div>
+  <div id="status"></div>
+  <h2>Pruebas</h2>
+  <div id="tests">—</div>
+  <h2>Eventos</h2>
+  <div id="log"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/geometries/RoundedBoxGeometry.js"></script>
+<script src="../src/data/controls-a.js"></script>
+<script src="../src/data/controls-b.js"></script>
+<script src="../src/data/learning.js"></script>
+<script src="../src/sim.js"></script>
+<script src="../src/gauges.js"></script>
+<script src="../src/world.js"></script>
+<script src="../src/cockpit.js"></script>
+<script src="../src/exterior.js"></script>
+<script>
+/* Inline STUBS: installed only for modules that are genuinely absent (failed to load). */
+(function () {
+  'use strict';
+  var C150 = window.C150 = window.C150 || {};
+  var stubbed = [];
+  if (!C150.Sim) {
+    stubbed.push('Sim');
+    C150.Sim = {
+      createState: function () {
+        return { yokeRoll: 0, yokePitch: 0, rudder: 0, brakeL: 0, brakeR: 0, parkingBrake: true, controlLock: true, throttle: 0, mixture: 1,
+          carbHeat: 0, primerOut: 0, primerLocked: true, ignition: 'OFF', masterBat: false, masterAlt: false, flapSwitch: 'OFF', trim: 0,
+          fuelValve: true, cabinHeat: 0, cabinAir: 0, lights: { dome: false, nav: false, strobe: false, beacon: false, taxi: false, landing: false },
+          pitotHeat: false, panelLights: 0, radio: { comOn: false, obs: 0, xpdrMode: 'OFF' }, altimeterSetting: 29.92, hiCorrection: 0,
+          doorLeftOpen: false, doorRightOpen: false, windowLeftOpen: false, paused: false, engine: { running: false, rpm: 0, primeCharges: 0 },
+          elec: { busVolts: 0 }, air: { onGround: true, pitch: 0, bank: 0, heading: 150 }, flaps: 0, propRpm: 0, events: [], time: 0 };
+      },
+      applyPreset: function (s) { var n = C150.Sim.createState(); Object.keys(n).forEach(function (k) { s[k] = n[k]; }); return s; },
+      step: function (s, dt) { if (!s.paused) s.time += dt; },
+      PRESETS: { parked: { label: 'Estacionado' } },
+      actions: {}
+    };
+  }
+  if (!C150.World) {
+    stubbed.push('World');
+    C150.World = { create: function (THREE) {
+      var g = new THREE.Group();
+      var ground = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.MeshBasicMaterial({ color: 0x6d8a4c }));
+      ground.rotation.x = -Math.PI / 2; ground.position.y = -0.65; g.add(ground);
+      return { group: g, update: function () {}, setQuality: function () {} };
+    } };
+  }
+  if (!C150.Cockpit) {
+    stubbed.push('Cockpit');
+    C150.Cockpit = { create: function (THREE) {
+      var g = new THREE.Group(), pickables = [], anchors = {}, views = {}, mats = {};
+      function box(id, x, y, z, w, h, d, color) {
+        var m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({ color: color }));
+        m.position.set(x, y, z); m.userData.controlId = id; g.add(m); pickables.push(m); anchors[id] = m; mats[id] = m.material;
+        views[id] = { position: new THREE.Vector3(x + 0.05, y + 0.12, z + 0.42), target: new THREE.Vector3(x, y, z) };
+      }
+      var panel = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.42, 0.02), new THREE.MeshStandardMaterial({ color: 0x333333 }));
+      panel.position.set(0, 0.48, -0.011); g.add(panel);
+      box('yoke', -0.266, 0.476, 0.16, 0.2, 0.06, 0.03, 0x222222);
+      box('throttle', 0.009, 0.312, 0.03, 0.03, 0.03, 0.06, 0x111111);
+      box('master', -0.355, 0.312, 0.01, 0.03, 0.05, 0.02, 0xaa2222);
+      var V = THREE.Vector3;
+      return { group: g, pickables: pickables, anchors: anchors, views: views,
+        presets: { pilot: { position: new V(-0.235, 0.88, 0.70), target: new V(-0.10, 0.50, 0), label: 'Piloto' },
+          center: { position: new V(0.03, 0.55, 0.40), target: new V(0.03, 0.45, 0), label: 'Centro' } },
+        dragAxes: { throttle: { axis: new V(0, 0, -1), length: 0.06, out: new V(0, 0, 1) } },
+        update: function () {}, setHighlight: function (id, kind) { if (mats[id]) mats[id].emissive.setHex(kind ? 0x553311 : 0); },
+        clearHighlights: function () {}, eye: new V(-0.235, 0.88, 0.70) };
+    } };
+  }
+  if (!C150.Exterior) {
+    stubbed.push('Exterior');
+    C150.Exterior = { create: function (THREE) {
+      var scene = new THREE.Scene(); scene.background = new THREE.Color(0xbfd6ea);
+      scene.add(new THREE.HemisphereLight(0xffffff, 0x666666, 1));
+      var body = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 6), new THREE.MeshStandardMaterial({ color: 0xffffff })); scene.add(body);
+      var camera = new THREE.PerspectiveCamera(35, 4 / 3, 0.1, 500); camera.position.set(-6.6, 3.5, 9); var target = new THREE.Vector3();
+      camera.lookAt(target);
+      var ext = { scene: scene, camera: camera, root: body, target: target, cameraBusy: false, followAttitude: true, playing: null, caption: '',
+        update: function () {}, setHighlight: function () {}, play: function (n) { ext.playing = n; return true; }, stop: function () { ext.playing = null; },
+        setView: function () {}, showLabels: function () {}, setSize: function (w, h) { camera.aspect = w / h; camera.updateProjectionMatrix(); } };
+      return ext;
+    } };
+  }
+  window.__stubbed = stubbed;
+})();
+</script>
+<script src="../src/core.js"></script>
+<script>
+(function () {
+  'use strict';
+  var C150 = window.C150, Core = C150.Core;
+  var $ = function (id) { return document.getElementById(id); };
+  var view = $('view'), logEl = $('log'), statusEl = $('status'), tip = $('tip'), insetLabel = $('insetLabel');
+  var params = new URLSearchParams(location.search);
+
+  // Synthetic pointer ids are not "active" pointers: make pointer capture tolerant (test-only shim).
+  ['setPointerCapture', 'releasePointerCapture'].forEach(function (fn) {
+    var orig = HTMLCanvasElement.prototype[fn];
+    HTMLCanvasElement.prototype[fn] = function (id) { try { return orig.call(this, id); } catch (e) { return undefined; } };
+  });
+
+  /* ------------------------------------------------------------ event log */
+  var events = [], frameCount = 0;
+  function log(line) {
+    var d = document.createElement('div'); d.textContent = line;
+    logEl.insertBefore(d, logEl.firstChild);
+    while (logEl.childNodes.length > 120) logEl.removeChild(logEl.lastChild);
+  }
+  function nameOf(id) {
+    var list = (C150.DATA && C150.DATA.controls) || [];
+    for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i].nombre;
+    return id;
+  }
+  ['hover', 'select', 'operate', 'viewchange', 'pick', 'layout', 'error', 'preset', 'pause', 'animend'].forEach(function (ev) {
+    Core.on(ev, function (a, b, c) {
+      events.push({ ev: ev, a: a, b: b, c: c, t: performance.now() });
+      if (ev !== 'hover' || a) log(ev + ' ' + JSON.stringify([a, b].filter(function (x) { return x !== undefined; })));
+    });
+  });
+  Core.on('frame', function () { frameCount++; });
+  Core.on('error', function (msg) { var e = $('err'); e.textContent = msg; e.style.display = 'flex'; });
+  Core.on('hover', function (id, sub, p) {
+    if (!id) { tip.style.display = 'none'; return; }
+    tip.textContent = nameOf(id) + (sub ? ' · ' + sub : '');
+    tip.style.left = (p.x + 14) + 'px'; tip.style.top = (p.y + 10) + 'px'; tip.style.display = 'block';
+  });
+  Core.on('layout', function (r) {
+    if (!r) { insetLabel.style.display = 'none'; return; }
+    insetLabel.style.display = 'block';
+    insetLabel.style.left = r.x + 'px'; insetLabel.style.top = r.y + 'px';
+    insetLabel.textContent = r.main === 'cockpit' ? 'Exterior · clic para agrandar' : 'Cabina · clic para volver';
+  });
+
+  var ok = Core.init({ container: view, state: C150.Sim.createState('parked') });
+  var state = Core.state;
+  window.__core = Core;
+
+  // Some embedded/hidden browser panes pause requestAnimationFrame: core.js now drives itself from a ~30 Hz timer
+  // meanwhile (its own watchdog), so the harness no longer pumps Core.tick() itself.
+  if (window.__stubbed.length) log('STUBS: ' + window.__stubbed.join(', '));
+
+  /* ------------------------------------------------------------ debug UI */
+  ['pilot', 'flight', 'panel', 'left', 'center', 'right', 'floor', 'overhead', 'copilot', 'door'].forEach(function (n, i) {
+    var b = document.createElement('button'); b.textContent = (i < 8 ? (i + 1) + ' ' : '') + n;
+    b.addEventListener('click', function () { Core.focusPreset(n); }); $('presets').appendChild(b);
+  });
+  Object.keys(C150.Sim.PRESETS || { parked: 1 }).forEach(function (k) {
+    var o = document.createElement('option'); o.value = k; o.textContent = 'Sim: ' + k; $('simPreset').appendChild(o);
+  });
+  $('simPreset').addEventListener('change', function (e) { Core.applyPreset(e.target.value); });
+  ((Core.exterior && Core.exterior.ANIMATIONS) || []).forEach(function (a) {
+    var o = document.createElement('option'); o.value = a; o.textContent = a; $('anim').appendChild(o);
+  });
+  $('anim').addEventListener('change', function (e) { if (e.target.value) Core.playExterior(e.target.value, { loop: true }); });
+  $('enlarge').addEventListener('click', function () { var a = $('anim').value || 'axes-roll'; Core.playExterior(a, { enlarge: true }); });
+  $('stopAnim').addEventListener('click', function () { Core.playExterior(null); });
+  ((C150.DATA && C150.DATA.controls) || []).forEach(function (c) {
+    var o = document.createElement('option'); o.value = c.id; o.textContent = c.id; $('target').appendChild(o);
+  });
+  $('target').addEventListener('change', function (e) { Core.setTargetHighlight(e.target.value || null); });
+  $('swap').addEventListener('click', function () { Core.setMainView(Core.getMainView() === 'cockpit' ? 'exterior' : 'cockpit'); });
+  $('pause').addEventListener('click', function () { Core.setPaused(!state.paused); });
+  var insetOn = true;
+  $('insetToggle').addEventListener('click', function () { insetOn = !insetOn; Core.setInsetVisible(insetOn); });
+  $('narrow').addEventListener('click', function () { view.style.flex = view.style.flex ? '' : '0 0 600px'; });
+  $('pickBtn').addEventListener('click', function () { Core.pickMode(function (id) { log('pickMode → ' + id); }); log('pickMode armado: hacé clic en un control'); });
+  function holdButton(btn, id, sub) {
+    var b = $(btn);
+    b.addEventListener('pointerdown', function () { Core.hold(id, sub, true); });
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (t) { b.addEventListener(t, function () { Core.hold(id, sub, false); }); });
+  }
+  holdButton('holdStart', 'ignition', 'start');
+  holdButton('holdFlaps', 'flap-switch', 'down');
+  setInterval(function () {
+    var s = state;
+    statusEl.textContent = 'vista ' + Core.getMainView() + (s.paused ? ' (PAUSA)' : '') + ' · sel ' + (Core.getSelected() || '—') +
+      '\nyoke ' + s.yokeRoll.toFixed(2) + '/' + s.yokePitch.toFixed(2) + ' timón ' + s.rudder.toFixed(2) + ' frenos ' + s.brakeL.toFixed(1) + '/' + s.brakeR.toFixed(1) +
+      '\nacel ' + s.throttle.toFixed(2) + ' mezcla ' + s.mixture.toFixed(2) + ' carb ' + s.carbHeat.toFixed(2) + ' trim ' + s.trim.toFixed(2) +
+      '\nllave ' + s.ignition + ' flaps ' + s.flapSwitch + ' ' + (s.flaps || 0).toFixed(1) + '° · bat ' + s.masterBat + ' alt ' + s.masterAlt +
+      ' · traba ' + s.controlLock + '\nRPM ' + Math.round((s.engine && s.engine.rpm) || 0) + ' · ' + (Core.getCaption() || '');
+    if (s.events && s.events.length) { s.events.splice(0).forEach(function (e) { log('state.event [' + e.kind + '] ' + e.text); }); }
+  }, 250);
+
+  /* ------------------------------------------------------------ test helpers */
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function assert(c, msg) { if (!c) throw new Error(msg); }
+  function near(a, b, tol) { return Math.abs(a - b) <= tol; }
+  function lastEvent(ev) { for (var i = events.length - 1; i >= 0; i--) if (events[i].ev === ev) return events[i]; return null; }
+  function eventsSince(ev, t0) { return events.filter(function (e) { return e.ev === ev && e.t >= t0; }); }
+  var canvas = Core.renderer && Core.renderer.domElement;
+  var pid = 10;
+  function fire(type, x, y, opt) {
+    opt = opt || {};
+    var r = canvas.getBoundingClientRect();
+    canvas.dispatchEvent(new PointerEvent(type, { clientX: r.left + x, clientY: r.top + y, pointerId: opt.id || 1, pointerType: opt.type || 'mouse',
+      button: type === 'pointermove' ? -1 : (opt.button || 0), buttons: type === 'pointerup' ? 0 : 1, isPrimary: true, bubbles: true, cancelable: true }));
+  }
+  async function click(p) { var id = ++pid; fire('pointerdown', p.x, p.y, { id: id }); await wait(40); fire('pointerup', p.x, p.y, { id: id }); await wait(60); }
+  async function drag(p, dx, dy, opt) {
+    var id = ++pid, steps = 6;
+    fire('pointerdown', p.x, p.y, { id: id });
+    fire('pointermove', p.x + Math.sign(dx || 0) * 8, p.y + Math.sign(dy || 0) * 8, { id: id });   // passes the 6 px threshold
+    var sx = p.x + Math.sign(dx || 0) * 8, sy = p.y + Math.sign(dy || 0) * 8;
+    for (var i = 1; i <= steps; i++) { fire('pointermove', sx + dx * i / steps, sy + dy * i / steps, { id: id }); await wait(16); }
+    if (opt && opt.during) await opt.during();
+    fire('pointerup', sx + dx, sy + dy, { id: id });
+    await wait(30);
+  }
+  function key(type, k) { document.body.dispatchEvent(new KeyboardEvent(type, { key: k, bubbles: true, cancelable: true })); }
+  async function tap(k, ms) { key('keydown', k); await wait(ms || 30); key('keyup', k); }
+  /** A screen point (css px) where Core.pickAt returns this control id, or null. */
+  function findPoint(id) {
+    var cam = Core.camera, r = Core.getInsetRect(), W = canvas.clientWidth, H = canvas.clientHeight;
+    var v = new THREE.Vector3(), best = null;
+    var meshes = (Core.cockpit.pickables || []).filter(function (m) { return m.userData.controlId === id && m.layers.test(new THREE.Layers()); });
+    for (var m = 0; m < meshes.length && !best; m++) {
+      var mesh = meshes[m], pos = mesh.geometry.attributes.position, n = pos.count, step = Math.max(1, Math.floor(n / 60));
+      mesh.geometry.computeBoundingBox();
+      var pts = [mesh.geometry.boundingBox.getCenter(new THREE.Vector3())];
+      for (var i = 0; i < n; i += step) pts.push(new THREE.Vector3().fromBufferAttribute(pos, i).multiplyScalar(0.85).add(pts[0].clone().multiplyScalar(0.15)));
+      for (var j = 0; j < pts.length; j++) {
+        v.copy(pts[j]).applyMatrix4(mesh.matrixWorld).project(cam);
+        var x = (v.x + 1) / 2 * W, y = (1 - v.y) / 2 * H;
+        if (x < 4 || y < 4 || x > W - 4 || y > H - 4 || v.z > 1) continue;
+        if (r && x >= r.x - 4 && x <= r.x + r.w + 4 && y >= r.y - 4 && y <= r.y + r.h + 4) continue;
+        var hit = Core.pickAt(x, y);
+        if (hit && hit.id === id) { best = { x: x, y: y, sub: hit.subId }; break; }
+      }
+    }
+    return best;
+  }
+  async function viewFor(id, presets) {
+    var p = findPoint(id);
+    for (var i = 0; !p && i < presets.length; i++) { Core.focusPreset(presets[i]); await wait(1000); p = findPoint(id); }
+    return p;
+  }
+  function screenDir(id) {   // projected value-increasing axis of a knob (independent of core's math)
+    var ax = Core.cockpit.dragAxes[id], a = Core.cockpit.anchors[id].getWorldPosition(new THREE.Vector3());
+    var b = a.clone().addScaledVector(ax.axis, ax.length);
+    a.project(Core.camera); b.project(Core.camera);
+    var dx = (b.x - a.x) * canvas.clientWidth / 2, dy = -(b.y - a.y) * canvas.clientHeight / 2, L = Math.hypot(dx, dy) || 1;
+    return L < 20 ? { x: 0, y: ax.axis.z < 0 ? -1 : 1 } : { x: dx / L, y: dy / L };
+  }
+  function expectedInset() {
+    var W = canvas.clientWidth, H = canvas.clientHeight, w = Core.isMobile() ? Math.min(360, Math.max(120, W * 0.42)) : Math.min(360, Math.max(170, W * 0.30));
+    var h = w * 0.75; if (h > H * 0.45) { h = H * 0.45; w = h * 4 / 3; }
+    return { x: W - 12 - Math.round(w), y: 12, w: Math.round(w), h: Math.round(h) };
+  }
+
+  /* ------------------------------------------------------------ tests */
+  var TESTS = [
+    ['init: canvas, vista cabina, layout del inset', async function () {
+      assert(ok === true, 'init devolvió ' + ok);
+      assert(canvas && canvas.parentNode === view, 'canvas no está en el contenedor');
+      assert(Core.getMainView() === 'cockpit', 'vista inicial ' + Core.getMainView());
+      var r = Core.getInsetRect(), e = expectedInset();
+      assert(r && r.x === e.x && r.y === e.y && r.w === e.w && r.h === e.h, 'inset ' + JSON.stringify(r) + ' esperado ' + JSON.stringify(e));
+      assert(lastEvent('layout'), 'no hubo evento layout');
+    }],
+    ['frame ~15 Hz', async function () {
+      var c0 = frameCount; await wait(1000); var n = frameCount - c0;
+      assert(n >= 8 && n <= 20, n + ' eventos frame en 1 s');
+    }],
+    ['hover sobre el acelerador', async function () {
+      Core.applyPreset('parked');
+      var p = await viewFor('throttle', ['center', 'pilot', 'panel']);
+      assert(p, 'no encontré el acelerador en pantalla');
+      fire('pointermove', p.x, p.y); await wait(120);
+      var h = lastEvent('hover'); assert(h && h.a === 'throttle', 'hover ' + (h && h.a));
+      assert(canvas.style.cursor === 'grab', 'cursor ' + canvas.style.cursor);
+    }],
+    ['clic: select + fly-to a la vista del control', async function () {
+      Core.select(null);
+      var p = findPoint('throttle'); await click(p);
+      assert(Core.getSelected() === 'throttle', 'seleccionado ' + Core.getSelected());
+      assert(lastEvent('select').a === 'throttle', 'evento select');
+      await wait(1000);
+      var v = Core.cockpit.views.throttle.position, d = Core.camera.position.distanceTo(v);
+      assert(d < 0.03, 'cámara a ' + d.toFixed(3) + ' m de la vista');
+    }],
+    ['clic sobre el seleccionado: operate (slider ±25 %, rebota en los extremos)', async function () {
+      Core.setInput('throttle', 0);
+      var p = findPoint('throttle'); assert(p, 'acelerador no visible'); var t0 = performance.now();
+      await click(p);
+      assert(near(state.throttle, 0.25, 1e-9), 'throttle ' + state.throttle);
+      assert(eventsSince('operate', t0).some(function (e) { return e.a === 'throttle'; }), 'sin evento operate');
+      assert((state.events || []).some(function (e) { return /ajuste fino/.test(e.text); }), 'sin aviso de ajuste fino');
+      Core.setInput('throttle', 0.9); Core.operate('throttle'); assert(state.throttle === 1, 'tope: ' + state.throttle);
+      Core.operate('throttle'); assert(near(state.throttle, 0.75, 1e-9), 'rebote: ' + state.throttle);
+      Core.setInput('mixture', 1); Core.operate('mixture'); assert(near(state.mixture, 0.75, 1e-9), 'mezcla: ' + state.mixture);
+      Core.setInput('mixture', 1);
+      Core.setInput('throttle', 0);
+    }],
+    ['arrastre del acelerador a lo largo de su eje', async function () {
+      Core.setInput('throttle', 0.3);
+      var p = findPoint('throttle'), d = screenDir('throttle'), cam0 = Core.camera.position.clone();
+      await drag(p, d.x * 50, d.y * 50);
+      assert(state.throttle > 0.45, 'hacia adentro: ' + state.throttle.toFixed(3));
+      var v1 = state.throttle; p = findPoint('throttle');
+      await drag(p, -d.x * 50, -d.y * 50);
+      assert(state.throttle < v1 - 0.2, 'hacia afuera: ' + state.throttle.toFixed(3));
+      assert(Core.camera.position.distanceTo(cam0) < 0.005, 'la cámara orbitó durante el arrastre');
+      Core.setInput('throttle', 0);
+    }],
+    ['arrastre de carb heat: sacar = sube el valor', async function () {
+      var p = await viewFor('carb-heat', ['center', 'panel']); assert(p, 'carb heat no visible');
+      Core.setInput('carbHeat', 0.5);
+      var d = screenDir('carb-heat');
+      await drag(p, d.x * 40, d.y * 40);
+      assert(state.carbHeat > 0.6, 'carbHeat ' + state.carbHeat.toFixed(3));
+      Core.setInput('carbHeat', 0);
+    }],
+    ['traba de comandos: el volante no se mueve y avisa', async function () {
+      Core.applyPreset('parked'); state.events.length = 0;
+      assert(state.controlLock === true, 'el preset parked debería tener la traba');
+      Core.focusPreset('pilot'); await wait(1000);
+      var p = findPoint('yoke'); assert(p, 'volante no visible');
+      await drag(p, 60, 0);
+      assert(state.yokeRoll === 0, 'yokeRoll ' + state.yokeRoll);
+      var tested = (state.events || []).some(function (e) { return /Primero sacá la traba de comandos/.test(e.text); });
+      await wait(300);
+      assert(tested || /traba/.test(logEl.textContent), 'sin mensaje de la traba');
+    }],
+    ['volante: arrastre 2D y vuelta al centro', async function () {
+      Core.setInput('controlLock', false);
+      var p = findPoint('yoke'); assert(p, 'volante no visible');
+      var during = { roll: 0, pitch: 0 };
+      await drag(p, 60, 60, { during: async function () { during.roll = state.yokeRoll; during.pitch = state.yokePitch; } });
+      assert(near(during.roll, 0.5, 0.08) && near(during.pitch, 0.5, 0.08), 'durante: ' + during.roll.toFixed(2) + '/' + during.pitch.toFixed(2));
+      await wait(500);
+      assert(Math.abs(state.yokeRoll) < 0.01 && Math.abs(state.yokePitch) < 0.01, 'no volvió al centro: ' + state.yokeRoll + '/' + state.yokePitch);
+    }],
+    ['teclado: flechas (rampa y retorno), traba', async function () {
+      key('keydown', 'ArrowLeft'); await wait(300);
+      var r = state.yokeRoll; key('keyup', 'ArrowLeft');
+      assert(r < -0.2 && r > -0.8, 'roll con ← ' + r.toFixed(2));
+      key('keydown', 'ArrowDown'); await wait(250);
+      var pch = state.yokePitch; key('keyup', 'ArrowDown');
+      assert(pch > 0.2, 'pitch con ↓ (tirar) ' + pch.toFixed(2));
+      await wait(500);
+      assert(Math.abs(state.yokeRoll) < 0.01 && Math.abs(state.yokePitch) < 0.01, 'no volvió al centro');
+      Core.setInput('controlLock', true);
+      key('keydown', 'ArrowRight'); await wait(200); key('keyup', 'ArrowRight');
+      assert(state.yokeRoll === 0, 'con traba se movió: ' + state.yokeRoll);
+      Core.setInput('controlLock', false);
+    }],
+    ['teclado: acelerador, flaps, trim, master, timón, frenos', async function () {
+      Core.setInput('throttle', 0.5);
+      await tap('PageUp'); await tap('+');
+      assert(near(state.throttle, 0.6, 1e-6), 'PageUp/+ ' + state.throttle);
+      await tap('-'); assert(near(state.throttle, 0.55, 1e-6), '- ' + state.throttle);
+      Core.setInput('throttle', 0);
+      key('keydown', 'f'); await wait(50); assert(state.flapSwitch === 'DOWN', 'F ' + state.flapSwitch);
+      key('keyup', 'f'); await wait(30); assert(state.flapSwitch === 'OFF', 'F soltada ' + state.flapSwitch);
+      await tap('r'); assert(state.flapSwitch === 'UP', 'R ' + state.flapSwitch);
+      Core.setInput('trim', 0); await tap('t'); assert(state.trim < 0, 'T nariz abajo ' + state.trim);
+      await tap('g'); await tap('g'); assert(state.trim > 0, 'G nariz arriba ' + state.trim);
+      Core.setInput('trim', 0);
+      Core.setInput('masterBat', false);
+      await tap('m'); assert(state.masterBat && state.masterAlt, 'M encendido');
+      await tap('m'); assert(!state.masterBat && !state.masterAlt, 'M apagado');
+      key('keydown', 'z'); await wait(250); var rz = state.rudder; key('keyup', 'z');
+      assert(rz < -0.2, 'Z timón izquierda ' + rz);
+      key('keydown', 'b'); await wait(30); assert(state.brakeL === 1 && state.brakeR === 1, 'B frenos');
+      key('keyup', 'b'); await wait(30); assert(state.brakeL === 0 && state.brakeR === 0, 'B suelto');
+      await wait(400); assert(Math.abs(state.rudder) < 0.01, 'timón no volvió');
+    }],
+    ['teclado: presets 1–8, C swap, P pausa, Esc', async function () {
+      var t0 = performance.now();
+      await tap('3'); await wait(950);
+      var pe = eventsSince('preset', t0); assert(pe.length && pe[pe.length - 1].a === 'panel', 'preset panel');
+      var d = Core.camera.position.distanceTo(Core.cockpit.presets.panel.position);
+      assert(d < 0.03, 'cámara no llegó al preset panel: ' + d.toFixed(3));
+      await tap('c'); assert(Core.getMainView() === 'exterior', 'C → exterior');
+      assert(lastEvent('viewchange').a === 'exterior', 'viewchange exterior');
+      assert(lastEvent('layout').a.main === 'exterior', 'layout main');
+      await tap('c'); assert(Core.getMainView() === 'cockpit', 'C → cabina');
+      await tap('p'); assert(state.paused === true && lastEvent('pause').a === true, 'P pausa');
+      var t = state.time; await wait(200); assert(state.time === t, 'el sim avanzó en pausa');
+      await tap('p'); assert(state.paused === false, 'P reanuda');
+      Core.select('master'); await tap('Escape'); assert(Core.getSelected() === null, 'Esc no deseleccionó');
+    }],
+    ['inset: clic cambia la vista principal (y vuelve)', async function () {
+      var r = Core.getInsetRect(); assert(r, 'sin inset');
+      await click({ x: r.x + r.w / 2, y: r.y + r.h / 2 });
+      assert(Core.getMainView() === 'exterior', 'clic en inset → exterior');
+      r = Core.getInsetRect();
+      await click({ x: r.x + r.w / 2, y: r.y + r.h / 2 });
+      assert(Core.getMainView() === 'cockpit', 'clic en inset → cabina');
+    }],
+    ['operate: llave START momentáneo, flaps 2 s, master con interlock, perilla', async function () {
+      Core.setInput('ignition', 'BOTH');
+      Core.operate('ignition'); assert(state.ignition === 'START', 'BOTH → START (motor parado): ' + state.ignition);
+      await wait(1400); assert(state.ignition === 'BOTH', 'START no volvió a BOTH: ' + state.ignition);
+      Core.setInput('ignition', 'OFF'); Core.operate('ignition'); assert(state.ignition === 'R', 'OFF → R');
+      Core.setInput('ignition', 'OFF');
+      Core.setInput('flapSwitch', 'OFF'); state.flaps = 0;
+      Core.operate('flap-switch'); assert(state.flapSwitch === 'DOWN', 'flaps DOWN');
+      await wait(2250); assert(state.flapSwitch === 'OFF', 'flaps no volvió a OFF: ' + state.flapSwitch);
+      Core.setInput('masterBat', false);
+      Core.operate('master', 'alt'); assert(state.masterAlt && state.masterBat, 'ALT arrastra BAT');
+      Core.operate('master', 'bat'); assert(!state.masterBat && !state.masterAlt, 'BAT off apaga ALT');
+      Core.setInput('altimeterSetting', 29.92); Core.operate('altimeter'); assert(near(state.altimeterSetting, 29.93, 1e-9), 'Kollsman ' + state.altimeterSetting);
+      Core.setInput('radio.obs', 355); Core.operate('vor-indicator'); assert(state.radio.obs === 0, 'OBS no dio la vuelta: ' + state.radio.obs);
+      assert(Core.operate('asi') === false, 'un instrumento no debería operarse');
+      Core.operate('light-switches', 'beacon'); assert(state.lights.beacon === true, 'beacon');
+      Core.operate('light-switches', 'pitot'); assert(state.pitotHeat === true, 'pitot');
+      Core.operate('doors', 'window'); assert(state.windowLeftOpen === true, 'ventanilla');
+      Core.operate('transponder'); assert(state.radio.xpdrMode === 'SBY', 'xpdr ' + state.radio.xpdrMode);
+      Core.applyPreset('parked');
+    }],
+    ['hold: pedales, frenos, START, flaps', async function () {
+      Core.hold('rudder-pedals', 'left', true); await wait(400);
+      assert(state.rudder < -0.95, 'pedal izq ' + state.rudder);
+      Core.hold('rudder-pedals', 'left', false); await wait(450);
+      assert(Math.abs(state.rudder) < 0.01, 'pedal no volvió ' + state.rudder);
+      Core.hold('toe-brakes', 'right', true); await wait(30);
+      assert(state.brakeR === 1 && state.brakeL === 0, 'freno der');
+      Core.hold('toe-brakes', 'right', false); await wait(30);
+      assert(state.brakeR === 0, 'freno der suelto');
+      Core.setInput('ignition', 'BOTH'); Core.hold('ignition', 'start', true); await wait(1500);
+      assert(state.ignition === 'START', 'START mantenido ' + state.ignition);
+      Core.hold('ignition', 'start', false); assert(state.ignition === 'BOTH', 'START soltado');
+      Core.setInput('ignition', 'OFF');
+      Core.hold('flap-switch', 'down', true); await wait(2300);
+      assert(state.flapSwitch === 'DOWN', 'flaps DOWN mantenido');
+      Core.hold('flap-switch', 'down', false); assert(state.flapSwitch === 'OFF', 'flaps soltado');
+    }],
+    ['pickMode: el clic llama fn(id) sin seleccionar', async function () {
+      Core.select(null); Core.focusPreset('pilot'); await wait(1000);
+      var p = findPoint('master') || await viewFor('master', ['left', 'panel']); assert(p, 'master no visible');
+      var got = null; Core.pickMode(function (id) { got = id; });
+      var t0 = performance.now(); await click(p);
+      assert(got === 'master', 'fn recibió ' + got);
+      assert(eventsSince('pick', t0).length === 1, 'evento pick');
+      assert(Core.getSelected() === null, 'no debería seleccionar');
+      await click(p); assert(Core.getSelected() === 'master', 'pickMode no es de un solo uso');
+    }],
+    ['arrastre: trim (arriba = nariz abajo), pedales, frenos mantenidos', async function () {
+      var p = await viewFor('trim-wheel', ['center', 'floor', 'panel']); assert(p, 'rueda de trim no visible');
+      Core.setInput('trim', 0); await drag(p, 0, -48);
+      assert(state.trim < -0.3, 'trim ' + state.trim.toFixed(2));
+      Core.setInput('trim', 0);
+      p = await viewFor('rudder-pedals', ['floor']); assert(p, 'pedales no visibles');
+      var mid = 0; await drag(p, 60, 0, { during: async function () { mid = state.rudder; } });
+      assert(near(mid, 0.5, 0.08), 'rudder durante ' + mid.toFixed(2));
+      await wait(450); assert(Math.abs(state.rudder) < 0.01, 'rudder no volvió');
+      p = findPoint('toe-brakes') || await viewFor('toe-brakes', ['floor']); assert(p, 'frenos no visibles');
+      var id = ++pid; fire('pointerdown', p.x, p.y, { id: id }); await wait(500);
+      var held = (p.sub === 'right' ? state.brakeR : state.brakeL);
+      fire('pointerup', p.x, p.y, { id: id }); await wait(30);
+      assert(held === 1, 'freno mantenido ' + held + ' (' + p.sub + ')');
+      assert(state.brakeL === 0 && state.brakeR === 0, 'frenos no se soltaron');
+    }],
+    ['exterior: agrandar animación y restaurar', async function () {
+      Core.setMainView('cockpit');
+      assert(Core.playExterior('axes-roll', { enlarge: true }) === true, 'play devolvió false');
+      assert(Core.getMainView() === 'exterior', 'no se agrandó');
+      await wait(400);
+      Core.playExterior(null);
+      assert(Core.getMainView() === 'cockpit', 'no restauró la cabina');
+      Core.setExteriorHighlight(['aileronL', 'aileronR']); Core.setExteriorHighlight([]);
+    }],
+    ['setInput con rutas y rangos; objetivo resaltado', async function () {
+      Core.setInput('lights.nav', true); assert(state.lights.nav === true, 'lights.nav');
+      Core.setInput('radio.obs', 90); assert(state.radio.obs === 90, 'radio.obs');
+      Core.setInput('throttle', 3); assert(state.throttle === 1, 'clamp throttle ' + state.throttle);
+      Core.setInput('masterAlt', true); assert(state.masterBat === true, 'interlock vía setInput');
+      Core.setTargetHighlight('mixture'); Core.setTargetHighlight(['mixture', 'throttle']); Core.setTargetHighlight(null);
+      var pc = Core.projectControl('throttle'); assert(pc && isFinite(pc.x) && isFinite(pc.y), 'projectControl');
+      Core.applyPreset('parked');
+    }],
+    ['resize: el inset se recalcula (ResizeObserver)', async function () {
+      var t0 = performance.now();
+      view.style.flex = '0 0 600px'; await wait(600);
+      var r = Core.getInsetRect(), e = expectedInset();
+      assert(eventsSince('layout', t0).length > 0, 'sin evento layout');
+      assert(r.w === e.w && r.x === e.x, 'inset ' + JSON.stringify(r) + ' esperado ' + JSON.stringify(e));
+      view.style.flex = ''; await wait(600);
+      e = expectedInset(); r = Core.getInsetRect();
+      assert(r.w === e.w, 'inset tras restaurar ' + r.w + ' vs ' + e.w);
+    }]
+  ];
+
+  async function runTests() {
+    var out = $('tests'); out.textContent = '';
+    var results = [], pass = 0;
+    for (var i = 0; i < TESTS.length; i++) {
+      var name = TESTS[i][0], row = document.createElement('div');
+      try { await TESTS[i][1](); results.push({ name: name, ok: true }); pass++; row.className = 'pass'; row.textContent = 'PASS ' + name; }
+      catch (e) { results.push({ name: name, ok: false, error: e.message }); row.className = 'fail'; row.textContent = 'FAIL ' + name + ' — ' + e.message; console.error('[core-harness] FAIL ' + name, e); }
+      out.appendChild(row);
+      key('keyup', 'ArrowLeft'); key('keyup', 'ArrowRight'); key('keyup', 'ArrowUp'); key('keyup', 'ArrowDown');
+    }
+    var sum = document.createElement('div'); sum.className = 'sum'; sum.textContent = pass + ' / ' + TESTS.length + ' OK';
+    out.appendChild(sum);
+    console.log('[core-harness] ' + pass + '/' + TESTS.length + ' OK', results.filter(function (r) { return !r.ok; }));
+    window.__coreTestResults = { pass: pass, total: TESTS.length, results: results };
+    Core.applyPreset('parked'); Core.focusPreset('pilot'); Core.select(null);
+    return window.__coreTestResults;
+  }
+  window.__runCoreTests = runTests;
+  $('runTests').addEventListener('click', runTests);
+  if (params.get('autotest') === '1' && ok) setTimeout(runTests, 1500);
+})();
+</script>
+</body>
+</html>

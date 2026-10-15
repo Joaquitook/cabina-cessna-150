@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cabina 3D: vista de prueba</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=B612+Mono:wght@400;700&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #E7EBEE; --surface: #F6F8F9; --line: #C3CCD3; --fg: #13202B; --fg-soft: #4A5966; --accent: #C8641A;
+    --font-display: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+    --font-body: 'Atkinson Hyperlegible', system-ui, sans-serif;
+    --font-data: 'B612 Mono', ui-monospace, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #0D1318; --surface: #151D24; --line: #2C3944; --fg: #E4EAEE; --fg-soft: #9AA9B5; --accent: #F08A3C; color-scheme: dark; }
+  }
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--bg); color: var(--fg); font: 14px/1.4 var(--font-body); display: flex; flex-direction: column; }
+  header { background: var(--surface); border-bottom: 1px solid var(--line); padding: 8px 16px; display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
+  h1 { font: 600 18px/1.2 var(--font-display); text-transform: uppercase; letter-spacing: .04em; margin: 0 8px 0 0; }
+  select, button { font: 13px var(--font-body); padding: 4px 8px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); border-radius: 6px; }
+  button[aria-pressed="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
+  button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  #view { position: relative; flex: 1; min-height: 0; }
+  #view canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+  #info { position: absolute; left: 12px; bottom: 12px; padding: 6px 10px; border-radius: 6px; background: rgba(13,19,24,.72); color: #E4EAEE; font: 12px var(--font-data); pointer-events: none; max-width: calc(100% - 40px); }
+  #pick { position: absolute; left: 12px; top: 12px; padding: 6px 10px; border-radius: 6px; background: rgba(13,19,24,.72); color: #F2C14E; font: 600 14px var(--font-display); letter-spacing: .04em; pointer-events: none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Cabina C150 — prueba</h1>
+  <label>Vista <select id="viewSel"></select></label>
+  <button id="demo" aria-pressed="false">Animar mandos</button>
+  <button id="engine" aria-pressed="false">Motor en marcha</button>
+  <button id="lock" aria-pressed="false">Traba de comandos</button>
+  <button id="doors" aria-pressed="false">Puertas / ventanilla</button>
+  <button id="night" aria-pressed="false">Luces de noche</button>
+  <button id="target" aria-pressed="false">Resaltar objetivo</button>
+  <label>Salida <select id="enc"><option value="srgb">PBR (app)</option><option value="linear">Linear (antes)</option></select></label>
+</header>
+<div id="view"><div id="pick"></div><div id="info"></div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/geometries/RoundedBoxGeometry.js"></script>
+<script src="../src/sim.js"></script>
+<script src="../src/gauges.js"></script>
+<script src="../src/world.js"></script>
+<script src="../src/cockpit.js"></script>
+<script src="../src/core.js"></script><!-- pipeline helpers only (Core.configureRenderer / createEnvironment) -->
+<script>
+(function () {
+  'use strict';
+  var C150 = window.C150 || {};
+  var view = document.getElementById('view'), info = document.getElementById('info'), pickEl = document.getElementById('pick');
+  var params = new URLSearchParams(location.search);
+
+  // simulation state: real sim when present, otherwise a small fake state with the contract fields
+  var state = C150.Sim ? C150.Sim.createState(params.get('preset') || 'parked') : {
+    yokeRoll: 0, yokePitch: 0, rudder: 0, brakeL: 0, brakeR: 0, parkingBrake: false, controlLock: false, throttle: 0, mixture: 1,
+    carbHeat: 0, primerOut: 0, primerLocked: true, ignition: 'OFF', masterBat: false, masterAlt: false, flapSwitch: 'OFF', trim: 0,
+    fuelValve: true, cabinHeat: 0, cabinAir: 0, lights: { dome: false, nav: false, strobe: false, beacon: false, taxi: false, landing: false },
+    pitotHeat: false, panelLights: 0, doorLeftOpen: false, doorRightOpen: false, windowLeftOpen: false,
+    engine: { rpm: 0 }, elec: { busVolts: 0, highVoltageLight: false }, air: { heading: 60 }, flaps: 0, propRpm: 0
+  };
+
+  var renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+  // same rendering pipeline as the app (core.js RENDERING NOTES) unless ?enc=linear
+  var legacy = params.get('enc') === 'linear';
+  if (legacy) { if (THREE.ColorManagement) THREE.ColorManagement.legacyMode = true; renderer.outputEncoding = THREE.LinearEncoding; }
+  else C150.Core.configureRenderer(renderer, 'alta');
+  document.getElementById('enc').value = legacy ? 'linear' : 'srgb';
+  view.appendChild(renderer.domElement);
+
+  var scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x9cc3e4);
+  var camera = new THREE.PerspectiveCamera(62, 1, 0.03, 60000);
+
+  var world = null;
+  try { if (C150.World) { world = C150.World.create(THREE); scene.add(world.group); } } catch (e) { console.error('world.js', e); world = null; }
+  if (!world) {
+    var ground = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.MeshBasicMaterial({ color: 0x6d8a4c }));
+    ground.rotation.x = -Math.PI / 2; ground.position.y = -0.65; scene.add(ground);
+  }
+  var hemi, sun;
+  if (legacy) {
+    hemi = new THREE.HemisphereLight(0xe3eefa, 0x6b5d48, 0.85);
+    sun = new THREE.DirectionalLight(0xfff3e0, 1.0);
+    sun.position.set(-3, 7, -4);
+    scene.add(hemi, sun);
+  } else {   // the app's lights (core.js buildLights), shadows and cabin environment
+    hemi = new THREE.HemisphereLight(new THREE.Color().setRGB(0.70, 0.80, 1.0), new THREE.Color().setRGB(0.42, 0.33, 0.24), 0.42);
+    sun = new THREE.DirectionalLight(new THREE.Color().setRGB(1.0, 0.955, 0.89), 3.3);
+    sun.target.position.set(0, 0.56, 0.42);
+    var sd = world && world.getSunDirectionLocal ? world.getSunDirectionLocal(new THREE.Vector3()) : new THREE.Vector3(-0.6, 0.53, -0.6);
+    sun.position.copy(sun.target.position).addScaledVector(sd, 5);
+    sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+    var scam = sun.shadow.camera; scam.left = scam.bottom = -1.3; scam.right = scam.top = 1.3; scam.near = 0.5; scam.far = 8;
+    sun.shadow.bias = -0.00025; sun.shadow.normalBias = 0.0035;
+    var bounce = new THREE.DirectionalLight(new THREE.Color().setRGB(1.0, 0.80, 0.62), 0.30); bounce.position.set(0.05, -1.0, 0.75);
+    scene.add(hemi, sun, sun.target, bounce);
+    scene.environment = C150.Core.createEnvironment(renderer, { cabin: true, size: 256 }).texture;
+    if (world) world.group.traverse(function (o) { if (o.material) [].concat(o.material).forEach(function (m) { m.toneMapped = false; }); });
+  }
+
+  var cockpit = C150.Cockpit.create(THREE, { gauges: C150.Gauges });
+  scene.add(cockpit.group);
+
+  var controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true; controls.dampingFactor = 0.12;
+  controls.minDistance = 0.05; controls.maxDistance = 4;
+
+  // view selector: presets first, then every control close-up
+  var sel = document.getElementById('viewSel');
+  Object.keys(cockpit.presets).forEach(function (k) {
+    var o = document.createElement('option'); o.value = 'preset:' + k; o.textContent = cockpit.presets[k].label; sel.appendChild(o);
+  });
+  Object.keys(cockpit.views).sort().forEach(function (k) {
+    var o = document.createElement('option'); o.value = 'view:' + k; o.textContent = 'Primer plano: ' + k; sel.appendChild(o);
+  });
+  var fly = null;
+  function goTo(v, instant) {
+    var spec = v.indexOf('preset:') === 0 ? cockpit.presets[v.slice(7)] : cockpit.views[v.slice(5)];
+    if (!spec) return;
+    var to = { p: spec.position.clone(), t: spec.target.clone() };
+    // OrbitControls needs a distance > 0: presets that sit AT the eye orbit around a point just ahead of it
+    if (to.p.distanceTo(to.t) < 0.05) to.t.add(new THREE.Vector3(0, 0, -0.3));
+    if (instant) { camera.position.copy(to.p); controls.target.copy(to.t); fly = null; return; }
+    fly = { p0: camera.position.clone(), t0: controls.target.clone(), p1: to.p, t1: to.t, k: 0 };
+  }
+  sel.addEventListener('change', function () { goTo(sel.value); });
+  var startView = params.get('view') ? (cockpit.views[params.get('view')] ? 'view:' + params.get('view') : 'preset:' + params.get('view')) : 'preset:pilot';
+  sel.value = startView; goTo(startView, true);
+
+  function toggle(id, fn) {
+    var b = document.getElementById(id);
+    b.addEventListener('click', function () { var on = b.getAttribute('aria-pressed') !== 'true'; b.setAttribute('aria-pressed', String(on)); fn(on); });
+  }
+  var demo = false, engineOn = false, targetOn = false;
+  toggle('demo', function (on) { demo = on; if (!on) { state.yokeRoll = 0; state.yokePitch = 0; state.rudder = 0; state.brakeL = state.brakeR = 0; } });
+  toggle('engine', function (on) {
+    engineOn = on;
+    if (C150.Sim && on) { C150.Sim.applyPreset(state, 'runup'); }
+    else if (C150.Sim) { C150.Sim.applyPreset(state, 'parked'); }
+  });
+  toggle('lock', function (on) { state.controlLock = on; });
+  toggle('doors', function (on) { state.doorLeftOpen = on; state.doorRightOpen = on; state.windowLeftOpen = on; });
+  toggle('night', function (on) {
+    state.panelLights = on ? 0.8 : 0; state.lights.dome = on; state.masterBat = state.masterBat || on;
+    scene.background.set(on ? 0x0b1220 : 0x9cc3e4); hemi.intensity = on ? 0.08 : 0.85; sun.intensity = on ? 0.02 : 1.0;
+  });
+  toggle('target', function (on) { targetOn = on; cockpit.setHighlight('mixture', on ? 'target' : null); });
+  document.getElementById('enc').addEventListener('change', function (e) {
+    params.set('enc', e.target.value); location.search = params.toString();
+  });
+
+  // picking: hover = soft glow, click = selected (orange) and fly to the close-up view
+  var ray = new THREE.Raycaster(), mouse = new THREE.Vector2(), hovered = null, selected = null, downAt = null;
+  function pickAt(ev) {
+    var r = renderer.domElement.getBoundingClientRect();
+    mouse.set(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
+    ray.setFromCamera(mouse, camera);
+    var hit = ray.intersectObjects(cockpit.pickables, false)[0];
+    return hit ? hit.object.userData : null;
+  }
+  renderer.domElement.addEventListener('pointermove', function (ev) {
+    var u = pickAt(ev), id = u ? u.controlId : null;
+    if (id !== hovered) {
+      if (hovered && hovered !== selected) cockpit.setHighlight(hovered, null);
+      hovered = id;
+      if (hovered && hovered !== selected) cockpit.setHighlight(hovered, 'hover');
+    }
+    pickEl.textContent = u ? u.controlId + (u.subId ? ' · ' + u.subId : '') : '';
+    renderer.domElement.style.cursor = u ? 'pointer' : 'default';
+  });
+  renderer.domElement.addEventListener('pointerdown', function (ev) { downAt = [ev.clientX, ev.clientY]; });
+  renderer.domElement.addEventListener('pointerup', function (ev) {
+    if (!downAt || Math.hypot(ev.clientX - downAt[0], ev.clientY - downAt[1]) > 5) return;
+    var u = pickAt(ev), id = u ? u.controlId : null;
+    if (selected) cockpit.setHighlight(selected, null);
+    selected = id;
+    if (selected) { cockpit.setHighlight(selected, 'selected'); if (cockpit.views[selected]) { sel.value = 'view:' + selected; goTo(sel.value); } }
+  });
+
+  function resize() {
+    var w = view.clientWidth, h = view.clientHeight;
+    renderer.setSize(w, h, false); camera.aspect = w / Math.max(1, h); camera.updateProjectionMatrix();
+  }
+  window.addEventListener('resize', resize); resize();
+
+  var last = performance.now(), t = 0, fpsAcc = 0, fpsN = 0, fps = 0;
+  function frame(now) {
+    var dt = Math.min(0.1, (now - last) / 1000); last = now; t += dt;
+    if (demo) {
+      state.yokeRoll = Math.sin(t * 0.9); state.yokePitch = Math.sin(t * 0.6);
+      state.rudder = Math.sin(t * 0.7); state.brakeL = Math.max(0, Math.sin(t * 1.3)); state.brakeR = Math.max(0, -Math.sin(t * 1.3));
+      state.throttle = 0.5 + 0.5 * Math.sin(t * 0.5); state.mixture = 0.5 + 0.5 * Math.cos(t * 0.45);
+      state.carbHeat = 0.5 + 0.5 * Math.sin(t * 0.8); state.cabinHeat = 0.5 + 0.5 * Math.sin(t * 0.55); state.cabinAir = 0.5 + 0.5 * Math.cos(t * 0.65);
+      state.primerOut = 0.5 + 0.5 * Math.sin(t * 1.1); state.primerLocked = Math.sin(t * 0.3) > 0;
+      state.trim = Math.sin(t * 0.4); state.parkingBrake = Math.sin(t * 0.35) > 0;
+      state.flapSwitch = ['UP', 'OFF', 'DOWN', 'OFF'][Math.floor(t * 0.7) % 4];
+      state.ignition = ['OFF', 'R', 'L', 'BOTH', 'START'][Math.floor(t * 0.8) % 5];
+      state.masterBat = Math.floor(t * 0.5) % 2 === 0; state.masterAlt = state.masterBat && Math.floor(t) % 2 === 0;
+      state.fuelValve = Math.sin(t * 0.25) > -0.5;
+      ['dome', 'nav', 'strobe', 'beacon', 'taxi', 'landing'].forEach(function (k, i) { state.lights[k] = Math.sin(t * 0.9 + i) > 0; });
+      state.pitotHeat = Math.sin(t * 0.9 + 6) > 0;
+      state.panelLights = 0.5 + 0.5 * Math.sin(t * 0.3);
+      if (!C150.Sim) { state.propRpm = engineOn ? 2300 : 0; }
+    }
+    if (C150.Sim) C150.Sim.step(state, dt);
+    else state.propRpm = engineOn ? 2300 : 0;
+    if (world) world.update(state, dt);
+    cockpit.update(state, dt);
+    if (fly) {
+      fly.k = Math.min(1, fly.k + dt * 2.2);
+      var e = fly.k * fly.k * (3 - 2 * fly.k);
+      camera.position.lerpVectors(fly.p0, fly.p1, e); controls.target.lerpVectors(fly.t0, fly.t1, e);
+      if (fly.k >= 1) fly = null;
+    }
+    controls.update();
+    renderer.render(scene, camera);
+    fpsAcc += dt; fpsN++;
+    if (fpsAcc > 0.5) { fps = fpsN / fpsAcc; fpsAcc = 0; fpsN = 0; }
+    info.textContent = 'tri ' + renderer.info.render.triangles + ' · llamadas ' + renderer.info.render.calls + ' · ' + fps.toFixed(0) + ' fps · ' +
+      (state.engine ? Math.round(state.engine.rpm || 0) + ' RPM' : '') + ' · flaps ' + Math.round(state.flaps || 0) + '°';
+    lastFrameAt = performance.now();
+    if (!rafPending) { rafPending = true; requestAnimationFrame(onRaf); }
+  }
+  var lastFrameAt = performance.now(), rafPending = true;
+  function onRaf(now) { rafPending = false; frame(now); }
+  requestAnimationFrame(onRaf);
+  // preview panes that never run requestAnimationFrame: keep rendering with a ~30 Hz timer
+  setInterval(function () { if (performance.now() - lastFrameAt > 250) frame(performance.now()); }, 33);
+  window.__cockpit = cockpit; window.__state = state; window.__renderer = renderer; window.__camera = camera; window.__controls = controls; window.__goTo = goTo;
+})();
+</script>
+</body>
+</html>

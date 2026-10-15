@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Exterior 3D: vista de prueba</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=B612+Mono:wght@400;700&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<!--
+  tests/exterior-preview.html — standalone check of src/exterior.js (C150.Exterior).
+  Serve the project root (python -m http.server 8710) and open /tests/exterior-preview.html.
+  - Vista: every public view (ext.VIEWS / setView). Animación: the 16 animations of contract §6 (ext.play).
+  - Parte: highlight one exterior part (ext.setHighlight). Etiquetas: ext.showLabels.
+  - Mandos en vivo: sliders write the sim inputs; C150.Sim.step runs so the surfaces/lights follow the state.
+  - ?autotest=1 plays every animation and highlights every part; results in window.__extTestResults.
+-->
+<style>
+  :root {
+    --bg: #E7EBEE; --surface: #F6F8F9; --line: #C3CCD3; --fg: #13202B; --fg-soft: #4A5966; --accent: #C8641A;
+    --font-display: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+    --font-body: 'Atkinson Hyperlegible', system-ui, sans-serif;
+    --font-data: 'B612 Mono', ui-monospace, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #0D1318; --surface: #151D24; --line: #2C3944; --fg: #E4EAEE; --fg-soft: #9AA9B5; --accent: #F08A3C; color-scheme: dark; }
+  }
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--bg); color: var(--fg); font: 14px/1.4 var(--font-body); display: flex; flex-direction: column; }
+  header { background: var(--surface); border-bottom: 1px solid var(--line); padding: 8px 16px; display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
+  h1 { font: 600 18px/1.2 var(--font-display); text-transform: uppercase; letter-spacing: .04em; margin: 0 8px 0 0; }
+  select, button, input { font: 13px var(--font-body); color: var(--fg); }
+  select, button { padding: 4px 8px; border: 1px solid var(--line); background: var(--bg); border-radius: 6px; }
+  button[aria-pressed="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
+  button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  label { display: inline-flex; align-items: center; gap: 4px; }
+  input[type=range] { width: 90px; }
+  #view { position: relative; flex: 1; min-height: 0; }
+  #view canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+  #cap { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); max-width: calc(100% - 32px); padding: 6px 12px; border-radius: 6px;
+    background: rgba(13,19,24,.78); color: #E4EAEE; font: 600 15px var(--font-display); letter-spacing: .02em; text-align: center; pointer-events: none; }
+  #log { position: absolute; left: 12px; top: 12px; padding: 6px 10px; border-radius: 6px; background: rgba(13,19,24,.72); color: #9AA9B5; font: 12px var(--font-data); pointer-events: none; white-space: pre; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Exterior C150 — prueba</h1>
+  <label>Vista <select id="viewSel"></select></label>
+  <label>Animación <select id="animSel"><option value="">(ninguna)</option></select></label>
+  <button id="stop">Parar</button>
+  <label>Parte <select id="partSel"><option value="">(ninguna)</option></select></label>
+  <button id="labels" aria-pressed="false">Etiquetas</button>
+  <label>Volante <input id="roll" type="range" min="-1" max="1" step="0.05" value="0"></label>
+  <label>Prof. <input id="pitch" type="range" min="-1" max="1" step="0.05" value="0"></label>
+  <label>Pedales <input id="rud" type="range" min="-1" max="1" step="0.05" value="0"></label>
+  <label>Trim <input id="trim" type="range" min="-1" max="1" step="0.05" value="0"></label>
+  <label>Escenario <select id="preset"></select></label>
+  <button id="lights" aria-pressed="false">Luces + master</button>
+</header>
+<div id="view"><div id="log"></div><div id="cap"></div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+<script src="../src/sim.js"></script>
+<script src="../src/exterior.js"></script>
+<script src="../src/core.js"></script><!-- pipeline helpers only (Core.configureRenderer / createEnvironment) -->
+<script>
+(function () {
+  'use strict';
+  var C150 = window.C150 || {};
+  var $ = function (id) { return document.getElementById(id); };
+  var view = $('view'), cap = $('cap'), logEl = $('log');
+  var state = C150.Sim.createState('parked');
+  var renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+  view.insertBefore(renderer.domElement, view.firstChild);
+  C150.Core.configureRenderer(renderer, 'alta');            // same pipeline as the app (core.js RENDERING NOTES)
+  var ext = C150.Exterior.create(THREE);
+  if (!ext.scene.environment) ext.scene.environment = C150.Core.createEnvironment(renderer, { cabin: false, studio: true, size: 128 }).texture;
+  ext.scene.traverse(function (o) {                          // unlit helpers are not tone mapped (as core does)
+    if (o.material) [].concat(o.material).forEach(function (m) { if (m.isMeshBasicMaterial || m.isSpriteMaterial || m.isLineBasicMaterial) m.toneMapped = false; });
+  });
+  var controls = new THREE.OrbitControls(ext.camera, renderer.domElement);
+  if (ext.target && ext.target.isVector3) controls.target = ext.target;
+  controls.enableDamping = true; controls.minDistance = 2.5; controls.maxDistance = 40;
+  controls.addEventListener('start', function () { if (Math.abs(ext.camera.up.y - 1) > 1e-3) ext.camera.up.set(0, 1, 0); });
+
+  function resize() {
+    var w = Math.max(1, view.clientWidth), h = Math.max(1, view.clientHeight);
+    renderer.setSize(w, h, false);
+    ext.camera.aspect = w / h; ext.camera.updateProjectionMatrix();
+    if (ext.setSize) ext.setSize(w, h);
+  }
+  window.addEventListener('resize', resize); resize();
+
+  function opt(sel, v, label) { var o = document.createElement('option'); o.value = v; o.textContent = label || v; sel.appendChild(o); }
+  (ext.VIEWS ? Object.keys(ext.VIEWS) : ['rear34', 'side', 'top', 'front', 'rear', 'pitot']).forEach(function (v) { opt($('viewSel'), v); });
+  (ext.ANIMATIONS || []).forEach(function (a) { opt($('animSel'), a); });
+  (ext.PARTS || []).forEach(function (p) { opt($('partSel'), p); });
+  Object.keys(C150.Sim.PRESETS).forEach(function (p) { opt($('preset'), p, C150.Sim.PRESETS[p].label); });
+
+  $('viewSel').onchange = function () { ext.setView(this.value); };
+  $('animSel').onchange = function () { if (this.value) ext.play(this.value, { loop: true }); else ext.stop(); };
+  $('stop').onclick = function () { ext.stop(); $('animSel').value = ''; };
+  $('partSel').onchange = function () { ext.setHighlight(this.value ? [this.value] : []); };
+  $('labels').onclick = function () { var on = this.getAttribute('aria-pressed') !== 'true'; this.setAttribute('aria-pressed', String(on)); ext.showLabels(on); };
+  [['roll', 'yokeRoll'], ['pitch', 'yokePitch'], ['rud', 'rudder'], ['trim', 'trim']].forEach(function (p) {
+    $(p[0]).oninput = function () { state.controlLock = false; state[p[1]] = +this.value; };
+  });
+  $('preset').onchange = function () { C150.Sim.applyPreset(state, this.value); };
+  $('lights').onclick = function () {
+    var on = this.getAttribute('aria-pressed') !== 'true'; this.setAttribute('aria-pressed', String(on));
+    C150.Sim.actions.setMaster(state, 'bat', on);
+    ['nav', 'strobe', 'beacon', 'taxi', 'landing'].forEach(function (k) { state.lights[k] = on; });
+  };
+
+  var last = performance.now(), lastRaf = 0;
+  function frame(dt) {
+    C150.Sim.step(state, dt);
+    ext.followAttitude = !(state.air && state.air.onGround);
+    ext.update(state, dt);
+    if (!ext.cameraBusy) controls.update();
+    renderer.render(ext.scene, ext.camera);
+    cap.textContent = ext.caption || '';
+    logEl.textContent = 'vista ' + (ext.view || '-') + ' · anim ' + (ext.playing || '-') +
+      '\nalerones ' + Math.round(state.surfaces.aileronL) + '/' + Math.round(state.surfaces.aileronR) +
+      '° · prof ' + Math.round(state.surfaces.elevator) + '° · timón ' + Math.round(state.surfaces.rudder) + '°';
+  }
+  function loop(now) { lastRaf = now; var dt = Math.min(0.1, (now - last) / 1000); last = now; frame(dt); requestAnimationFrame(loop); }
+  requestAnimationFrame(loop);
+  // preview panes that pause requestAnimationFrame: keep animating from a timer
+  setInterval(function () { var t = performance.now(); if (t - lastRaf > 250) { frame(Math.min(0.1, (t - last) / 1000)); last = t; } }, 33);
+
+  window.__ext = ext; window.__state = state;
+
+  if (/autotest=1/.test(location.search)) {
+    var results = [];
+    function check(name, fn) { try { var r = fn(); results.push({ name: name, ok: r !== false }); } catch (e) { results.push({ name: name, ok: false, error: e.message }); } }
+    var A = ['axes-roll', 'axes-pitch', 'axes-yaw', 'four-forces', 'aoa-stall', 'flaps-extend', 'trim-tab', 'adverse-yaw', 'left-turning',
+      'coordinated-turn', 'ground-steering', 'propeller-throttle', 'lights-demo', 'controls-check', 'carb-ice', 'pitot-static'];
+    A.forEach(function (a) {
+      check('play ' + a, function () {
+        if (ext.play(a, {}) === false) return false;
+        for (var i = 0; i < 40; i++) ext.update(state, 0.1);   // 4 s of the animation
+        renderer.render(ext.scene, ext.camera);
+        return typeof ext.caption === 'string' && ext.caption.length > 0;
+      });
+    });
+    ext.stop();
+    (ext.PARTS || []).forEach(function (p) { check('highlight ' + p, function () { ext.setHighlight([p]); ext.update(state, 0.05); renderer.render(ext.scene, ext.camera); return true; }); });
+    ext.setHighlight([]);
+    check('play desconocida devuelve false', function () { return ext.play('no-existe') === false; });
+    window.__extTestResults = { pass: results.filter(function (r) { return r.ok; }).length, total: results.length, results: results };
+    console.log('[exterior-preview] ' + window.__extTestResults.pass + '/' + results.length + ' OK');
+  }
+})();
+</script>
+</body>
+</html>

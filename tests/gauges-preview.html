@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vista de instrumentos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=B612+Mono:wght@400;700&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #E7EBEE; --surface: #F6F8F9; --line: #C3CCD3; --fg: #13202B; --fg-soft: #4A5966;
+    --accent: #C8641A; --panel: #8C9196;
+    --font-display: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+    --font-body: 'Atkinson Hyperlegible', system-ui, sans-serif;
+    --font-data: 'B612 Mono', ui-monospace, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0D1318; --surface: #151D24; --line: #2C3944; --fg: #E4EAEE; --fg-soft: #9AA9B5; --accent: #F08A3C; --panel: #3A3D40; color-scheme: dark; }
+  }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.45 var(--font-body); }
+  header { position: sticky; top: 0; z-index: 2; background: var(--surface); border-bottom: 1px solid var(--line); padding: 10px 16px; }
+  h1 { font: 600 20px/1.2 var(--font-display); text-transform: uppercase; letter-spacing: .04em; margin: 0 0 6px; }
+  h2 { font: 600 17px/1.2 var(--font-display); text-transform: uppercase; letter-spacing: .04em; margin: 18px 0 8px; }
+  .controls { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 4px 14px; align-items: center; }
+  .controls label { display: grid; grid-template-columns: 62px 1fr 52px; gap: 6px; align-items: center; font-size: 13px; color: var(--fg-soft); }
+  .controls output { font: 12px var(--font-data); color: var(--fg); text-align: right; }
+  .controls input[type=range] { width: 100%; accent-color: var(--accent); }
+  .row { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; margin-top: 6px; font-size: 13px; }
+  .stats { font: 12px var(--font-data); color: var(--fg-soft); }
+  main { padding: 0 16px 40px; }
+  .grid { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end; background: var(--panel); padding: 14px; border-radius: 10px; }
+  figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  figcaption { font: 11px var(--font-data); color: #F2F2F2; opacity: .85; }
+  canvas { display: block; }
+  canvas.round { width: calc(170px * var(--z, 1)); height: calc(170px * var(--z, 1)); }
+  canvas.small { width: calc(124px * var(--z, 1)); height: calc(124px * var(--z, 1)); }
+  canvas.cluster { width: calc(230px * var(--z, 1)); height: calc(115px * var(--z, 1)); }
+  canvas.radio { width: calc(320px * var(--z, 1)); height: calc(100px * var(--z, 1)); }
+  canvas.strip { width: calc(320px * var(--z, 1)); height: calc(80px * var(--z, 1)); }
+  canvas.trim { width: calc(52px * var(--z, 1)); height: calc(166px * var(--z, 1)); }
+  canvas.flap { width: calc(42px * var(--z, 1)); height: calc(168px * var(--z, 1)); }
+  .note { color: var(--fg-soft); font-size: 13px; margin: 6px 0 0; }
+  @media (max-width: 480px) { canvas.radio, canvas.strip { width: 100%; height: auto; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Instrumentos C150.Gauges — vista de prueba</h1>
+  <div class="controls" id="controls"></div>
+  <div class="row">
+    <label><input type="checkbox" id="animate"> Animar (estado 3)</label>
+    <label>Variante <select id="variant"><option>150M</option><option>A150M</option></select></label>
+    <label>Zoom <select id="zoom"><option value="0.75">75%</option><option value="1" selected>100%</option><option value="1.5">150%</option><option value="2">200%</option></select></label>
+    <span class="stats" id="stats"></span>
+  </div>
+  <p class="note" id="simnote"></p>
+</header>
+<main id="main"></main>
+
+<script src="../src/sim.js" onerror="window.__noSim = true"></script>
+<script src="../src/gauges.js"></script>
+<script>
+(function () {
+  'use strict';
+  var G = window.C150 && window.C150.Gauges;
+  var Sim = window.C150 && window.C150.Sim;
+  document.getElementById('simnote').textContent = Sim
+    ? 'Usando C150.Sim.createState() como base de cada estado (se sobrescriben los valores de la demo).'
+    : 'src/sim.js no está disponible: se usan estados falsos locales con los campos del contrato.';
+
+  // Estado falso con todos los campos que leen los instrumentos (contrato §3).
+  function fakeState() {
+    return {
+      variant: '150M', trim: 0, flaps: 0, altimeterSetting: 29.92, hiCorrection: 0, time: 0, fieldElevation: 100,
+      lights: { dome: false, nav: false, strobe: false, beacon: false, taxi: false, landing: false },
+      radio: { comOn: false, comFreq: 118.10, comStby: 121.90, navFreq: 113.90, navStby: 116.30, obs: 0, xpdrMode: 'OFF', xpdrCode: '7000' },
+      engine: { running: false, rpm: 0, oilTempF: 70, oilPressPsi: 0 },
+      elec: { busVolts: 0, ammeterAmps: 0, batteryPct: 100, highVoltageLight: false },
+      vacuum: { suctionInHg: 0 },
+      gyro: { aiSpin: 0, hiSpin: 0, tcPowered: false },
+      fuel: { leftGal: 13, rightGal: 11.4 },
+      air: { ias: 0, tas: 0, altitude: 100, indicatedAlt: 100, vs: 0, pitch: 0, bank: 0, heading: 150, hiHeading: 150,
+             turnRate: 0, slip: 0, onGround: true },
+      pos: { x: -75, z: -129.9 }
+    };
+  }
+  function makeState(preset) {
+    var st = null;
+    if (Sim && typeof Sim.createState === 'function') { try { st = Sim.createState(preset); } catch (e) { st = null; } }
+    var f = fakeState();
+    if (!st) return f;
+    for (var k in f) if (st[k] === undefined) st[k] = f[k];
+    return st;
+  }
+  function assign(dst, src) {
+    for (var k in src) {
+      if (src[k] && typeof src[k] === 'object' && !Array.isArray(src[k])) { dst[k] = dst[k] || {}; assign(dst[k], src[k]); }
+      else dst[k] = src[k];
+    }
+    return dst;
+  }
+
+  var parked = assign(makeState('parked'), {
+    masterBat: false, masterAlt: false, flaps: 0, trim: 0,
+    engine: { running: false, rpm: 0, oilTempF: 70, oilPressPsi: 0 },
+    elec: { busVolts: 0, ammeterAmps: 0 }, vacuum: { suctionInHg: 0 },
+    gyro: { aiSpin: 0, hiSpin: 0, tcPowered: false },
+    radio: { comOn: false, xpdrMode: 'OFF' },
+    air: { ias: 0, vs: 0, pitch: 0, bank: 0, heading: 150, hiHeading: 168, turnRate: 0, slip: 0, altitude: 100, indicatedAlt: 100 }
+  });
+  var runup = assign(makeState('runup'), {
+    masterBat: true, masterAlt: true, flaps: 0, trim: 0,
+    engine: { running: true, rpm: 1700, oilTempF: 135, oilPressPsi: 52 },
+    elec: { busVolts: 14.1, ammeterAmps: 6 }, vacuum: { suctionInHg: 5.0 },
+    gyro: { aiSpin: 1, hiSpin: 1, tcPowered: true },
+    radio: { comOn: true, xpdrMode: 'SBY', obs: 60 },
+    air: { ias: 0, vs: 0, pitch: 0, bank: 0, heading: 60, hiHeading: 60, turnRate: 0, slip: 0, altitude: 100, indicatedAlt: 110 },
+    pos: { x: -480.3, z: 208 }
+  });
+  var flying = assign(makeState('cruise'), {
+    masterBat: true, masterAlt: true, flaps: 0, trim: 0.25,
+    engine: { running: true, rpm: 2450, oilTempF: 190, oilPressPsi: 50 },
+    elec: { busVolts: 14.2, ammeterAmps: 2 }, vacuum: { suctionInHg: 5.0 },
+    gyro: { aiSpin: 1, hiSpin: 1, tcPowered: true },
+    radio: { comOn: true, xpdrMode: 'ALT', xpdrCode: '7000', obs: 180 },
+    fuel: { leftGal: 7.5, rightGal: 6.8 },
+    air: { ias: 75, vs: 500, pitch: 6, bank: 30, heading: 95, hiHeading: 97, turnRate: 0, slip: 0.12,
+           altitude: 2500, indicatedAlt: 2500 },
+    pos: { x: 3000, z: -8000 }
+  });
+  var STATES = [
+    { name: '1 · Estacionado, sin energía', st: parked },
+    { name: '2 · Prueba de motor (1700 RPM)', st: runup },
+    { name: '3 · Virando 30° a la derecha y subiendo', st: flying }
+  ];
+
+  var CLASS = { 'compass': 'strip', 'navcom': 'radio', 'transponder': 'radio', 'oil-gauges': 'cluster',
+    'fuel-gauges': 'cluster', 'trim-indicator': 'trim', 'flap-indicator': 'flap',
+    'clock': 'small', 'oat': 'small', 'suction': 'small', 'ammeter': 'small' };
+
+  var main = document.getElementById('main'), cells = [];
+  STATES.forEach(function (S, si) {
+    var h = document.createElement('h2'); h.textContent = S.name; main.appendChild(h);
+    var grid = document.createElement('div'); grid.className = 'grid'; main.appendChild(grid);
+    G.IDS.forEach(function (id) {
+      var sz = G.size(id), fig = document.createElement('figure'), cv = document.createElement('canvas');
+      cv.width = sz.w; cv.height = sz.h; cv.className = CLASS[id] || 'round';
+      cv.setAttribute('data-gauge', id); cv.setAttribute('data-state', si);
+      var cap = document.createElement('figcaption'); cap.textContent = id;
+      fig.appendChild(cv); fig.appendChild(cap); grid.appendChild(fig);
+      cells.push({ id: id, st: S.st, ctx: cv.getContext('2d'), w: sz.w, h: sz.h, sig: null });
+    });
+  });
+
+  // Controles: modifican el estado 3 (en vuelo).
+  var SLIDERS = [
+    ['IAS', 'air.ias', 0, 180, 1], ['ALT', 'air.indicatedAlt', -200, 12000, 10], ['BANK', 'air.bank', -90, 90, 1],
+    ['PITCH', 'air.pitch', -30, 30, 0.5], ['VS', 'air.vs', -2500, 2500, 10], ['HDG', 'air.heading', 0, 359, 1],
+    ['SLIP', 'air.slip', -1, 1, 0.01], ['RPM', 'engine.rpm', 0, 3500, 10], ['AMPS', 'elec.ammeterAmps', -60, 60, 1],
+    ['SUCT', 'vacuum.suctionInHg', 0, 10, 0.1], ['AI SPIN', 'gyro.aiSpin', 0, 1, 0.01], ['HI SPIN', 'gyro.hiSpin', 0, 1, 0.01],
+    ['FLAPS', 'flaps', 0, 40, 1], ['TRIM', 'trim', -1, 1, 0.01], ['OBS', 'radio.obs', 0, 359, 1],
+    ['BARO', 'altimeterSetting', 28.5, 31, 0.01], ['FUEL L', 'fuel.leftGal', 0, 13, 0.05], ['BUS V', 'elec.busVolts', 0, 14.4, 0.1]
+  ];
+  function getp(o, p) { return p.split('.').reduce(function (a, k) { return a == null ? a : a[k]; }, o); }
+  function setp(o, p, v) { var ks = p.split('.'), last = ks.pop(); ks.reduce(function (a, k) { return a[k] = a[k] || {}; }, o)[last] = v; }
+  var inputs = {};
+  var box = document.getElementById('controls');
+  SLIDERS.forEach(function (s) {
+    var lab = document.createElement('label'), span = document.createElement('span'), inp = document.createElement('input'), out = document.createElement('output');
+    span.textContent = s[0]; inp.type = 'range'; inp.min = s[2]; inp.max = s[3]; inp.step = s[4];
+    inp.value = getp(flying, s[1]) || 0; out.textContent = inp.value;
+    inp.addEventListener('input', function () { setp(flying, s[1], parseFloat(inp.value)); out.textContent = inp.value; derive(); });
+    lab.appendChild(span); lab.appendChild(inp); lab.appendChild(out); box.appendChild(lab);
+    inputs[s[1]] = { inp: inp, out: out };
+  });
+  document.getElementById('variant').addEventListener('change', function (e) {
+    STATES.forEach(function (S) { S.st.variant = e.target.value; });
+  });
+  document.getElementById('zoom').addEventListener('change', function (e) {
+    document.documentElement.style.setProperty('--z', e.target.value);
+  });
+
+  // Valores derivados del estado 3: altitud verdadera, rumbo del direccional y régimen de giro.
+  function derive() {
+    var a = flying.air;
+    a.altitude = a.indicatedAlt;
+    a.hiHeading = (a.heading + 2) % 360;
+    a.turnRate = a.ias > 30 ? 1091 * Math.tan(a.bank * Math.PI / 180) / a.ias : 0;
+  }
+  derive();
+
+  var redraws = 0, t0 = performance.now(), last = t0;
+  function frame(now) {
+    var dt = Math.min(0.1, (now - last) / 1000); last = now;
+    STATES.forEach(function (S) { S.st.time = (S.st.time || 0) + dt; });
+    if (document.getElementById('animate').checked) {
+      var t = (now - t0) / 1000, a = flying.air;
+      a.ias = 85 + 35 * Math.sin(t * 0.4);
+      a.indicatedAlt = 2500 + 1800 * Math.sin(t * 0.13);
+      a.vs = 1800 * Math.cos(t * 0.13) * 0.13 * 60 / 1.3;
+      a.bank = 35 * Math.sin(t * 0.3);
+      a.pitch = 8 * Math.sin(t * 0.5);
+      a.heading = (a.heading + a.turnRate * dt + 360) % 360;
+      a.slip = 0.5 * Math.sin(t * 0.7);
+      flying.engine.rpm = 2300 + 400 * Math.sin(t * 0.25);
+      flying.radio.obs = (flying.radio.obs + 6 * dt) % 360;
+      derive();
+      Object.keys(inputs).forEach(function (p) { var v = getp(flying, p); if (typeof v === 'number') { inputs[p].inp.value = v; inputs[p].out.textContent = (Math.round(v * 100) / 100); } });
+    }
+    for (var i = 0; i < cells.length; i++) {
+      var c = cells[i], sig = G.signature(c.id, c.st);
+      if (sig !== c.sig) { c.sig = sig; G.draw(c.id, c.ctx, c.w, c.h, c.st); redraws++; }
+    }
+    document.getElementById('stats').textContent = 'redibujos: ' + redraws;
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+  window.__preview = { STATES: STATES, cells: cells };
+})();
+</script>
+</body>
+</html>

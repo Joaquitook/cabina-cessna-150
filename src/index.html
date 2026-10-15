@@ -1,0 +1,163 @@
+<title>Cabina Cessna 150</title>
+<meta name="description" content="Aprendé la cabina del Cessna 150 en 3D: cada mando e instrumento, qué hace y cómo se usa.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=B612+Mono:wght@400;700&family=Barlow+Condensed:wght@500;600;700&display=swap">
+<style data-inline="styles.css"></style>
+
+<div id="app" class="app">
+  <header class="topbar">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+        <path d="M16 3c1.2 0 1.8 1.3 1.8 3.4V12l11 3.2v2.6l-11-1.4v6.2l3.6 2.6v2.1L16 26l-5.4 1.3v-2.1l3.6-2.6v-6.2l-11 1.4v-2.6l11-3.2V6.4C14.2 4.3 14.8 3 16 3z" fill="currentColor"/>
+      </svg>
+      <span class="brand-text">
+        <span class="brand-name">Cabina Cessna 150</span>
+        <span class="brand-tag">150M · 1976</span>
+      </span>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="Modos de la aplicación">
+      <button type="button" class="tab" role="tab" id="tab-explorar" data-mode="explorar" aria-controls="panel-explorar" aria-selected="true">Explorar</button>
+      <button type="button" class="tab" role="tab" id="tab-basico" data-mode="basico" aria-controls="panel-basico" aria-selected="false" tabindex="-1">Lo básico</button>
+      <button type="button" class="tab" role="tab" id="tab-recorrido" data-mode="recorrido" aria-controls="panel-recorrido" aria-selected="false" tabindex="-1">Recorrido</button>
+      <button type="button" class="tab" role="tab" id="tab-checklists" data-mode="checklists" aria-controls="panel-checklists" aria-selected="false" tabindex="-1">Checklists</button>
+      <button type="button" class="tab" role="tab" id="tab-volar" data-mode="volar" aria-controls="panel-volar" aria-selected="false" tabindex="-1">Volar</button>
+      <button type="button" class="tab" role="tab" id="tab-quiz" data-mode="quiz" aria-controls="panel-quiz" aria-selected="false" tabindex="-1">Quiz</button>
+    </nav>
+    <div class="topbar-actions">
+      <button type="button" id="btn-sound" class="icon-btn" aria-pressed="false" aria-label="Sonido de la bocina de pérdida: apagado" title="Sonido">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="i-speaker" d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path class="i-waves" d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/><path class="i-mute" d="M16 9.5l5 5m0-5l-5 5"/></svg>
+      </button>
+      <button type="button" id="btn-theme" class="icon-btn" aria-label="Tema: automático (según el sistema)" title="Tema">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <g class="i-auto"><circle cx="12" cy="12" r="7.5"/><path d="M12 4.5v15a7.5 7.5 0 0 0 0-15z" fill="currentColor" stroke="none"/></g>
+          <g class="i-sun"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/></g>
+          <g class="i-moon"><path d="M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 10 10z"/></g>
+        </svg>
+      </button>
+      <button type="button" id="btn-help" class="icon-btn icon-btn--help" aria-haspopup="dialog" aria-label="Ayuda: cómo se usa" title="Ayuda">?</button>
+    </div>
+  </header>
+
+  <main class="main">
+    <section id="viewport" class="viewport" aria-label="Cabina en 3D. Arrastrá para mirar, tocá un control para conocerlo.">
+      <div class="vp-top">
+        <div id="vp-status" class="vp-status" aria-label="Estado del avión"></div>
+        <label class="vp-scenario">
+          <span class="vp-scenario-label">Escenario</span>
+          <select id="vp-scenario-select" aria-label="Escenario: dónde y cómo está el avión"></select>
+        </label>
+      </div>
+
+      <div id="vp-stall" class="vp-stall" hidden role="status">
+        <span class="vp-stall-dot" aria-hidden="true"></span>Bocina de pérdida
+      </div>
+
+      <div id="inset-frame" class="inset-frame" hidden>
+        <span id="inset-label" class="inset-label">Así se ve desde afuera</span>
+        <div class="inset-actions">
+          <button type="button" id="inset-labels" class="inset-btn" aria-pressed="false" title="Mostrar los nombres de las partes">Ver etiquetas</button>
+          <button type="button" id="inset-swap" class="inset-btn inset-btn--icon" aria-label="Agrandar la vista de afuera" title="Intercambiar vistas">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg>
+          </button>
+        </div>
+      </div>
+      <p id="inset-caption" class="inset-caption" hidden aria-live="off"></p>
+
+      <div id="vp-tooltip" class="vp-tooltip" hidden aria-hidden="true">
+        <strong class="vp-tooltip-name"></strong>
+        <span class="vp-tooltip-en"></span>
+      </div>
+
+      <div id="vp-cams" class="vp-cams">
+        <button type="button" id="vp-cams-toggle" class="vp-cams-toggle" aria-expanded="false" aria-controls="vp-cams-list">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 8.5h4l1.5-2.5h7L17 8.5h4V19H3z"/><circle cx="12" cy="13.5" r="3.4"/></svg>
+          <span>Vistas</span>
+        </button>
+        <div id="vp-cams-list" class="vp-cams-list" role="group" aria-label="Posiciones de la cámara"></div>
+      </div>
+
+      <div id="toasts" class="toasts" role="status" aria-live="polite" aria-relevant="additions"></div>
+
+      <div id="vp-overlay" class="vp-overlay" role="status">
+        <div class="vp-overlay-card">
+          <div class="vp-spinner" aria-hidden="true"></div>
+          <p id="vp-overlay-title" class="vp-overlay-title">Preparando la cabina…</p>
+          <p id="vp-overlay-text" class="vp-overlay-text">Armando el tablero, los instrumentos y el aeródromo.</p>
+        </div>
+      </div>
+    </section>
+
+    <aside id="panel" class="panel" aria-label="Ficha de instrucción">
+      <section id="panel-explorar" class="mode" role="tabpanel" aria-labelledby="tab-explorar" tabindex="-1"></section>
+      <section id="panel-basico" class="mode" role="tabpanel" aria-labelledby="tab-basico" tabindex="-1" hidden></section>
+      <section id="panel-recorrido" class="mode" role="tabpanel" aria-labelledby="tab-recorrido" tabindex="-1" hidden></section>
+      <section id="panel-checklists" class="mode" role="tabpanel" aria-labelledby="tab-checklists" tabindex="-1" hidden></section>
+      <section id="panel-volar" class="mode" role="tabpanel" aria-labelledby="tab-volar" tabindex="-1" hidden></section>
+      <section id="panel-quiz" class="mode" role="tabpanel" aria-labelledby="tab-quiz" tabindex="-1" hidden></section>
+      <div id="peek" class="peek" hidden>
+        <span class="peek-dot" aria-hidden="true"></span>
+        <span class="peek-text"><span class="peek-kicker">Tocaste</span> <strong id="peek-name"></strong></span>
+        <button type="button" id="peek-open" class="btn btn--small">Ver ficha</button>
+        <button type="button" id="peek-close" class="icon-btn icon-btn--small" aria-label="Cerrar">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+    </aside>
+  </main>
+
+  <div id="help" class="modal" hidden>
+    <div class="modal-backdrop" data-close="1"></div>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="help-title" tabindex="-1">
+      <div class="modal-head">
+        <h2 id="help-title" class="placard">Cómo se usa</h2>
+        <button type="button" class="icon-btn" data-close="1" aria-label="Cerrar la ayuda">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <h3 class="placard placard--small">Mirar la cabina</h3>
+        <ul class="help-list">
+          <li><strong>Arrastrá</strong> con el mouse o el dedo para girar la mirada.</li>
+          <li><strong>Rueda del mouse</strong> o <strong>pellizco</strong> con dos dedos para acercarte o alejarte.</li>
+          <li><strong>Clic derecho y arrastrar</strong> (o dos dedos) para desplazarte de costado.</li>
+          <li>Los botones de <strong>Vistas</strong>, abajo a la izquierda, te llevan a cada zona: tablero, piso, techo…</li>
+          <li>El cuadrito de arriba a la derecha muestra el avión <strong>desde afuera</strong>. Tocá las flechas para agrandarlo.</li>
+        </ul>
+        <h3 class="placard placard--small">Tocar los controles</h3>
+        <ul class="help-list">
+          <li><strong>Un toque</strong> sobre un control lo selecciona y te muestra su ficha a la derecha (o abajo, en el celular).</li>
+          <li><strong>Otro toque</strong> sobre el mismo control lo acciona: prende una luz, mueve la llave, saca la traba… En las perillas (acelerador, mezcla, calefacción) y en el compensador, cada toque lo corre <strong>un cuarto</strong> de su recorrido.</li>
+          <li><strong>Arrastrá</strong> las perillas (acelerador, mezcla, calefacción), el volante, la rueda del compensador y los pedales para moverlos.</li>
+          <li>En cada ficha, la sección <strong>Probalo</strong> te deja mover el mismo control con botones grandes.</li>
+          <li>En <strong>Volar</strong>, en el celular, el volante, los pedales, los frenos y el acelerador aparecen sobre la vista 3D, abajo.</li>
+        </ul>
+        <h3 class="placard placard--small" id="quality-title">Calidad gráfica</h3>
+        <div class="seg seg--quality" role="group" aria-labelledby="quality-title" id="quality-seg">
+          <button type="button" data-q="auto" aria-pressed="true">Auto</button>
+          <button type="button" data-q="alta" aria-pressed="false">Alta</button>
+          <button type="button" data-q="media" aria-pressed="false">Media</button>
+          <button type="button" data-q="baja" aria-pressed="false">Baja</button>
+        </div>
+        <p class="quality-note" id="quality-note" aria-live="polite">Alta: sombras suaves y reflejos. Si el celular o la compu va lenta, probá Media o Baja.</p>
+        <h3 class="placard placard--small">Atajos de teclado</h3>
+        <div id="help-keys"></div>
+        <p id="help-aviso" class="aviso"></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/geometries/RoundedBoxGeometry.js"></script>
+<script data-inline="data/controls-a.js"></script>
+<script data-inline="data/controls-b.js"></script>
+<script data-inline="data/learning.js"></script>
+<script data-inline="sim.js"></script>
+<script data-inline="gauges.js"></script>
+<script data-inline="world.js"></script>
+<script data-inline="cockpit.js"></script>
+<script data-inline="exterior.js"></script>
+<script data-inline="core.js"></script>
+<script data-inline="ui.js"></script>

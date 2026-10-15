@@ -1,0 +1,265 @@
+<!doctype html>
+<!-- ui-harness.html — page to check the UI shell (port 8704): same markup as src/index.html, plain script tags.
+     Real modules are used when present; inline stubs fill in ONLY what is missing.
+     ?nocore   simulates a failed 3D start (error overlay + local sim loop)
+     ?fakecore forces the fake Core (canvas with "3D": left half = throttle, right half = yoke)
+     Regenerate after changing src/index.html (the markup is copied verbatim). -->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+</head>
+<body>
+<title>Cabina Cessna 150</title>
+<meta name="description" content="Aprendé la cabina del Cessna 150 en 3D: cada mando e instrumento, qué hace y cómo se usa.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=B612+Mono:wght@400;700&family=Barlow+Condensed:wght@500;600;700&display=swap">
+<link rel="stylesheet" href="../src/styles.css">
+
+<div id="app" class="app">
+  <header class="topbar">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+        <path d="M16 3c1.2 0 1.8 1.3 1.8 3.4V12l11 3.2v2.6l-11-1.4v6.2l3.6 2.6v2.1L16 26l-5.4 1.3v-2.1l3.6-2.6v-6.2l-11 1.4v-2.6l11-3.2V6.4C14.2 4.3 14.8 3 16 3z" fill="currentColor"/>
+      </svg>
+      <span class="brand-text">
+        <span class="brand-name">Cabina Cessna 150</span>
+        <span class="brand-tag">150M · 1976</span>
+      </span>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="Modos de la aplicación">
+      <button type="button" class="tab" role="tab" id="tab-explorar" data-mode="explorar" aria-controls="panel-explorar" aria-selected="true">Explorar</button>
+      <button type="button" class="tab" role="tab" id="tab-basico" data-mode="basico" aria-controls="panel-basico" aria-selected="false" tabindex="-1">Lo básico</button>
+      <button type="button" class="tab" role="tab" id="tab-recorrido" data-mode="recorrido" aria-controls="panel-recorrido" aria-selected="false" tabindex="-1">Recorrido</button>
+      <button type="button" class="tab" role="tab" id="tab-checklists" data-mode="checklists" aria-controls="panel-checklists" aria-selected="false" tabindex="-1">Checklists</button>
+      <button type="button" class="tab" role="tab" id="tab-volar" data-mode="volar" aria-controls="panel-volar" aria-selected="false" tabindex="-1">Volar</button>
+      <button type="button" class="tab" role="tab" id="tab-quiz" data-mode="quiz" aria-controls="panel-quiz" aria-selected="false" tabindex="-1">Quiz</button>
+    </nav>
+    <div class="topbar-actions">
+      <button type="button" id="btn-sound" class="icon-btn" aria-pressed="false" aria-label="Sonido de la bocina de pérdida: apagado" title="Sonido">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="i-speaker" d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path class="i-waves" d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/><path class="i-mute" d="M16 9.5l5 5m0-5l-5 5"/></svg>
+      </button>
+      <button type="button" id="btn-theme" class="icon-btn" aria-label="Tema: automático (según el sistema)" title="Tema">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <g class="i-auto"><circle cx="12" cy="12" r="7.5"/><path d="M12 4.5v15a7.5 7.5 0 0 0 0-15z" fill="currentColor" stroke="none"/></g>
+          <g class="i-sun"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/></g>
+          <g class="i-moon"><path d="M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 10 10z"/></g>
+        </svg>
+      </button>
+      <button type="button" id="btn-help" class="icon-btn icon-btn--help" aria-haspopup="dialog" aria-label="Ayuda: cómo se usa" title="Ayuda">?</button>
+    </div>
+  </header>
+
+  <main class="main">
+    <section id="viewport" class="viewport" aria-label="Cabina en 3D. Arrastrá para mirar, tocá un control para conocerlo.">
+      <div class="vp-top">
+        <div id="vp-status" class="vp-status" aria-label="Estado del avión"></div>
+        <label class="vp-scenario">
+          <span class="vp-scenario-label">Escenario</span>
+          <select id="vp-scenario-select" aria-label="Escenario: dónde y cómo está el avión"></select>
+        </label>
+      </div>
+
+      <div id="vp-stall" class="vp-stall" hidden role="status">
+        <span class="vp-stall-dot" aria-hidden="true"></span>Bocina de pérdida
+      </div>
+
+      <div id="inset-frame" class="inset-frame" hidden>
+        <span id="inset-label" class="inset-label">Así se ve desde afuera</span>
+        <div class="inset-actions">
+          <button type="button" id="inset-labels" class="inset-btn" aria-pressed="false" title="Mostrar los nombres de las partes">Ver etiquetas</button>
+          <button type="button" id="inset-swap" class="inset-btn inset-btn--icon" aria-label="Agrandar la vista de afuera" title="Intercambiar vistas">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg>
+          </button>
+        </div>
+      </div>
+      <p id="inset-caption" class="inset-caption" hidden aria-live="off"></p>
+
+      <div id="vp-tooltip" class="vp-tooltip" hidden aria-hidden="true">
+        <strong class="vp-tooltip-name"></strong>
+        <span class="vp-tooltip-en"></span>
+      </div>
+
+      <div id="vp-cams" class="vp-cams">
+        <button type="button" id="vp-cams-toggle" class="vp-cams-toggle" aria-expanded="false" aria-controls="vp-cams-list">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 8.5h4l1.5-2.5h7L17 8.5h4V19H3z"/><circle cx="12" cy="13.5" r="3.4"/></svg>
+          <span>Vistas</span>
+        </button>
+        <div id="vp-cams-list" class="vp-cams-list" role="group" aria-label="Posiciones de la cámara"></div>
+      </div>
+
+      <div id="toasts" class="toasts" role="status" aria-live="polite" aria-relevant="additions"></div>
+
+      <div id="vp-overlay" class="vp-overlay" role="status">
+        <div class="vp-overlay-card">
+          <div class="vp-spinner" aria-hidden="true"></div>
+          <p id="vp-overlay-title" class="vp-overlay-title">Preparando la cabina…</p>
+          <p id="vp-overlay-text" class="vp-overlay-text">Armando el tablero, los instrumentos y el aeródromo.</p>
+        </div>
+      </div>
+    </section>
+
+    <aside id="panel" class="panel" aria-label="Ficha de instrucción">
+      <section id="panel-explorar" class="mode" role="tabpanel" aria-labelledby="tab-explorar" tabindex="-1"></section>
+      <section id="panel-basico" class="mode" role="tabpanel" aria-labelledby="tab-basico" tabindex="-1" hidden></section>
+      <section id="panel-recorrido" class="mode" role="tabpanel" aria-labelledby="tab-recorrido" tabindex="-1" hidden></section>
+      <section id="panel-checklists" class="mode" role="tabpanel" aria-labelledby="tab-checklists" tabindex="-1" hidden></section>
+      <section id="panel-volar" class="mode" role="tabpanel" aria-labelledby="tab-volar" tabindex="-1" hidden></section>
+      <section id="panel-quiz" class="mode" role="tabpanel" aria-labelledby="tab-quiz" tabindex="-1" hidden></section>
+      <div id="peek" class="peek" hidden>
+        <span class="peek-dot" aria-hidden="true"></span>
+        <span class="peek-text"><span class="peek-kicker">Tocaste</span> <strong id="peek-name"></strong></span>
+        <button type="button" id="peek-open" class="btn btn--small">Ver ficha</button>
+        <button type="button" id="peek-close" class="icon-btn icon-btn--small" aria-label="Cerrar">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+    </aside>
+  </main>
+
+  <div id="help" class="modal" hidden>
+    <div class="modal-backdrop" data-close="1"></div>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="help-title" tabindex="-1">
+      <div class="modal-head">
+        <h2 id="help-title" class="placard">Cómo se usa</h2>
+        <button type="button" class="icon-btn" data-close="1" aria-label="Cerrar la ayuda">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <h3 class="placard placard--small">Mirar la cabina</h3>
+        <ul class="help-list">
+          <li><strong>Arrastrá</strong> con el mouse o el dedo para girar la mirada.</li>
+          <li><strong>Rueda del mouse</strong> o <strong>pellizco</strong> con dos dedos para acercarte o alejarte.</li>
+          <li><strong>Clic derecho y arrastrar</strong> (o dos dedos) para desplazarte de costado.</li>
+          <li>Los botones de <strong>Vistas</strong>, abajo a la izquierda, te llevan a cada zona: tablero, piso, techo…</li>
+          <li>El cuadrito de arriba a la derecha muestra el avión <strong>desde afuera</strong>. Tocá las flechas para agrandarlo.</li>
+        </ul>
+        <h3 class="placard placard--small">Tocar los controles</h3>
+        <ul class="help-list">
+          <li><strong>Un toque</strong> sobre un control lo selecciona y te muestra su ficha a la derecha (o abajo, en el celular).</li>
+          <li><strong>Otro toque</strong> sobre el mismo control lo acciona: prende una luz, mueve la llave, saca la traba… En las perillas (acelerador, mezcla, calefacción) y en el compensador, cada toque lo corre <strong>un cuarto</strong> de su recorrido.</li>
+          <li><strong>Arrastrá</strong> las perillas (acelerador, mezcla, calefacción), el volante, la rueda del compensador y los pedales para moverlos.</li>
+          <li>En cada ficha, la sección <strong>Probalo</strong> te deja mover el mismo control con botones grandes.</li>
+          <li>En <strong>Volar</strong>, en el celular, el volante, los pedales, los frenos y el acelerador aparecen sobre la vista 3D, abajo.</li>
+        </ul>
+        <h3 class="placard placard--small" id="quality-title">Calidad gráfica</h3>
+        <div class="seg seg--quality" role="group" aria-labelledby="quality-title" id="quality-seg">
+          <button type="button" data-q="auto" aria-pressed="true">Auto</button>
+          <button type="button" data-q="alta" aria-pressed="false">Alta</button>
+          <button type="button" data-q="media" aria-pressed="false">Media</button>
+          <button type="button" data-q="baja" aria-pressed="false">Baja</button>
+        </div>
+        <p class="quality-note" id="quality-note" aria-live="polite">Alta: sombras suaves y reflejos. Si el celular o la compu va lenta, probá Media o Baja.</p>
+        <h3 class="placard placard--small">Atajos de teclado</h3>
+        <div id="help-keys"></div>
+        <p id="help-aviso" class="aviso"></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/geometries/RoundedBoxGeometry.js"></script>
+<script src="../src/data/controls-a.js"></script>
+<script src="../src/data/controls-b.js"></script>
+<script src="../src/data/learning.js"></script>
+<script>
+/* Harness stubs — used ONLY when a real module is missing. */
+(function () {
+  var C = window.C150 = window.C150 || {};
+  C.DATA = C.DATA || {};
+  var D = C.DATA;
+  if (!D.meta) D.meta = { avion: 'Cessna 150M 1976', aviso: 'Basado en un Cessna 150M 1976. El avión de tu escuela puede tener diferencias: siempre manda el manual (POH) y el instructor.' };
+  if (!D.categories) D.categories = [
+    { id: 'mandos', nombre: 'Mandos de vuelo', color: '#4A6FD8' }, { id: 'motor', nombre: 'Motor', color: '#C4428E' },
+    { id: 'vuelo', nombre: 'Instrumentos de vuelo', color: '#2196C4' }];
+  if (!D.controls || !D.controls.length) D.controls = [
+    { id: 'yoke', nombre: 'Volante de mando', ingles: 'Control wheel (yoke)', categoria: 'mandos', prioridad: 1, otrosNombres: ['Volante'],
+      ubicacion: 'Frente a tu asiento.', resumen: 'Tirás o empujás para subir o bajar la nariz; girás para inclinar.', queHace: 'Mueve alerones y profundidad.',
+      enElAvion: 'Alerones y timón de profundidad.', comoSeUsa: ['Agarralo suave.'], cuando: 'Todo el vuelo.', errores: ['Apretarlo fuerte.'], truco: 'Como la mano por la ventanilla.',
+      dato: 'Los dos volantes están unidos.', rangos: [], relacionados: ['throttle'], partesAvion: ['aileronL', 'aileronR', 'elevator'], probar: { tipo: 'yoke' } },
+    { id: 'throttle', nombre: 'Acelerador', ingles: 'Throttle', categoria: 'motor', prioridad: 1, otrosNombres: [], ubicacion: 'Centro abajo.',
+      resumen: 'Más o menos potencia.', queHace: 'Abre la mariposa del carburador.', enElAvion: 'Cambian las RPM.', comoSeUsa: ['Movelo suave.'], cuando: 'Siempre.',
+      errores: [], truco: '', dato: '', rangos: [], relacionados: [], partesAvion: ['propeller'],
+      probar: { tipo: 'slider', clave: 'throttle', min: 0, max: 1, paso: 0.01, etiquetaMin: 'Ralentí', etiquetaMax: 'A fondo' } },
+    { id: 'asi', nombre: 'Velocímetro', ingles: 'Airspeed indicator', categoria: 'vuelo', prioridad: 1, otrosNombres: [], ubicacion: 'Arriba a la izquierda.',
+      resumen: 'Velocidad respecto del aire.', queHace: 'Mide presión dinámica.', enElAvion: 'Usa el pitot.', comoSeUsa: [], cuando: 'Siempre.', errores: [],
+      truco: '', dato: '', rangos: [{ color: 'blanco', desde: 42, hasta: 85, unidad: 'kt', texto: 'Flaps' }, { color: 'verde', desde: 47, hasta: 107, unidad: 'kt', texto: 'Normal' },
+      { color: 'amarillo', desde: 107, hasta: 141, unidad: 'kt', texto: 'Precaución' }, { color: 'rojo', desde: 141, hasta: 141, unidad: 'kt', texto: 'Nunca exceder' }],
+      relacionados: [], partesAvion: ['pitotTube'], probar: null }];
+  if (!D.lessons) D.lessons = [{ id: 'l1', titulo: 'Los tres ejes', resumen: 'Alabeo, cabeceo y guiñada.', pasos: [
+    { titulo: 'Alabeo', texto: 'El volante inclina el avión.', anim: 'axes-roll', foco: null, vista: 'exterior' },
+    { titulo: 'El volante', texto: 'Está frente a vos.', anim: null, foco: 'yoke', vista: 'cockpit' }] }];
+  if (!D.tour) D.tour = [{ control: 'yoke', titulo: 'El volante', texto: 'Frente a vos.' }, { control: 'throttle', titulo: 'El acelerador', texto: 'Centro abajo.' }];
+  if (!D.checklists) D.checklists = [{ id: 'c1', titulo: 'Prueba', descripcion: 'Checklist de prueba.', preset: 'parked', items: [
+    { control: 'throttle', texto: 'Acelerador — A FONDO', detalle: 'Empujalo.', check: function (s) { return s.throttle > 0.9; } },
+    { control: 'yoke', texto: 'Volante — LIBRE', detalle: 'Confirmalo.', check: null }] }];
+  if (!D.quiz) D.quiz = [{ tipo: 'donde', control: 'throttle', pregunta: '¿Dónde está el acelerador?' },
+    { tipo: 'opciones', pregunta: '¿Qué hace el volante?', opciones: ['Inclina y cabecea', 'Frena', 'Arranca'], correcta: 0, explicacion: 'Mueve alerones y profundidad.' }];
+  if (!D.missions) D.missions = [{ id: 'm1', titulo: 'Acelerá', objetivo: 'Llevá el acelerador a fondo.', preset: 'parked', consejo: 'Con +.', pasos: ['Empujá el acelerador.'],
+    check: function (s) { return s.throttle; } }];
+  if (!D.glossary) D.glossary = [];
+})();
+</script>
+<script src="../src/sim.js"></script>
+<script src="../src/gauges.js"></script>
+<script src="../src/world.js"></script>
+<script src="../src/cockpit.js"></script>
+<script src="../src/exterior.js"></script>
+<script src="../src/core.js"></script>
+<script>
+/* Harness: ?nocore simulates a missing/failed 3D module; a fake Core is used only if core.js did not load. */
+(function () {
+  var C = window.C150;
+  if (/[?&]nocore\b/.test(location.search)) { delete C.Core; return; }
+  if (C.Core && !/[?&]fakecore\b/.test(location.search)) return;
+  var L = {}, st = null, sel = null, main = 'cockpit', pick = null, box = null;
+  function emit(ev) { var a = [].slice.call(arguments, 1); (L[ev] || []).forEach(function (f) { f.apply(null, a); }); }
+  function inset() { var w = box.clientWidth, iw = Math.max(170, Math.min(360, w * 0.3)); return { x: w - iw - 12, y: 12, w: iw, h: iw * 0.75, main: main }; }
+  C.Core = {
+    on: function (e, f) { (L[e] = L[e] || []).push(f); return function () {}; },
+    init: function (o) {
+      box = o.container; st = o.state; this.state = st;
+      var cv = document.createElement('canvas'); cv.width = 800; cv.height = 500;
+      cv.style.cssText = 'width:100%;height:100%;position:absolute;left:0;top:0';
+      var g = cv.getContext('2d'); g.fillStyle = '#26323c'; g.fillRect(0, 0, 800, 500); g.fillStyle = '#9fb0bd';
+      g.font = '700 90px sans-serif'; g.textAlign = 'center'; g.fillText('3D', 400, 280); box.appendChild(cv);
+      cv.addEventListener('click', function (e) {
+        var id = e.offsetX < cv.clientWidth / 2 ? 'throttle' : 'yoke';
+        if (pick) { var f = pick; pick = null; f(id); emit('pick', id); return; }
+        if (sel === id) C.Core.operate(id); else C.Core.select(id, { focus: true });
+      });
+      cv.addEventListener('mousemove', function (e) { emit('hover', e.offsetX < cv.clientWidth / 2 ? 'throttle' : 'yoke', null, { x: e.offsetX, y: e.offsetY }); });
+      cv.addEventListener('mouseleave', function () { emit('hover', null, null, null); });
+      var last = performance.now(), acc = 0;
+      (function loop() {
+        var t = performance.now(), dt = Math.min(0.1, (t - last) / 1000); last = t;
+        if (C.Sim) C.Sim.step(st, dt);
+        acc += dt; if (acc > 1 / 15) { emit('frame', st, acc); acc = 0; }
+        requestAnimationFrame(loop);
+      })();
+      setTimeout(function () { emit('layout', inset()); }, 50);
+      window.addEventListener('resize', function () { emit('layout', inset()); });
+      return true;
+    },
+    select: function (id) { if (sel !== id) { sel = id; emit('select', id); } },
+    focusPreset: function () { return true; }, setMainView: function (v) { main = v; emit('viewchange', v); emit('layout', inset()); },
+    getMainView: function () { return main; }, getInsetRect: function () { return box ? inset() : null; },
+    setTargetHighlight: function () {}, setExteriorHighlight: function () {},
+    playExterior: function (a, o) { if (o && o.enlarge && a) this.setMainView('exterior'); },
+    operate: function (id) { if (id === 'throttle') st.throttle = st.throttle >= 1 ? 0.75 : Math.min(1, st.throttle + 0.25); },
+    setInput: function (p, v) { var o = st, k = p.split('.'); while (k.length > 1) o = o[k.shift()]; o[k[0]] = v; },
+    hold: function (id, sub, on) { if (id === 'toe-brakes') { st.brakeL = st.brakeR = on ? 1 : 0; } if (id === 'rudder-pedals') st.rudder = on ? (sub === 'right' ? 1 : -1) : 0; },
+    pickMode: function (f) { pick = f; }, applyPreset: function (n) { C.Sim.applyPreset(st, n); },
+    setPaused: function (b) { st.paused = !!b; emit('pause', !!b); }, isMobile: function () { return innerWidth < 900; },
+    getCaption: function () { return main === 'exterior' ? 'Vista de afuera (Core de prueba)' : 'Alerones al medio'; }
+  };
+})();
+</script>
+<script src="../src/ui.js"></script>
+
+</body>
+</html>

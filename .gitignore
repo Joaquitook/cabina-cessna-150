@@ -1,0 +1,8 @@
+# Copia para publicar como Artifact de claude.ai (se regenera con node build.js)
+dist/
+
+# Configuración local de Vercel y de herramientas
+.vercel/
+.claude/
+node_modules/
+*.log
