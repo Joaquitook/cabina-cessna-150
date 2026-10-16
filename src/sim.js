@@ -1771,6 +1771,31 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   };
 
   /** Stall (critical) angle of attack in degrees for a flap setting. */
+  /** Throttle (0..1) that holds iasKt and vsFpm steadily in a coordinated bank (thrust = drag + W·sin γ, the same
+   *  model as solveSteady) with the current mixture, carb heat and magnetos. Used to mirror demonstrations (core.js):
+   *  the cockpit throttle and tachometer then match what the airplane is doing and the force arrows balance.
+   *  null without a running engine or below 25 kt. Does not change the state. */
+  Sim.steadyThrottle = function (s, iasKt, vsFpm, bankDeg) {
+    if (!s || !s.engine || !s.engine.running || !s._sim || !s.air || !(iasKt > 25)) return null;
+    var alt = num(s.air.altitude, 0), sig = sigmaAt(alt), sq = Math.sqrt(sig);
+    var V = iasKt * KT / sq, tasKt = V / KT;
+    var gamma = Math.asin(clamp(num(vsFpm, 0) / FPM / V, -0.4, 0.4));
+    var q = 0.5 * RHO0 * sig * V * V, fr = clamp(num(s.flaps, 0), 0, FLAP_MAX) / FLAP_MAX;
+    var n = 1 / Math.max(0.35, Math.cos(clamp(num(bankDeg, 0), -70, 70) * DEG));
+    var CL = n * WEIGHT * Math.cos(gamma) / (q * S_WING);
+    var Daero = q * S_WING * (CD0 + FLAP_DCD * fr + K_IND * CL * CL);
+    var keep = s.throttle, thr = clamp(num(keep, 0.5), 0, 1);
+    var rpmMin = Math.max(300, C_J * tasKt / 2 * 2550 + 1);
+    try {
+      for (var it = 0; it < 6; it++) {
+        var Treq = Daero + windmillDrag(q, thr) + WEIGHT * Math.sin(gamma);
+        var rpm = thrustN(rpmMin, tasKt, sig) >= Treq ? rpmMin
+          : bisect(function (r) { return thrustN(r, tasKt, sig) - Treq; }, rpmMin, 3400, 40);
+        thr = throttleForRpm(s, rpm, iasKt, alt);
+      }
+    } finally { s.throttle = keep; }
+    return clamp(thr, 0, 1);
+  };
   Sim.stallAoa = function (flaps) { return alphaStall(clamp(num(flaps, 0), 0, FLAP_MAX)); };
 
   // Internal helpers exposed for tests and tuning only (not part of the public contract).

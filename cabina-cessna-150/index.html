@@ -243,7 +243,9 @@ kbd {
 .vp-layout-btn[aria-pressed="true"] { background: var(--accent-ink); color: var(--accent-fg); }
 .vp-layout-btn[hidden] { display: none; }
 /* 'Las dos': the toolbar stays over the cockpit half; each half gets a label */
-.app.is-dos-side .vp-top { right: calc(50% + 10px); }
+.app.is-dos-side .vp-top { right: calc(50% + 10px); flex-direction: row; flex-wrap: wrap; align-items: center; }
+.app.is-dos-side .vp-top .vp-status { flex-basis: 100%; }
+.app.is-dos-side .vp-cams { right: calc(50% + 10px); }   /* the camera presets belong to the cockpit half */
 .pane-label {
   position: absolute; z-index: 2; display: flex; align-items: center; gap: 6px; pointer-events: none;
 }
@@ -343,9 +345,15 @@ kbd {
 .mode { padding: var(--mode-pt) var(--gutter) 28px; flex: 1 0 auto; }
 .mode:focus-visible { outline-offset: -3px; }
 
-.mode-head { margin-bottom: 14px; }
-.mode-title { font-size: 28px; }
-.mode-sub { color: var(--fg-soft); margin: 4px 0 0; }
+.mode-head { margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid var(--fg); }
+.mode-title { font-size: 34px; font-weight: 700; line-height: .98; letter-spacing: .005em; text-wrap: balance; }
+.mode-sub { color: var(--fg-soft); margin: 8px 0 0; font-size: 15px; line-height: 1.45; }
+/* numbered mono kicker (same family as the AIRE lab's .lab-kicker) */
+.mode-kicker {
+  display: flex; align-items: center; gap: 8px; margin: 0 0 6px; font-family: var(--font-data); font-size: 12px;
+  text-transform: uppercase; letter-spacing: .14em; color: var(--accent-ink);
+}
+.mode-kicker-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px var(--accent-tint); }
 .kicker {
   display: flex; align-items: center; gap: 6px; font-family: var(--font-display); font-weight: 600;
   text-transform: uppercase; letter-spacing: .08em; font-size: 14px; color: var(--fg-soft); margin: 0 0 4px;
@@ -834,7 +842,7 @@ details.fold[open] > summary::after { content: '−'; }
   .main { flex-direction: column; }
   .viewport { flex: 0 0 auto; height: 52svh; min-height: 300px; }
   .panel { width: auto; flex: 1 1 auto; border-left: 0; border-top: 1px solid var(--line); }
-  .mode-title { font-size: 26px; }
+  .mode-title { font-size: 30px; }
   .detail-title { font-size: 27px; }
   .lead { font-size: 16px; margin: 6px 0 10px; }
   .inset-caption { font-size: 12px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
@@ -1310,6 +1318,7 @@ details.fold[open] > summary::after { content: '−'; }
 .vo-tab[aria-selected="true"] { background: var(--surface); color: var(--fg); box-shadow: 0 1px 3px rgba(0, 0, 0, .15); }
 .vo-tab-n { font-family: var(--font-data); font-size: 12px; padding: 1px 6px; border-radius: 999px; background: var(--accent-tint); color: var(--accent-ink); letter-spacing: 0; }
 .sit-intro { font-size: 17px; line-height: 1.5; margin: 0 0 14px; color: var(--fg-soft); }
+.mode-head .sit-intro { margin: 8px 0 0; font-size: 16px; }
 .sit-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
 .sit-card {
   width: 100%; height: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; text-align: left; padding: 12px 14px 14px;
@@ -8012,6 +8021,31 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   };
 
   /** Stall (critical) angle of attack in degrees for a flap setting. */
+  /** Throttle (0..1) that holds iasKt and vsFpm steadily in a coordinated bank (thrust = drag + W·sin γ, the same
+   *  model as solveSteady) with the current mixture, carb heat and magnetos. Used to mirror demonstrations (core.js):
+   *  the cockpit throttle and tachometer then match what the airplane is doing and the force arrows balance.
+   *  null without a running engine or below 25 kt. Does not change the state. */
+  Sim.steadyThrottle = function (s, iasKt, vsFpm, bankDeg) {
+    if (!s || !s.engine || !s.engine.running || !s._sim || !s.air || !(iasKt > 25)) return null;
+    var alt = num(s.air.altitude, 0), sig = sigmaAt(alt), sq = Math.sqrt(sig);
+    var V = iasKt * KT / sq, tasKt = V / KT;
+    var gamma = Math.asin(clamp(num(vsFpm, 0) / FPM / V, -0.4, 0.4));
+    var q = 0.5 * RHO0 * sig * V * V, fr = clamp(num(s.flaps, 0), 0, FLAP_MAX) / FLAP_MAX;
+    var n = 1 / Math.max(0.35, Math.cos(clamp(num(bankDeg, 0), -70, 70) * DEG));
+    var CL = n * WEIGHT * Math.cos(gamma) / (q * S_WING);
+    var Daero = q * S_WING * (CD0 + FLAP_DCD * fr + K_IND * CL * CL);
+    var keep = s.throttle, thr = clamp(num(keep, 0.5), 0, 1);
+    var rpmMin = Math.max(300, C_J * tasKt / 2 * 2550 + 1);
+    try {
+      for (var it = 0; it < 6; it++) {
+        var Treq = Daero + windmillDrag(q, thr) + WEIGHT * Math.sin(gamma);
+        var rpm = thrustN(rpmMin, tasKt, sig) >= Treq ? rpmMin
+          : bisect(function (r) { return thrustN(r, tasKt, sig) - Treq; }, rpmMin, 3400, 40);
+        thr = throttleForRpm(s, rpm, iasKt, alt);
+      }
+    } finally { s.throttle = keep; }
+    return clamp(thr, 0, 1);
+  };
   Sim.stallAoa = function (flaps) { return alphaStall(clamp(num(flaps, 0), 0, FLAP_MAX)); };
 
   // Internal helpers exposed for tests and tuning only (not part of the public contract).
@@ -13735,10 +13769,16 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     function addGauge(gid, controlId, parent, x, y, z, w, h, round) {
       var sz = (Gauges && Gauges.size) ? Gauges.size(gid) : { w: 256, h: round ? 256 : 128 };
       var cv = makeCanvas(sz.w, sz.h);
-      var tex = canvasTex(cv);
+      // Gauge faces are redrawn many times per second. An sRGB-tagged canvas texture (SRGB8_ALPHA8) takes a very slow
+      // upload path in Chrome/ANGLE (~15 ms of GPU per upload on integrated GPUs: a turn or a mirrored demonstration
+      // cost 20-40 ms per frame). So the texture stays a plain RGBA8 upload (LinearEncoding, outside allTextures) and
+      // the sRGB decode is done in the shader (material.userData.srgbMaps, see onBeforeCompileC150).
+      var tex = new THREE.CanvasTexture(cv);
+      tex.anisotropy = 4;
       var mat = std({ map: tex, emissiveMap: tex, emissive: 0x555555, roughness: 0.55, metalness: 0, alphaTest: round ? 0.5 : 0 });
       mat.toneMapped = false;               // dials stay crisp and true to colour under ACES (RENDERING NOTES, core.js)
       mat.userData.noAo = true;             // and keep their full ambient light (readability)
+      mat.userData.srgbMaps = true;         // map / emissiveMap hold sRGB values in an RGBA8 texture
       var geo = round ? new THREE.CircleGeometry(w, 48) : new THREE.PlaneGeometry(w, h);
       var face = mesh(geo, mat, parent, x, y, z);
       face.userData.noCast = true;
@@ -14702,6 +14742,15 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       }
       fs = fs.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n' +
         '{ float c150Ndv = clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0); totalEmissiveRadiance += uRim * pow(1.0 - c150Ndv, 3.0); }');
+      if (this.userData.srgbMaps && colorMode === 'srgb') {
+        // gauge faces: sRGB values in an RGBA8 texture (fast canvas upload) → decode here (same as an sRGB texture)
+        var dec = 'vec3 c150Dec(vec3 c) { return mix(pow(c * 0.9478672986 + vec3(0.0521327014), vec3(2.4)), c * 0.0773993808, vec3(lessThanEqual(c, vec3(0.04045)))); }\n';
+        fs = fs.replace('void main() {', dec + 'void main() {')
+          .replace('#include <map_fragment>', '#ifdef USE_MAP\nvec4 sampledDiffuseColor = texture2D( map, vUv );\n' +
+            'sampledDiffuseColor.rgb = c150Dec(sampledDiffuseColor.rgb);\ndiffuseColor *= sampledDiffuseColor;\n#endif')
+          .replace('#include <emissivemap_fragment>', '#ifdef USE_EMISSIVEMAP\nvec4 emissiveColor = texture2D( emissiveMap, vUv );\n' +
+            'totalEmissiveRadiance *= c150Dec(emissiveColor.rgb);\n#endif');
+      }
       if (glass) {
         // + forward scattering of the sun by dust on the glass (alpha map = dust/edge density): looking toward the sun
         // the windshield glows softly, so the glass reads as a surface while staying clear
@@ -14719,7 +14768,10 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       }
       shader.fragmentShader = fs;
     }
-    function cacheKeyC150() { return 'c150:' + (this.userData.detail && detailOn ? 'd' : '') + (this.userData.glass ? 'g' : '') + (this.userData.noAo ? 'n' : ''); }
+    function cacheKeyC150() {
+      return 'c150:' + (this.userData.detail && detailOn ? 'd' : '') + (this.userData.glass ? 'g' : '') + (this.userData.noAo ? 'n' : '') +
+        (this.userData.srgbMaps && colorMode === 'srgb' ? 's' : '');
+    }
     function patchMaterial(m) {
       if (!m || !m.isMeshStandardMaterial || matUniforms.has(m)) return;
       var d = m.userData.detail, g = m.userData.glass;
@@ -15002,11 +15054,15 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     if (rpm < 300) return 0;
     return ground ? clamp((rpm - 650) / 1850, 0, 1) : clamp((rpm - 650 - 4 * ias) / (1800 - 2.2 * ias), 0, 1);
   }
-  /** Rough angle of attack (°) of the 150 in 1 g flight at ias kt (clean: 16° at the 47 kt stall). */
-  function aoaFor(ias, flaps) {
-    var vs = 47 - 5 * clamp(flaps / 40, 0, 1);
-    return clamp(-1 + 17 * Math.pow(vs / Math.max(ias, 30), 2), -2, 20);
+  /** Angle of attack (°, from the wing's zero-lift line, as sim.js) that holds n g at ias kt: the same lift model as
+   *  the simulator (CL = n·W / (q·S), q from the indicated airspeed; CLα 0.085/°, +0.45 CL at 40° of flap), so the
+   *  force arrows of a mirrored demonstration balance (level flight: lift = weight). Clean: 16° at the ≈ 46.6 kt stall. */
+  var AOA_W = 725.7 * 9.80665, AOA_S = 14.86, AOA_QKT = 0.5 * 1.225 * 0.514444 * 0.514444;
+  function aoaFor(ias, flaps, n) {
+    var v = Math.max(ias, 30), cl = (n > 0 ? n : 1) * AOA_W / (AOA_QKT * v * v * AOA_S);
+    return clamp((cl - 0.45 * clamp(flaps / 40, 0, 1)) / 0.085, -2, 20);
   }
+  function loadFactor(bankDeg) { return 1 / Math.max(0.35, Math.cos(clamp(num(bankDeg, 0), -70, 70) * DEG)); }
   /** Straight and level with this power: {ias, vs, pitch}. Too little power → it glides (best glide 60 kt). */
   function perfLevel(pw, flaps) {
     var hi = pw >= 0.55;
@@ -15173,9 +15229,11 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     if (air) P.pitch += 3 * tr;
     // airspeed / vertical speed: they follow the attitude and power with the airplane's inertia
     var iasT = A.ias - (air ? 8 * tr : 0), tauI = F.air !== air ? 0.5 : 3.2;
-    P.ias = S.att === 'stall' ? A.ias : F.ias + (iasT - F.ias) * (1 - Math.exp(-t / tauI));
+    // from the ground straight to a flight pose the airplane appears in the air: already at flying speed (easing up
+    // from 0 kt would give a huge angle of attack and a false stall warning for the first moments)
+    P.ias = S.att === 'stall' ? A.ias : (air && !F.air ? iasT : F.ias + (iasT - F.ias) * (1 - Math.exp(-t / tauI)));
     P.vs = air ? F.vs + (A.vs - F.vs) * (1 - Math.exp(-t / (F.air !== air ? 0.5 : 1.6))) : 0;
-    P.aoa = air ? aoaFor(P.ias, fl) : 0;
+    P.aoa = air ? aoaFor(P.ias, fl, loadFactor(P.bank)) : 0;
     P.stallWarn = air && P.aoa > 12.5;
     // engine
     var rpm;
@@ -15695,7 +15753,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     // then the airplane "flies" on its own (heading from animState.turnRate, position from its speed, height from its
     // climb), and an airborne movement over a parked airplane lifts it to ≈ 1500 ft so the ground falls away below.
     var FT_M = 0.3048;
-    var venv = { on: false, vx: 0, vz: 0, vh: 0, va: 0, floor: 0, x: 0, z: 0, h: 0, a: 0, init: false };
+    var venv = { on: false, vx: 0, vz: 0, vh: 0, va: 0, floor: 0, x: 0, z: 0, h: 0, a: 0, init: false, ret: 0 };
     function simAgl(state) {
       var a = state.air || {};
       if (a.onGround !== false) return 0;
@@ -15715,16 +15773,23 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         venv.va = clamp(venv.va + animState.vs / 196.85 * dt, 0, 3000);
         if (animState.onGround) venv.va = 0;
         tx = venv.vx; tz = venv.vz; th = venv.vh - disp.yaw; ta = venv.va;
-      } else venv.on = false;
+      } else if (venv.on) { venv.on = false; venv.ret = 3; }   // the movement ended: glide back to the sim's scenery
+      // after a pose / animation the scenery goes back to the sim's heading, place and height calmly (≈ 3 s, at most
+      // 50°/s of turn) instead of spinning back in a blink
+      var ret = !active && venv.ret > 0;
+      if (ret) venv.ret = Math.max(0, venv.ret - dt);
       var floorT = active && !animState.onGround ? 450 : 0;
-      venv.floor += (floorT - venv.floor) * (dt > 0 ? k(dt, 1.3) : 1);
+      venv.floor += (floorT - venv.floor) * (dt > 0 ? k(dt, ret ? 1.6 : 1.3) : 1);
       ta = Math.max(ta, venv.floor);
-      if (!venv.init || dt === 0 || Math.hypot(tx - venv.x, tz - venv.z) > 150) { venv.x = tx; venv.z = tz; }
-      else { var kp = k(dt, 0.25); venv.x += (tx - venv.x) * kp; venv.z += (tz - venv.z) * kp; }
+      var far = Math.hypot(tx - venv.x, tz - venv.z);
+      if (!venv.init || dt === 0 || far > (ret ? 30000 : 150)) { venv.x = tx; venv.z = tz; }
+      else { var kp = k(dt, ret ? 0.9 : 0.25); venv.x += (tx - venv.x) * kp; venv.z += (tz - venv.z) * kp; }
       var dh = ((th - venv.h) % 360 + 540) % 360 - 180;
-      if (!venv.init || dt === 0) venv.h = th; else venv.h += dh * k(dt, 0.3);
+      if (!venv.init || dt === 0) venv.h = th;
+      else if (ret) { var step = dh * k(dt, 0.9), lim = 50 * dt; venv.h += Math.max(-lim, Math.min(lim, step)); }
+      else venv.h += dh * k(dt, 0.3);
       venv.h = (venv.h + 360) % 360;
-      if (!venv.init) venv.a = ta; else venv.a += (ta - venv.a) * (dt > 0 ? k(dt, 0.5) : 1);
+      if (!venv.init) venv.a = ta; else venv.a += (ta - venv.a) * (dt > 0 ? k(dt, ret ? 1.2 : 0.5) : 1);
       venv.init = true;
     }
 
@@ -17699,6 +17764,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         animState.active = false; animState.kind = null; animState.name = null;
         return;
       }
+      var fresh = !live.init;
       if (!live.init) {   // start from where the airplane is, so nothing jumps in the cockpit
         live.ias = num(a.ias, 0); live.vs = num(a.vs, 0); live.turn = 0; live.slip = num(a.slip, 0);
         live.ail = clamp(num(st.yokeRoll, 0), -1, 1); live.elev = clamp(num(st.yokePitch, 0), -1, 1); live.rud = clamp(num(st.rudder, 0), -1, 1);
@@ -17712,9 +17778,13 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       var iasT, vsT;
       if (P.ias !== null) iasT = P.ias;
       else iasT = ground ? (P.roll || P.rollSpeed ? num(P.rollSpeed, 1.2) / 0.514444 : 0) : clamp(88 - 1.1 * (disp.pitch - 2), 45, 130);
+      // a flight movement started with the airplane on the ground: it appears in the air already at flying speed
+      // (easing up from 0 kt would show a huge angle of attack and a false stall horn for the first seconds)
+      if (fresh && !ground && a.onGround !== false) live.ias = iasT;
       if (P.vs !== null) vsT = P.vs;
       else if (ground) vsT = 0;
-      else vsT = clamp(101.27 * live.ias * Math.sin((disp.pitch - aoaFor(live.ias, disp.flaps)) * DEG), -1500, 1500);
+      // flight path = pitch − angle of attack + the wing's 3° incidence (sim.js convention)
+      else vsT = clamp(101.27 * live.ias * Math.sin((disp.pitch - aoaFor(live.ias, disp.flaps, loadFactor(disp.bank)) + 3) * DEG), -1500, 1500);
       live.ias += (iasT - live.ias) * (dt > 0 ? k(dt, isPose ? 0.15 : 1.4) : 1);   // poses already ease airspeed and climb
       live.vs += (vsT - live.vs) * (dt > 0 ? k(dt, isPose ? 0.15 : 0.9) : 1);
       // turn rate: the nose turning on screen + the steady turn of a banked wing (or of the nose wheel on the ground)
@@ -17746,7 +17816,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       AS.onGround = !!ground;
       AS.trim = P.rawTab !== null ? (P.rawTab > 0 ? P.rawTab / 20 : P.rawTab / 10) : num(P.trim, 0);
       AS.carbHeat = P.heat ? 1 : num(P.carbHeat, 0);
-      AS.aoa = ground ? 0 : (P.aoa !== null && P.aoa !== undefined ? P.aoa : aoaFor(live.ias, disp.flaps));
+      AS.aoa = ground ? 0 : (P.aoa !== null && P.aoa !== undefined ? P.aoa : aoaFor(live.ias, disp.flaps, loadFactor(disp.bank)));
       AS.stallWarn = P.stallWarn !== null && P.stallWarn !== undefined ? !!P.stallWarn : (!ground && AS.aoa > 12.5);
     }
     function clearPose() {
@@ -17769,6 +17839,10 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     }
     var surfTmp = {};
 
+    // a door that popped open in flight (failure 'door') only trails ajar in the slipstream (≈ 8°, like the cockpit)
+    function doorOpenAmount(state) {
+      return state.failures && state.failures.door && state.air && state.air.onGround === false ? 0.13 : 1;
+    }
     function stateCaption(state) {
       var yr = num(state.yokeRoll, 0), yp = num(state.yokePitch, 0), rd = num(state.rudder, 0);
       var onGround = !state.air || state.air.onGround !== false;
@@ -17792,7 +17866,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         : 'Compensador nariz abajo: la aleta SUBE y el timón de profundidad tiende a BAJAR';
       var bl = num(state.brakeL, 0), br = num(state.brakeR, 0);
       if (onGround && (bl > 0.2 || br > 0.2)) return bl > 0.2 && br > 0.2 ? 'Frenos aplicados (las dos puntas de pedal)' : (bl > 0.2 ? 'Freno izquierdo: el avión tiende a doblar a la izquierda' : 'Freno derecho: el avión tiende a doblar a la derecha');
-      if (clock - track.rpmT < 1.5) return 'Hélice a ' + Math.round(num(state.propRpm, 0) / 10) * 10 + ' RPM (acelerador ' + (track.rpmDir > 0 ? 'hacia adentro)' : 'hacia afuera)');
+      if (clock - track.rpmT < 1.5 && num(state.propRpm, 0) > 300) return 'Hélice a ' + Math.round(num(state.propRpm, 0) / 10) * 10 + ' RPM (acelerador ' + (track.rpmDir > 0 ? 'hacia adentro)' : 'hacia afuera)');
       if (num(state.flaps, 0) > 0.5) return 'Flaps a ' + Math.round(num(state.flaps, 0)) + '°';
       return '';
     }
@@ -18027,7 +18101,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         ground = P.ground; arrowsV = P.arrows;
         caption = P.caption;
         lightsOn = stateLights(state);
-        doorTargets.doorL = state.doorLeftOpen ? 1 : 0; doorTargets.doorR = state.doorRightOpen ? 1 : 0;
+        doorTargets.doorL = state.doorLeftOpen ? 1 : 0; doorTargets.doorR = state.doorRightOpen ? doorOpenAmount(state) : 0;
         doorTargets.windowL = state.windowLeftOpen ? 1 : 0;
       } else {
         var sf = state.surfaces;
@@ -18049,7 +18123,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         target.nose = num(state.noseWheelAngle, 0);
         target.rpm = num(state.propRpm, 0);
         lightsOn = stateLights(state);
-        doorTargets.doorL = state.doorLeftOpen ? 1 : 0; doorTargets.doorR = state.doorRightOpen ? 1 : 0;
+        doorTargets.doorL = state.doorLeftOpen ? 1 : 0; doorTargets.doorR = state.doorRightOpen ? doorOpenAmount(state) : 0;
         doorTargets.windowL = state.windowLeftOpen ? 1 : 0;
         arrowsV = {
           roll: Math.abs(num(state.yokeRoll, 0)) > 0.1 && !state.controlLock ? num(state.yokeRoll, 0) : 0,
@@ -18175,6 +18249,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       skyMat.uniforms.uGlowAmt.value = (1 - dk) * bd.k.glow;
       diskMat.color.setRGB(lerp(1, 0.42, grassK), lerp(1, 0.56, grassK), lerp(1, 0.3, grassK)).multiplyScalar(1 - 0.65 * dk);
       setEnvDim((1 - 0.78 * dk) * bd.k.env);   // the studio reflections dim with the light (paint, glass, metal)
+      // the propeller blur disc is unlit: at dusk it must darken too (it read as a grey glowing disc behind the airplane)
+      prop.disc.material.color.setScalar(1 - 0.8 * dk);
 
       veil.visible = !!ext.worldVisible && dk > 0.01;
       if (veil.visible) { veil.material.opacity = 0.8 * dk; veil.position.copy(camera.position); }
@@ -20466,7 +20542,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
  *     applyPreset during a mirror drops the snapshot (the new preset is the base of the next one).
  *   *setAirPeek(bool) · *getAirPeek() → {region, key, caption, virtual}|null · event *'airpeek'(info|null): moving a flight
  *     control in the cockpit briefly shows the air around that part in the exterior view with a caption (see "el aire
- *     en toda la app" below; getCaption() returns the peek caption while no exterior caption runs).
+ *     en toda la app" below; getCaption() returns the peek caption while it runs and no animation or pose does).
  *
  * Decisions where the contract leaves room (other agents: please read):
  *  - Colour pipeline: physically based (see RENDERING NOTES below). setToneMapping('none') is kept for debugging.
@@ -22201,7 +22277,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     }
 
     updateInputs(dt);
-    updateMirror();
+    updateMirror(dt);
     if (Sim && Sim.step && (!state.paused || mirror)) {
       // a demonstration keeps moving the instruments even while the simulation is paused
       var wasPaused = !!state.paused;
@@ -22640,7 +22716,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   }
   function startMirror(a) {
     var air = state.air;
-    mirror = { snap: snapCopy(state, true), simRef: state._sim, airborne: null };
+    mirror = { snap: snapCopy(state, true), simRef: state._sim, airborne: null, thr: null };
     cancelMomentary();
     endDrag(true);
     // a demonstration needs a live cockpit: unlocked controls, power on, gyros spinning, out of the wind tunnel
@@ -22663,7 +22739,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     emit('mirror', false);
     emit('frame', state, 0);
   }
-  function applyMirror(a) {
+  function applyMirror(a, dt) {
     var pp = state.puppet, air = state.air, act = actions();
     var airborne = animAirborne(a);
     if (airborne && mirror.airborne !== true) {
@@ -22696,8 +22772,22 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     state.brakeL = clamp(num(a.brakeL, 0), 0, 1);
     state.brakeR = clamp(num(a.brakeR, 0), 0, 1);
     if (airborne || ias > 1) state.parkingBrake = false;
-    if (typeof a.throttle === 'number' && isFinite(a.throttle)) state.throttle = clamp(a.throttle, 0, 1);
     var engineOn = typeof a.engineOn === 'boolean' ? a.engineOn : (num(a.rpm, 0) > 300 || airborne ? true : null);
+    var thrA = (typeof a.throttle === 'number' && isFinite(a.throttle)) ? clamp(a.throttle, 0, 1) : null;
+    // In flight, the throttle is the one that really holds this speed and climb in the simulator (Sim.steadyThrottle):
+    // the tachometer agrees with the movement and the force arrows balance (thrust = drag in level flight). Idle and
+    // full power demonstrations keep their throttle. The knob moves at a hand's pace.
+    var thrT = thrA;
+    if (airborne && engineOn !== false && thrA !== null && thrA > 0.05 && thrA < 0.95 && Sim.steadyThrottle &&
+        state.engine && state.engine.running) {
+      var ts = Sim.steadyThrottle(state, pp.ias, pp.vs, pp.bank);
+      if (ts !== null) thrT = clamp(ts, 0.06, 0.94);
+    }
+    if (thrT !== null) {
+      if (mirror.thr === null || mirror.thr === undefined || !(dt > 0)) mirror.thr = thrT;
+      else mirror.thr += clamp(thrT - mirror.thr, -0.8 * dt, 0.8 * dt);
+      state.throttle = mirror.thr;
+    }
     if (engineOn !== null && act && act.setEngine && !!(state.engine && state.engine.running) !== engineOn) act.setEngine(state, engineOn);
     if (typeof a.flaps === 'number' && isFinite(a.flaps)) {
       var f = clamp(a.flaps, 0, 40), cur = num(state.flaps, 0);
@@ -22706,14 +22796,14 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       state.flaps = f;
     }
   }
-  function updateMirror() {
+  function updateMirror(dt) {
     if (!state || !Sim || !Sim.step) return;
     var a = getAnimState();
     var active = !!(a && a.active) && !!state.puppet;
     if (mirror && mirror.simRef !== state._sim) mirror = null;   // a preset was applied behind our back: start over
     if (active && !mirror) startMirror(a);
     else if (!active && mirror) endMirror();
-    if (mirror) { try { applyMirror(a); } catch (e) { reportOnce('mirror', e); } }
+    if (mirror) { try { applyMirror(a, dt); } catch (e) { reportOnce('mirror', e); } }
   }
   /** Contract v3: a held exterior movement (ext.POSES ids) → its Spanish caption, or false. */
   function poseExterior(name) {
@@ -22776,7 +22866,13 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     pickAt: pickAt,
     projectControl: projectControl,
     setInsetVisible: setInsetVisible,
-    getCaption: function () { return (ext && ext.caption) || (peek.on ? peek.caption : '') || ''; },
+    // an animation / pose has its own caption; otherwise the air peek explains the control the student is moving
+    // (better than the exterior's generic "what the surfaces do" line)
+    getCaption: function () {
+      var busy = !!(ext && (ext.playing || ext.posing));
+      if (peek.on && peek.caption && !busy) return peek.caption;
+      return (ext && ext.caption) || '';
+    },
     setToneMapping: setToneMapping,
     setQuality: setQuality,
     getQuality: function () { return quality; },
@@ -24309,7 +24405,11 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
 
   function renderList() {
     var h = A.h;
-    V.appendChild(h('p', { class: 'sit-intro', text: 'Cosas que pueden pasar en un vuelo y qué hacés. No es teoría: el avión las vive en el simulador y vos actuás con los mandos (los botones de acá, el teclado o la cabina 3D).' }));
+    // panel header in the app's family: numbered mono kicker + display title + lead, closed by a hairline
+    V.appendChild(h('div', { class: 'mode-head' },
+      h('p', { class: 'mode-kicker' }, h('span', { class: 'mode-kicker-dot', 'aria-hidden': 'true' }), '05 · Situaciones prácticas'),
+      h('h2', { class: 'placard mode-title', text: '¿Qué harías?' }),
+      h('p', { class: 'mode-sub sit-intro', text: 'Cosas que pueden pasar en un vuelo y qué hacés. No es teoría: el avión las vive en el simulador y vos actuás con los mandos (los botones de acá, el teclado o la cabina 3D).' })));
     if (!SIT.length) { V.appendChild(h('p', { class: 'empty', text: 'Las situaciones todavía no están cargadas.' })); return; }
     var grid = h('ul', { class: 'sit-grid', 'aria-label': 'Situaciones prácticas' });
     SIT.forEach(function (x, i) {
@@ -25243,12 +25343,22 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   var LAYOUT_NAMES = { cabina: 'Cabina', dos: 'Las dos', afuera: 'Afuera' };
   var userLayout = (function () { var l = store.get('layout', 'cabina'); return LAYOUT_IDS.indexOf(l) >= 0 ? l : 'cabina'; })();
   var paneRects = null;                 // { cockpit:{x,y,w,h}, exterior:{x,y,w,h} } in 'dos'
+  var dosShrinkPending = false;
   var layoutBtns = {};
-  function canDos() { return has('setLayout'); }
+  function canDos() { return has('setLayout') && dosFits(); }
+  /** 'Las dos' needs room: two halves of at least ~300 px (side by side) or ~250 px tall (stacked). On a phone the
+   *  halves would be tiny and buried under the overlays, so there the cockpit + inset layout is used instead. */
+  function dosSideBySide() { var vp = $('viewport'); return !vp || vp.clientWidth >= vp.clientHeight; }
+  function dosFits() {
+    var vp = $('viewport'), W = vp ? vp.clientWidth : 0, H = vp ? vp.clientHeight : 0;
+    if (!W || !H) return true;          // not laid out yet: decide later
+    return W >= H ? (W / 2 >= 300 && H >= 300) : (H / 2 >= 250 && W >= 300);
+  }
   /** Applies a layout; Core.setLayout when present, else the classic main view + inset ('dos' falls back to 'cabina'). */
   function applyLayout(name) {
     if (LAYOUT_IDS.indexOf(name) < 0) name = 'cabina';
-    if (canDos()) {
+    if (name === 'dos' && !dosFits()) name = 'cabina';
+    if (has('setLayout')) {
       cc('setLayout', name);
       var got = cc('getLayout');
       layoutMode = LAYOUT_IDS.indexOf(got) >= 0 ? got : name;
@@ -25289,7 +25399,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     for (var id in layoutBtns) {
       if (!Object.prototype.hasOwnProperty.call(layoutBtns, id)) continue;
       setAttr(layoutBtns[id], 'aria-pressed', layoutMode === id ? 'true' : 'false');
-      if (id === 'dos') layoutBtns[id].hidden = coreReady && !canDos();
+      if (id === 'dos') layoutBtns[id].hidden = coreReady && !canDos() && layoutMode !== 'dos';
     }
   }
 
@@ -25363,6 +25473,11 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       else if (ins) r = ins;
     }
     insetRect = (r && num(r.w, 0) > 0) ? { x: num(r.x, 0), y: num(r.y, 0), w: r.w, h: num(r.h, 0) } : null;
+    // the view got too small for 'Las dos' (phone rotated, window narrowed): back to the cockpit + inset
+    if (layoutMode === 'dos' && !dosFits() && !dosShrinkPending) {
+      dosShrinkPending = true;
+      setTimeout(function () { dosShrinkPending = false; if (layoutMode === 'dos' && !dosFits()) applyLayout('cabina'); }, 0);
+    }
     syncLayoutSwitch();
     positionPaneLabels();
     positionInset();
@@ -25397,7 +25512,9 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     if (dos) {                                     // 'Las dos': subtitle at the bottom of the exterior pane
       var R = dosRects(), r = R.exterior, vp = $('viewport'), H = vp ? vp.clientHeight : 0;
       st.left = Math.round(r.x + 12) + 'px'; st.right = 'auto'; st.top = 'auto';
-      st.bottom = Math.round(Math.max(0, H - (r.y + r.h)) + (flypadShown() ? VO.overlay.offsetHeight + 74 : 62)) + 'px';
+      // side by side, the camera buttons stay under the cockpit half (CSS): the subtitle can sit lower
+      var sideBySide = R.exterior.x > R.cockpit.x + 1;
+      st.bottom = Math.round(Math.max(0, H - (r.y + r.h)) + (flypadShown() ? VO.overlay.offsetHeight + 74 : (sideBySide ? 18 : 62))) + 'px';
       st.width = 'fit-content'; st.marginLeft = st.marginRight = '0';
       st.maxWidth = Math.max(120, Math.round(r.w - 24)) + 'px'; st.transform = 'none'; st.textAlign = 'left';
       return;
@@ -26373,7 +26490,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     sug = sug.slice(0, 6);
     var chips = h('div', { class: 'chips' });
     sug.forEach(function (id) { chips.appendChild(controlChip(id, function () { openControl(id, 'list'); })); });
-    return h('div', { class: 'card' },
+    return h('div', { class: 'card card--welcome' },
+      modeKicker('01 · Explorar'),
       h('h2', { class: 'placard mode-title', text: 'Conocé la cabina' }),
       h('p', { class: 'lead', text: 'Una cabina de Cessna 150 en 3D para recorrer antes de tu primera clase: cada mando y cada instrumento, qué hace y qué le pasa al avión cuando lo usás.' }),
       h('p', { class: 'aviso aviso--top', text: AVISO }),
@@ -26573,8 +26691,16 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     actBtns: [], autoBtn: null, loopBtn: null, nowEl: null, poseCaption: '',
     air: store.get('lessonAir', true) !== false, airOn: false, airBtn: null };
 
+  /* Panel header (same family as the AIRE lab): numbered mono kicker (the tab's place in the order) + big display title
+   * + short lead, closed by a hairline. */
+  var MODE_KICKER = { 'Lo básico': '02 · Lecciones', Recorrido: '03 · Paseo guiado', Checklists: '04 · Listas del manual',
+    Volar: '05 · Simulador', Quiz: '07 · Repaso' };
+  function modeKicker(text) {
+    return h('p', { class: 'mode-kicker' }, h('span', { class: 'mode-kicker-dot', 'aria-hidden': 'true' }), text);
+  }
   function modeHead(title, sub) {
-    return h('div', { class: 'mode-head' }, h('h2', { class: 'placard mode-title', text: title }), sub ? h('p', { class: 'mode-sub', text: sub }) : null);
+    return h('div', { class: 'mode-head' }, MODE_KICKER[title] ? modeKicker(MODE_KICKER[title]) : null,
+      h('h2', { class: 'placard mode-title', text: title }), sub ? h('p', { class: 'mode-sub', text: sub }) : null);
   }
   function emptyState(text) { return h('p', { class: 'empty', text: text }); }
 
@@ -26821,7 +26947,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     var foco = p.foco && CTRL[p.foco] ? p.foco : null;
     var moves = p.vista === 'exterior' || arr(p.acciones).length > 0;
     var hint = moves
-      ? (lbWide() && canDos() ? 'A la izquierda, la cabina: así se ve desde adentro. A la derecha, el avión desde afuera.'
+      ? (lbWide() && canDos() ? (dosSideBySide() ? 'A la izquierda, la cabina: así se ve desde adentro. A la derecha, el avión desde afuera.'
+        : 'Arriba, la cabina: así se ve desde adentro. Abajo, el avión desde afuera.')
         : 'Ves el avión desde afuera; el cuadrito muestra cómo se ve desde adentro: volante, horizonte e instrumentos.')
       : '';
     if (foco) hint += (hint ? ' ' : '') + 'En la cabina, lo que titila es ' + ctrlName(foco) + '.';

@@ -1272,6 +1272,24 @@ test('failures: no NaN with every failure on, from every preset', function () {
   });
 });
 
+test('steadyThrottle: the throttle that holds a speed and climb (mirrored demonstrations)', function () {
+  var s = Sim.createState('cruise');
+  var thr0 = s.throttle, ias = s.air.ias;
+  var lvl = Sim.steadyThrottle(s, ias, 0, 0);
+  assert.strictEqual(s.throttle, thr0, 'does not change the state');
+  assert.ok(lvl !== null && Math.abs(lvl - thr0) < 0.04, 'level at the preset speed ≈ the preset throttle (' + lvl.toFixed(3) + ' vs ' + thr0.toFixed(3) + ')');
+  assert.ok(Sim.steadyThrottle(s, ias, 0, 30) > lvl + 0.01, 'a 30° turn needs a bit more power');
+  assert.ok(Sim.steadyThrottle(s, 68, 500, 0) > lvl, 'a 500 fpm climb at Vy needs more power');
+  assert.ok(Sim.steadyThrottle(s, 65, -500, 0) < lvl, 'a descent needs less');
+  // flown with that throttle the airplane really holds the speed and the altitude
+  s.throttle = lvl;
+  var alt0 = s.air.altitude;
+  run(s, 40);
+  assert.ok(Math.abs(s.air.ias - ias) < 4 && Math.abs(s.air.altitude - alt0) < 120, 'holds it (ias ' + s.air.ias.toFixed(1) + ', alt ' + (s.air.altitude - alt0).toFixed(0) + ' ft)');
+  var p = Sim.createState('parked');
+  assert.strictEqual(Sim.steadyThrottle(p, 80, 0, 0), null, 'engine stopped: null');
+});
+
 /* ================================================================== summary */
 console.log('\nC150.Sim tests');
 console.table(results);

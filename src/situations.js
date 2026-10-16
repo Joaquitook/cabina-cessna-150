@@ -142,7 +142,11 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
 
   function renderList() {
     var h = A.h;
-    V.appendChild(h('p', { class: 'sit-intro', text: 'Cosas que pueden pasar en un vuelo y qué hacés. No es teoría: el avión las vive en el simulador y vos actuás con los mandos (los botones de acá, el teclado o la cabina 3D).' }));
+    // panel header in the app's family: numbered mono kicker + display title + lead, closed by a hairline
+    V.appendChild(h('div', { class: 'mode-head' },
+      h('p', { class: 'mode-kicker' }, h('span', { class: 'mode-kicker-dot', 'aria-hidden': 'true' }), '05 · Situaciones prácticas'),
+      h('h2', { class: 'placard mode-title', text: '¿Qué harías?' }),
+      h('p', { class: 'mode-sub sit-intro', text: 'Cosas que pueden pasar en un vuelo y qué hacés. No es teoría: el avión las vive en el simulador y vos actuás con los mandos (los botones de acá, el teclado o la cabina 3D).' })));
     if (!SIT.length) { V.appendChild(h('p', { class: 'empty', text: 'Las situaciones todavía no están cargadas.' })); return; }
     var grid = h('ul', { class: 'sit-grid', 'aria-label': 'Situaciones prácticas' });
     SIT.forEach(function (x, i) {

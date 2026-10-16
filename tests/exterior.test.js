@@ -132,7 +132,10 @@ REQUIRED.forEach((id) => {
   [[0.8, 88], [1, 68], [0.45, 76]].forEach(([thr, ias]) => ok(near(E.thrFor(E.rpmFor(thr, ias, false), ias, false), thr, 1e-6), 'thrFor invierte rpmFor'));
   const L = E.perfLevel(0.8, 0);
   ok(near(L.ias, 88, 2) && L.vs === 0, 'crucero ≈ 88 kt nivelado');
-  ok(near(E.aoaFor(47, 0), 16, 0.2), 'ángulo de ataque ≈ 16° a 47 kt (pérdida limpia)');
+  ok(near(E.aoaFor(46.6, 0), 16, 0.2), 'ángulo de ataque ≈ 16° a 46,6 kt (pérdida limpia, como sim.js)');
+  ok(near(E.aoaFor(95, 0), 3.85, 0.1), 'crucero 95 kt: ≈ 3,9° (sustentación = peso con el modelo de sim.js)');
+  ok(E.aoaFor(70, 0, 1 / Math.cos(30 * Math.PI / 180)) > E.aoaFor(70, 0) + 0.8, 'en viraje de 30° hace falta más ángulo de ataque (1,15 g)');
+  ok(E.aoaFor(60, 40) < E.aoaFor(60, 0) - 4, 'con flaps 40 el mismo peso se sostiene con menos ángulo de ataque');
 }
 
 console.log((fail ? 'FALLAS: ' + fail + ' · ' : '') + 'OK: ' + pass + ' comprobaciones de las poses del exterior pasaron.');

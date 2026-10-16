@@ -56,7 +56,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
  *     applyPreset during a mirror drops the snapshot (the new preset is the base of the next one).
  *   *setAirPeek(bool) · *getAirPeek() → {region, key, caption, virtual}|null · event *'airpeek'(info|null): moving a flight
  *     control in the cockpit briefly shows the air around that part in the exterior view with a caption (see "el aire
- *     en toda la app" below; getCaption() returns the peek caption while no exterior caption runs).
+ *     en toda la app" below; getCaption() returns the peek caption while it runs and no animation or pose does).
  *
  * Decisions where the contract leaves room (other agents: please read):
  *  - Colour pipeline: physically based (see RENDERING NOTES below). setToneMapping('none') is kept for debugging.
@@ -1791,7 +1791,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     }
 
     updateInputs(dt);
-    updateMirror();
+    updateMirror(dt);
     if (Sim && Sim.step && (!state.paused || mirror)) {
       // a demonstration keeps moving the instruments even while the simulation is paused
       var wasPaused = !!state.paused;
@@ -2230,7 +2230,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   }
   function startMirror(a) {
     var air = state.air;
-    mirror = { snap: snapCopy(state, true), simRef: state._sim, airborne: null };
+    mirror = { snap: snapCopy(state, true), simRef: state._sim, airborne: null, thr: null };
     cancelMomentary();
     endDrag(true);
     // a demonstration needs a live cockpit: unlocked controls, power on, gyros spinning, out of the wind tunnel
@@ -2253,7 +2253,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     emit('mirror', false);
     emit('frame', state, 0);
   }
-  function applyMirror(a) {
+  function applyMirror(a, dt) {
     var pp = state.puppet, air = state.air, act = actions();
     var airborne = animAirborne(a);
     if (airborne && mirror.airborne !== true) {
@@ -2286,8 +2286,22 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     state.brakeL = clamp(num(a.brakeL, 0), 0, 1);
     state.brakeR = clamp(num(a.brakeR, 0), 0, 1);
     if (airborne || ias > 1) state.parkingBrake = false;
-    if (typeof a.throttle === 'number' && isFinite(a.throttle)) state.throttle = clamp(a.throttle, 0, 1);
     var engineOn = typeof a.engineOn === 'boolean' ? a.engineOn : (num(a.rpm, 0) > 300 || airborne ? true : null);
+    var thrA = (typeof a.throttle === 'number' && isFinite(a.throttle)) ? clamp(a.throttle, 0, 1) : null;
+    // In flight, the throttle is the one that really holds this speed and climb in the simulator (Sim.steadyThrottle):
+    // the tachometer agrees with the movement and the force arrows balance (thrust = drag in level flight). Idle and
+    // full power demonstrations keep their throttle. The knob moves at a hand's pace.
+    var thrT = thrA;
+    if (airborne && engineOn !== false && thrA !== null && thrA > 0.05 && thrA < 0.95 && Sim.steadyThrottle &&
+        state.engine && state.engine.running) {
+      var ts = Sim.steadyThrottle(state, pp.ias, pp.vs, pp.bank);
+      if (ts !== null) thrT = clamp(ts, 0.06, 0.94);
+    }
+    if (thrT !== null) {
+      if (mirror.thr === null || mirror.thr === undefined || !(dt > 0)) mirror.thr = thrT;
+      else mirror.thr += clamp(thrT - mirror.thr, -0.8 * dt, 0.8 * dt);
+      state.throttle = mirror.thr;
+    }
     if (engineOn !== null && act && act.setEngine && !!(state.engine && state.engine.running) !== engineOn) act.setEngine(state, engineOn);
     if (typeof a.flaps === 'number' && isFinite(a.flaps)) {
       var f = clamp(a.flaps, 0, 40), cur = num(state.flaps, 0);
@@ -2296,14 +2310,14 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       state.flaps = f;
     }
   }
-  function updateMirror() {
+  function updateMirror(dt) {
     if (!state || !Sim || !Sim.step) return;
     var a = getAnimState();
     var active = !!(a && a.active) && !!state.puppet;
     if (mirror && mirror.simRef !== state._sim) mirror = null;   // a preset was applied behind our back: start over
     if (active && !mirror) startMirror(a);
     else if (!active && mirror) endMirror();
-    if (mirror) { try { applyMirror(a); } catch (e) { reportOnce('mirror', e); } }
+    if (mirror) { try { applyMirror(a, dt); } catch (e) { reportOnce('mirror', e); } }
   }
   /** Contract v3: a held exterior movement (ext.POSES ids) → its Spanish caption, or false. */
   function poseExterior(name) {
@@ -2366,7 +2380,13 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     pickAt: pickAt,
     projectControl: projectControl,
     setInsetVisible: setInsetVisible,
-    getCaption: function () { return (ext && ext.caption) || (peek.on ? peek.caption : '') || ''; },
+    // an animation / pose has its own caption; otherwise the air peek explains the control the student is moving
+    // (better than the exterior's generic "what the surfaces do" line)
+    getCaption: function () {
+      var busy = !!(ext && (ext.playing || ext.posing));
+      if (peek.on && peek.caption && !busy) return peek.caption;
+      return (ext && ext.caption) || '';
+    },
     setToneMapping: setToneMapping,
     setQuality: setQuality,
     getQuality: function () { return quality; },

@@ -226,7 +226,9 @@ kbd {
 .vp-layout-btn[aria-pressed="true"] { background: var(--accent-ink); color: var(--accent-fg); }
 .vp-layout-btn[hidden] { display: none; }
 /* 'Las dos': the toolbar stays over the cockpit half; each half gets a label */
-.app.is-dos-side .vp-top { right: calc(50% + 10px); }
+.app.is-dos-side .vp-top { right: calc(50% + 10px); flex-direction: row; flex-wrap: wrap; align-items: center; }
+.app.is-dos-side .vp-top .vp-status { flex-basis: 100%; }
+.app.is-dos-side .vp-cams { right: calc(50% + 10px); }   /* the camera presets belong to the cockpit half */
 .pane-label {
   position: absolute; z-index: 2; display: flex; align-items: center; gap: 6px; pointer-events: none;
 }
@@ -326,9 +328,15 @@ kbd {
 .mode { padding: var(--mode-pt) var(--gutter) 28px; flex: 1 0 auto; }
 .mode:focus-visible { outline-offset: -3px; }
 
-.mode-head { margin-bottom: 14px; }
-.mode-title { font-size: 28px; }
-.mode-sub { color: var(--fg-soft); margin: 4px 0 0; }
+.mode-head { margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid var(--fg); }
+.mode-title { font-size: 34px; font-weight: 700; line-height: .98; letter-spacing: .005em; text-wrap: balance; }
+.mode-sub { color: var(--fg-soft); margin: 8px 0 0; font-size: 15px; line-height: 1.45; }
+/* numbered mono kicker (same family as the AIRE lab's .lab-kicker) */
+.mode-kicker {
+  display: flex; align-items: center; gap: 8px; margin: 0 0 6px; font-family: var(--font-data); font-size: 12px;
+  text-transform: uppercase; letter-spacing: .14em; color: var(--accent-ink);
+}
+.mode-kicker-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px var(--accent-tint); }
 .kicker {
   display: flex; align-items: center; gap: 6px; font-family: var(--font-display); font-weight: 600;
   text-transform: uppercase; letter-spacing: .08em; font-size: 14px; color: var(--fg-soft); margin: 0 0 4px;
@@ -817,7 +825,7 @@ details.fold[open] > summary::after { content: '−'; }
   .main { flex-direction: column; }
   .viewport { flex: 0 0 auto; height: 52svh; min-height: 300px; }
   .panel { width: auto; flex: 1 1 auto; border-left: 0; border-top: 1px solid var(--line); }
-  .mode-title { font-size: 26px; }
+  .mode-title { font-size: 30px; }
   .detail-title { font-size: 27px; }
   .lead { font-size: 16px; margin: 6px 0 10px; }
   .inset-caption { font-size: 12px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
@@ -1293,6 +1301,7 @@ details.fold[open] > summary::after { content: '−'; }
 .vo-tab[aria-selected="true"] { background: var(--surface); color: var(--fg); box-shadow: 0 1px 3px rgba(0, 0, 0, .15); }
 .vo-tab-n { font-family: var(--font-data); font-size: 12px; padding: 1px 6px; border-radius: 999px; background: var(--accent-tint); color: var(--accent-ink); letter-spacing: 0; }
 .sit-intro { font-size: 17px; line-height: 1.5; margin: 0 0 14px; color: var(--fg-soft); }
+.mode-head .sit-intro { margin: 8px 0 0; font-size: 16px; }
 .sit-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
 .sit-card {
   width: 100%; height: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; text-align: left; padding: 12px 14px 14px;

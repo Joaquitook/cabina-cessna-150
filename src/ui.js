@@ -760,12 +760,22 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   var LAYOUT_NAMES = { cabina: 'Cabina', dos: 'Las dos', afuera: 'Afuera' };
   var userLayout = (function () { var l = store.get('layout', 'cabina'); return LAYOUT_IDS.indexOf(l) >= 0 ? l : 'cabina'; })();
   var paneRects = null;                 // { cockpit:{x,y,w,h}, exterior:{x,y,w,h} } in 'dos'
+  var dosShrinkPending = false;
   var layoutBtns = {};
-  function canDos() { return has('setLayout'); }
+  function canDos() { return has('setLayout') && dosFits(); }
+  /** 'Las dos' needs room: two halves of at least ~300 px (side by side) or ~250 px tall (stacked). On a phone the
+   *  halves would be tiny and buried under the overlays, so there the cockpit + inset layout is used instead. */
+  function dosSideBySide() { var vp = $('viewport'); return !vp || vp.clientWidth >= vp.clientHeight; }
+  function dosFits() {
+    var vp = $('viewport'), W = vp ? vp.clientWidth : 0, H = vp ? vp.clientHeight : 0;
+    if (!W || !H) return true;          // not laid out yet: decide later
+    return W >= H ? (W / 2 >= 300 && H >= 300) : (H / 2 >= 250 && W >= 300);
+  }
   /** Applies a layout; Core.setLayout when present, else the classic main view + inset ('dos' falls back to 'cabina'). */
   function applyLayout(name) {
     if (LAYOUT_IDS.indexOf(name) < 0) name = 'cabina';
-    if (canDos()) {
+    if (name === 'dos' && !dosFits()) name = 'cabina';
+    if (has('setLayout')) {
       cc('setLayout', name);
       var got = cc('getLayout');
       layoutMode = LAYOUT_IDS.indexOf(got) >= 0 ? got : name;
@@ -806,7 +816,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     for (var id in layoutBtns) {
       if (!Object.prototype.hasOwnProperty.call(layoutBtns, id)) continue;
       setAttr(layoutBtns[id], 'aria-pressed', layoutMode === id ? 'true' : 'false');
-      if (id === 'dos') layoutBtns[id].hidden = coreReady && !canDos();
+      if (id === 'dos') layoutBtns[id].hidden = coreReady && !canDos() && layoutMode !== 'dos';
     }
   }
 
@@ -880,6 +890,11 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       else if (ins) r = ins;
     }
     insetRect = (r && num(r.w, 0) > 0) ? { x: num(r.x, 0), y: num(r.y, 0), w: r.w, h: num(r.h, 0) } : null;
+    // the view got too small for 'Las dos' (phone rotated, window narrowed): back to the cockpit + inset
+    if (layoutMode === 'dos' && !dosFits() && !dosShrinkPending) {
+      dosShrinkPending = true;
+      setTimeout(function () { dosShrinkPending = false; if (layoutMode === 'dos' && !dosFits()) applyLayout('cabina'); }, 0);
+    }
     syncLayoutSwitch();
     positionPaneLabels();
     positionInset();
@@ -914,7 +929,9 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     if (dos) {                                     // 'Las dos': subtitle at the bottom of the exterior pane
       var R = dosRects(), r = R.exterior, vp = $('viewport'), H = vp ? vp.clientHeight : 0;
       st.left = Math.round(r.x + 12) + 'px'; st.right = 'auto'; st.top = 'auto';
-      st.bottom = Math.round(Math.max(0, H - (r.y + r.h)) + (flypadShown() ? VO.overlay.offsetHeight + 74 : 62)) + 'px';
+      // side by side, the camera buttons stay under the cockpit half (CSS): the subtitle can sit lower
+      var sideBySide = R.exterior.x > R.cockpit.x + 1;
+      st.bottom = Math.round(Math.max(0, H - (r.y + r.h)) + (flypadShown() ? VO.overlay.offsetHeight + 74 : (sideBySide ? 18 : 62))) + 'px';
       st.width = 'fit-content'; st.marginLeft = st.marginRight = '0';
       st.maxWidth = Math.max(120, Math.round(r.w - 24)) + 'px'; st.transform = 'none'; st.textAlign = 'left';
       return;
@@ -1890,7 +1907,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     sug = sug.slice(0, 6);
     var chips = h('div', { class: 'chips' });
     sug.forEach(function (id) { chips.appendChild(controlChip(id, function () { openControl(id, 'list'); })); });
-    return h('div', { class: 'card' },
+    return h('div', { class: 'card card--welcome' },
+      modeKicker('01 · Explorar'),
       h('h2', { class: 'placard mode-title', text: 'Conocé la cabina' }),
       h('p', { class: 'lead', text: 'Una cabina de Cessna 150 en 3D para recorrer antes de tu primera clase: cada mando y cada instrumento, qué hace y qué le pasa al avión cuando lo usás.' }),
       h('p', { class: 'aviso aviso--top', text: AVISO }),
@@ -2090,8 +2108,16 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     actBtns: [], autoBtn: null, loopBtn: null, nowEl: null, poseCaption: '',
     air: store.get('lessonAir', true) !== false, airOn: false, airBtn: null };
 
+  /* Panel header (same family as the AIRE lab): numbered mono kicker (the tab's place in the order) + big display title
+   * + short lead, closed by a hairline. */
+  var MODE_KICKER = { 'Lo básico': '02 · Lecciones', Recorrido: '03 · Paseo guiado', Checklists: '04 · Listas del manual',
+    Volar: '05 · Simulador', Quiz: '07 · Repaso' };
+  function modeKicker(text) {
+    return h('p', { class: 'mode-kicker' }, h('span', { class: 'mode-kicker-dot', 'aria-hidden': 'true' }), text);
+  }
   function modeHead(title, sub) {
-    return h('div', { class: 'mode-head' }, h('h2', { class: 'placard mode-title', text: title }), sub ? h('p', { class: 'mode-sub', text: sub }) : null);
+    return h('div', { class: 'mode-head' }, MODE_KICKER[title] ? modeKicker(MODE_KICKER[title]) : null,
+      h('h2', { class: 'placard mode-title', text: title }), sub ? h('p', { class: 'mode-sub', text: sub }) : null);
   }
   function emptyState(text) { return h('p', { class: 'empty', text: text }); }
 
@@ -2338,7 +2364,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     var foco = p.foco && CTRL[p.foco] ? p.foco : null;
     var moves = p.vista === 'exterior' || arr(p.acciones).length > 0;
     var hint = moves
-      ? (lbWide() && canDos() ? 'A la izquierda, la cabina: así se ve desde adentro. A la derecha, el avión desde afuera.'
+      ? (lbWide() && canDos() ? (dosSideBySide() ? 'A la izquierda, la cabina: así se ve desde adentro. A la derecha, el avión desde afuera.'
+        : 'Arriba, la cabina: así se ve desde adentro. Abajo, el avión desde afuera.')
         : 'Ves el avión desde afuera; el cuadrito muestra cómo se ve desde adentro: volante, horizonte e instrumentos.')
       : '';
     if (foco) hint += (hint ? ' ' : '') + 'En la cabina, lo que titila es ' + ctrlName(foco) + '.';

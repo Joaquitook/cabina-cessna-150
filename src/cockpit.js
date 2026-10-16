@@ -1110,10 +1110,16 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     function addGauge(gid, controlId, parent, x, y, z, w, h, round) {
       var sz = (Gauges && Gauges.size) ? Gauges.size(gid) : { w: 256, h: round ? 256 : 128 };
       var cv = makeCanvas(sz.w, sz.h);
-      var tex = canvasTex(cv);
+      // Gauge faces are redrawn many times per second. An sRGB-tagged canvas texture (SRGB8_ALPHA8) takes a very slow
+      // upload path in Chrome/ANGLE (~15 ms of GPU per upload on integrated GPUs: a turn or a mirrored demonstration
+      // cost 20-40 ms per frame). So the texture stays a plain RGBA8 upload (LinearEncoding, outside allTextures) and
+      // the sRGB decode is done in the shader (material.userData.srgbMaps, see onBeforeCompileC150).
+      var tex = new THREE.CanvasTexture(cv);
+      tex.anisotropy = 4;
       var mat = std({ map: tex, emissiveMap: tex, emissive: 0x555555, roughness: 0.55, metalness: 0, alphaTest: round ? 0.5 : 0 });
       mat.toneMapped = false;               // dials stay crisp and true to colour under ACES (RENDERING NOTES, core.js)
       mat.userData.noAo = true;             // and keep their full ambient light (readability)
+      mat.userData.srgbMaps = true;         // map / emissiveMap hold sRGB values in an RGBA8 texture
       var geo = round ? new THREE.CircleGeometry(w, 48) : new THREE.PlaneGeometry(w, h);
       var face = mesh(geo, mat, parent, x, y, z);
       face.userData.noCast = true;
@@ -2077,6 +2083,15 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       }
       fs = fs.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n' +
         '{ float c150Ndv = clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0); totalEmissiveRadiance += uRim * pow(1.0 - c150Ndv, 3.0); }');
+      if (this.userData.srgbMaps && colorMode === 'srgb') {
+        // gauge faces: sRGB values in an RGBA8 texture (fast canvas upload) → decode here (same as an sRGB texture)
+        var dec = 'vec3 c150Dec(vec3 c) { return mix(pow(c * 0.9478672986 + vec3(0.0521327014), vec3(2.4)), c * 0.0773993808, vec3(lessThanEqual(c, vec3(0.04045)))); }\n';
+        fs = fs.replace('void main() {', dec + 'void main() {')
+          .replace('#include <map_fragment>', '#ifdef USE_MAP\nvec4 sampledDiffuseColor = texture2D( map, vUv );\n' +
+            'sampledDiffuseColor.rgb = c150Dec(sampledDiffuseColor.rgb);\ndiffuseColor *= sampledDiffuseColor;\n#endif')
+          .replace('#include <emissivemap_fragment>', '#ifdef USE_EMISSIVEMAP\nvec4 emissiveColor = texture2D( emissiveMap, vUv );\n' +
+            'totalEmissiveRadiance *= c150Dec(emissiveColor.rgb);\n#endif');
+      }
       if (glass) {
         // + forward scattering of the sun by dust on the glass (alpha map = dust/edge density): looking toward the sun
         // the windshield glows softly, so the glass reads as a surface while staying clear
@@ -2094,7 +2109,10 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       }
       shader.fragmentShader = fs;
     }
-    function cacheKeyC150() { return 'c150:' + (this.userData.detail && detailOn ? 'd' : '') + (this.userData.glass ? 'g' : '') + (this.userData.noAo ? 'n' : ''); }
+    function cacheKeyC150() {
+      return 'c150:' + (this.userData.detail && detailOn ? 'd' : '') + (this.userData.glass ? 'g' : '') + (this.userData.noAo ? 'n' : '') +
+        (this.userData.srgbMaps && colorMode === 'srgb' ? 's' : '');
+    }
     function patchMaterial(m) {
       if (!m || !m.isMeshStandardMaterial || matUniforms.has(m)) return;
       var d = m.userData.detail, g = m.userData.glass;
