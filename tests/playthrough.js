@@ -5,8 +5,10 @@
  *
  * Uso: node tests/playthrough.js     (sale con código 1 si algo falla)
  *
- *  - Checklists: igual que la UI, sólo se evalúa el ítem actual (≈10 Hz) y queda tildado en cuanto su
- *    check(state) da true; los ítems con check === null se confirman a mano (acá, automáticamente).
+ *  - Checklists: igual que la UI, sólo se evalúa el ítem actual (≈10 Hz) y queda tildado cuando su
+ *    check(state) da true durante 0,8 s seguidos (contrato v3: antes se tildaba apenas el valor pasaba por el
+ *    objetivo, aunque el alumno siguiera arrastrando); los ítems con check === null se confirman a mano (acá,
+ *    automáticamente).
  *    'arranque' (continuaDe 'antes-arrancar') se prueba de las dos formas: siguiendo con el mismo
  *    estado y desde el preset.
  *  - Misiones: preset, ctx = { t, dt, hold:0, data:{} } nuevo, check() en cada cuadro (como ui.js)
@@ -32,6 +34,7 @@ var Sim = C150.Sim, A = Sim.actions, DATA = C150.DATA;
 
 var DT = 1 / 30;            // paso de simulación (≈ 30 Hz, como el temporizador de respaldo de core)
 var EVAL_EVERY = 0.1;       // la UI evalúa la checklist ≈ 10 Hz
+var HOLD_OK = 0.8;          // contrato v3: el ítem tiene que quedar bien ≥ 0,8 s seguidos (y sin estar tocando nada)
 
 /* ───────────────────────────── entradas permitidas (contrato §3a) ───────────────────────────── */
 var ALLOWED = {
@@ -185,11 +188,17 @@ function runChecklist(cl, s) {
       continue;                                                    // confirmado a mano
     }
     if (typeof drivers[i] !== 'function') return { ok: false, msg: 'ítem ' + (i + 1) + ' tiene check pero no piloto' };
-    var t = 0, nextEval = 0, done = false;
+    // Contract v3 (checklist bug): an item only completes when its check stays true for HOLD_OK seconds while the
+    // student is not touching anything; here the pilot keeps holding the control, which is the strictest case.
+    var t = 0, nextEval = 0, done = false, okFor = 0;
     while (t < 120) {
       drivers[i](s, t);
       Sim.step(s, DT); t += DT; total += DT;
-      if (t >= nextEval) { nextEval += EVAL_EVERY; if (it.check(s)) { done = true; break; } }
+      if (t >= nextEval) {
+        nextEval += EVAL_EVERY;
+        okFor = it.check(s) ? okFor + EVAL_EVERY : 0;
+        if (okFor >= HOLD_OK - 1e-9) { done = true; break; }
+      }
     }
     if (!done) return { ok: false, msg: 'ítem ' + (i + 1) + ' «' + it.texto + '» no se cumple en 120 s', s: s };
   }

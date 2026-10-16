@@ -13,7 +13,9 @@
   - Vista: every public view (ext.VIEWS / setView). Animación: the 16 animations of contract §6 (ext.play).
   - Parte: highlight one exterior part (ext.setHighlight). Etiquetas: ext.showLabels.
   - Mandos en vivo: sliders write the sim inputs; C150.Sim.step runs so the surfaces/lights follow the state.
-  - ?autotest=1 plays every animation and highlights every part; results in window.__extTestResults.
+  - Pose: every held movement of contract v3 (ext.pose / clearPose); the log shows ext.animState. Fondo: cielo (the
+    world.js scenery, created here but not drawn on its own) / estudio / tunel.
+  - ?autotest=1 plays every animation, holds every pose and highlights every part; results in window.__extTestResults.
 -->
 <style>
   :root {
@@ -48,6 +50,8 @@
   <label>Vista <select id="viewSel"></select></label>
   <label>Animación <select id="animSel"><option value="">(ninguna)</option></select></label>
   <button id="stop">Parar</button>
+  <label>Pose <select id="poseSel"><option value="">(ninguna)</option></select></label>
+  <label>Fondo <select id="bdSel"><option>cielo</option><option>estudio</option><option>tunel</option></select></label>
   <label>Parte <select id="partSel"><option value="">(ninguna)</option></select></label>
   <button id="labels" aria-pressed="false">Etiquetas</button>
   <label>Volante <input id="roll" type="range" min="-1" max="1" step="0.05" value="0"></label>
@@ -62,6 +66,7 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
 <script src="../src/sim.js"></script>
+<script src="../src/world.js"></script>
 <script src="../src/exterior.js"></script>
 <script src="../src/core.js"></script><!-- pipeline helpers only (Core.configureRenderer / createEnvironment) -->
 <script>
@@ -75,7 +80,9 @@
   renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
   view.insertBefore(renderer.domElement, view.firstChild);
   C150.Core.configureRenderer(renderer, 'alta');            // same pipeline as the app (core.js RENDERING NOTES)
+  var world = C150.World.create(THREE);                     // not drawn here: the exterior's 'cielo' view reuses it
   var ext = C150.Exterior.create(THREE);
+  if (ext.setSun) ext.setSun(world.sunDirection);
   if (!ext.scene.environment) ext.scene.environment = C150.Core.createEnvironment(renderer, { cabin: false, studio: true, size: 128 }).texture;
   ext.scene.traverse(function (o) {                          // unlit helpers are not tone mapped (as core does)
     if (o.material) [].concat(o.material).forEach(function (m) { if (m.isMeshBasicMaterial || m.isSpriteMaterial || m.isLineBasicMaterial) m.toneMapped = false; });
@@ -97,6 +104,9 @@
   (ext.VIEWS ? Object.keys(ext.VIEWS) : ['rear34', 'side', 'top', 'front', 'rear', 'pitot']).forEach(function (v) { opt($('viewSel'), v); });
   (ext.ANIMATIONS || []).forEach(function (a) { opt($('animSel'), a); });
   (ext.PARTS || []).forEach(function (p) { opt($('partSel'), p); });
+  (ext.POSES || []).forEach(function (p) { opt($('poseSel'), p.id, p.etiqueta); });
+  $('poseSel').onchange = function () { if (this.value) ext.pose(this.value); else ext.clearPose(); };
+  $('bdSel').onchange = function () { ext.setBackdrop(this.value); };
   Object.keys(C150.Sim.PRESETS).forEach(function (p) { opt($('preset'), p, C150.Sim.PRESETS[p].label); });
 
   $('viewSel').onchange = function () { ext.setView(this.value); };
@@ -114,17 +124,24 @@
     ['nav', 'strobe', 'beacon', 'taxi', 'landing'].forEach(function (k) { state.lights[k] = on; });
   };
 
-  var last = performance.now(), lastRaf = 0;
+  var last = performance.now(), lastRaf = 0, frameMs = 0;
   function frame(dt) {
     C150.Sim.step(state, dt);
+    var t0 = performance.now();
+    world.update(state, dt);
     ext.followAttitude = !(state.air && state.air.onGround);
     ext.update(state, dt);
     if (!ext.cameraBusy) controls.update();
     renderer.render(ext.scene, ext.camera);
+    frameMs = frameMs * 0.95 + (performance.now() - t0) * 0.05;
     cap.textContent = ext.caption || '';
     logEl.textContent = 'vista ' + (ext.view || '-') + ' · anim ' + (ext.playing || '-') +
       '\nalerones ' + Math.round(state.surfaces.aileronL) + '/' + Math.round(state.surfaces.aileronR) +
-      '° · prof ' + Math.round(state.surfaces.elevator) + '° · timón ' + Math.round(state.surfaces.rudder) + '°';
+      '° · prof ' + Math.round(state.surfaces.elevator) + '° · timón ' + Math.round(state.surfaces.rudder) + '°' +
+      '\nfondo ' + ext.backdrop + ' · pose ' + (ext.posing || '-') + ' · ' + frameMs.toFixed(1) + ' ms/cuadro · ' + renderer.info.render.calls + ' draws' +
+      (ext.animState && ext.animState.active ? '\nalabeo ' + ext.animState.bank.toFixed(0) + '° cabeceo ' + ext.animState.pitch.toFixed(1) + '° · ' +
+        ext.animState.ias.toFixed(0) + ' kt · ' + ext.animState.vs.toFixed(0) + ' ft/min · giro ' + ext.animState.turnRate.toFixed(1) + '°/s · bola ' +
+        ext.animState.slip.toFixed(2) + ' · ' + ext.animState.rpm.toFixed(0) + ' RPM (acel ' + ext.animState.throttle.toFixed(2) + ')' : '');
   }
   function loop(now) { lastRaf = now; var dt = Math.min(0.1, (now - last) / 1000); last = now; frame(dt); requestAnimationFrame(loop); }
   requestAnimationFrame(loop);
@@ -150,6 +167,17 @@
     (ext.PARTS || []).forEach(function (p) { check('highlight ' + p, function () { ext.setHighlight([p]); ext.update(state, 0.05); renderer.render(ext.scene, ext.camera); return true; }); });
     ext.setHighlight([]);
     check('play desconocida devuelve false', function () { return ext.play('no-existe') === false; });
+    (ext.POSES || []).forEach(function (p) {
+      check('pose ' + p.id, function () {
+        var cap = ext.pose(p.id);
+        for (var i = 0; i < 30; i++) { world.update(state, 0.1); ext.update(state, 0.1); }   // 3 s held
+        renderer.render(ext.scene, ext.camera);
+        var a = ext.animState;
+        return typeof cap === 'string' && a.active && a.name === p.id && isFinite(a.ias) && isFinite(a.turnRate) && isFinite(a.slip);
+      });
+    });
+    check('pose desconocida devuelve false', function () { return ext.pose('no-existe') === false; });
+    check('clearPose: animState.active = false', function () { ext.clearPose(); ext.update(state, 0.05); return ext.animState.active === false && ext.posing === null; });
     window.__extTestResults = { pass: results.filter(function (r) { return r.ok; }).length, total: results.length, results: results };
     console.log('[exterior-preview] ' + window.__extTestResults.pass + '/' + results.length + ' OK');
   }

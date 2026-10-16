@@ -69,8 +69,8 @@ const SIM_PRESETS = ['parked', 'runup', 'runway', 'cruise', 'approach'];
 const CAM_PRESETS = ['pilot', 'panel', 'left', 'center', 'right', 'floor', 'overhead', 'copilot', 'door'];
 const PROBAR_TIPOS = ['yoke', 'pedales', 'slider', 'toggle', 'opciones', 'master', 'flaps', 'accion', 'luces', 'radio', 'perilla', 'puertas'];
 // contrato §1 + contrato v2 §4 (laboratorio del aire: data/lab.js, airfoil.js, airflow.js, lab.js)
-const SCRIPT_ORDER = ['data/controls-a.js', 'data/controls-b.js', 'data/learning.js', 'data/lab.js', 'sim.js', 'gauges.js',
-  'airfoil.js', 'world.js', 'cockpit.js', 'exterior.js', 'airflow.js', 'core.js', 'lab.js', 'ui.js'];
+const SCRIPT_ORDER = ['data/controls-a.js', 'data/controls-b.js', 'data/learning.js', 'data/lab.js', 'data/situations.js', 'sim.js', 'gauges.js',
+  'airfoil.js', 'world.js', 'cockpit.js', 'exterior.js', 'airflow.js', 'core.js', 'lab.js', 'situations.js', 'ui.js'];
 
 /* ───────────── Carga (global falso, sin DOM) ───────────── */
 

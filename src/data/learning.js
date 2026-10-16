@@ -97,22 +97,37 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         {
           titulo: 'Cuatro fuerzas, siempre',
           texto: 'En vuelo, sobre el avión empujan cuatro fuerzas. La sustentación (lift) la hace el ala y empuja hacia arriba. El peso (weight) tira hacia abajo. El empuje o tracción (thrust) lo da la hélice hacia adelante, y la resistencia (drag) es el aire que te frena.',
-          anim: 'four-forces', foco: null, vista: 'exterior'
+          anim: 'four-forces', foco: null, vista: 'exterior',
+          aire: { flujo: true, fuerzas: true },
+          acciones: [{ etiqueta: 'Vuelo nivelado', pose: 'nivelado' }, { etiqueta: 'Subiendo', pose: 'ascenso' },
+            { etiqueta: 'Bajando', pose: 'descenso' }]
         },
         {
           titulo: 'Empatadas = vuelo tranquilo',
           texto: 'En vuelo recto, nivelado y a velocidad constante, las cuatro están en equilibrio: la sustentación iguala al peso y el empuje iguala a la resistencia. Pensalo como una cinchada (tirar de la soga) donde los dos equipos tiran igual: la soga no se mueve, pero nadie está flojo.',
-          anim: 'four-forces', foco: null, vista: 'exterior'
+          anim: 'four-forces', foco: null, vista: 'exterior',
+          aire: { flujo: true, fuerzas: true },
+          acciones: [{ etiqueta: 'Empatadas: nivelado', pose: 'nivelado' },
+            { etiqueta: 'Más potencia', pose: 'potencia-max' },
+            { etiqueta: 'Potencia al mínimo', pose: 'potencia-ralenti' }]
         },
         {
           titulo: '¿Quién hace subir al avión?',
           texto: 'Mucha gente cree que para subir el ala le "gana" al peso. En un ascenso estable, lo que realmente sube al avión es el empuje de más que pone el motor. Por eso, para subir y quedarte subiendo necesitás potencia: el acelerador.',
-          anim: 'propeller-throttle', foco: 'throttle', vista: 'exterior'
+          anim: 'propeller-throttle', foco: 'throttle', vista: 'exterior',
+          aire: { flujo: true, fuerzas: true, foco: 'prop' },
+          acciones: [{ etiqueta: 'Acelerador a fondo', pose: 'potencia-max' },
+            { etiqueta: 'Ascenso estable', pose: 'ascenso' },
+            { etiqueta: 'Acelerador al mínimo', pose: 'potencia-ralenti' }, { etiqueta: 'Nivelado', pose: 'nivelado' }]
         },
         {
           titulo: 'La mano por la ventanilla',
           texto: 'Sacá la mano por la ventanilla del auto, plana. Si la inclinás un poquito con la punta hacia arriba, vas a sentir que sube (eso es sustentación) y que también la empuja hacia atrás (eso es resistencia). Un ala hace exactamente lo mismo, pero mucho mejor.',
-          anim: 'aoa-stall', foco: null, vista: 'exterior'
+          anim: 'aoa-stall', foco: null, vista: 'exterior',
+          aire: { flujo: true, fuerzas: true, foco: 'wing' },
+          acciones: [{ etiqueta: 'Ángulo chico', pose: 'nivelado' },
+            { etiqueta: 'Más ángulo', pose: 'cabeceo-arriba' },
+            { etiqueta: 'Demasiado ángulo: pérdida', pose: 'perdida' }]
         }
       ]
     },
@@ -125,27 +140,50 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         {
           titulo: 'Tres palitos imaginarios',
           texto: 'Imaginá tres palitos que se cruzan en el centro de gravedad del avión (el punto donde quedaría en equilibrio si lo colgaras de un hilo). El avión puede girar alrededor de cada uno. Cada comando de la cabina mueve una superficie y te da el control de uno de esos giros.',
-          anim: 'controls-check', foco: null, vista: 'exterior'
+          anim: 'controls-check', foco: null, vista: 'exterior',
+          acciones: [{ etiqueta: 'Alabeo izquierda', pose: 'alabeo-izq' },
+            { etiqueta: 'Alabeo derecha', pose: 'alabeo-der' }, { etiqueta: 'Nariz arriba', pose: 'cabeceo-arriba' },
+            { etiqueta: 'Nariz abajo', pose: 'cabeceo-abajo' },
+            { etiqueta: 'Guiñada izquierda', pose: 'guinada-izq' },
+            { etiqueta: 'Guiñada derecha', pose: 'guinada-der' }]
         },
         {
           titulo: 'Alabeo (roll): girar el volante',
           texto: 'El alabeo es inclinar las alas, alrededor del eje que va de la nariz a la cola. Si girás el volante a la izquierda, el alerón izquierdo sube y el derecho baja: el ala derecha sustenta más, la izquierda menos, y el avión se inclina a la izquierda. Los alerones están en el borde de atrás de cada ala, cerca de la punta.',
-          anim: 'axes-roll', foco: 'yoke', vista: 'exterior'
+          anim: 'axes-roll', foco: 'yoke', vista: 'exterior',
+          aire: { flujo: true, giros: true, foco: 'ailerons' },
+          acciones: [{ etiqueta: 'Inclinar a la izquierda', pose: 'alabeo-izq' },
+            { etiqueta: 'Inclinar a la derecha', pose: 'alabeo-der' },
+            { etiqueta: 'Alas niveladas', pose: 'nivelado' }]
         },
         {
           titulo: 'El volante no es el de un auto',
           texto: 'Con el volante elegís cuánto se inclina el avión, no "doblás" como en un auto. Cuando llegás a la inclinación que querés, volvés el volante casi al centro y la inclinación se queda. Es el ala inclinada la que hace virar al avión: su sustentación ahora también tira un poco hacia el costado.',
-          anim: 'coordinated-turn', foco: 'yoke', vista: 'exterior'
+          anim: 'coordinated-turn', foco: 'yoke', vista: 'exterior',
+          aire: { flujo: true, giros: true },
+          acciones: [{ etiqueta: 'Motor encendido', pose: 'motor-on' },
+            { etiqueta: 'Motor apagado', pose: 'motor-off' },
+            { etiqueta: 'Inclinar a la izquierda', pose: 'alabeo-izq' },
+            { etiqueta: 'Inclinar a la derecha', pose: 'alabeo-der' },
+            { etiqueta: 'Viraje a la izquierda', pose: 'viraje-izq' },
+            { etiqueta: 'Viraje a la derecha', pose: 'viraje-der' }]
         },
         {
           titulo: 'Cabeceo (pitch): tirar y empujar',
           texto: 'El cabeceo es subir o bajar la nariz, alrededor del eje que va de punta a punta de las alas. Si tirás del volante hacia vos, el timón de profundidad (elevator, la parte móvil de la cola horizontal) sube, la cola baja y la nariz sube. Si empujás, pasa al revés. Es como un subibaja.',
-          anim: 'axes-pitch', foco: 'yoke', vista: 'exterior'
+          anim: 'axes-pitch', foco: 'yoke', vista: 'exterior',
+          aire: { flujo: true, giros: true, foco: 'elevator' },
+          acciones: [{ etiqueta: 'Tirar: nariz arriba', pose: 'cabeceo-arriba' },
+            { etiqueta: 'Empujar: nariz abajo', pose: 'cabeceo-abajo' },
+            { etiqueta: 'Volante al centro', pose: 'nivelado' }]
         },
         {
           titulo: 'Guiñada (yaw): los pedales',
           texto: 'La guiñada es mover la nariz a la izquierda o a la derecha, alrededor de un eje vertical. Si empujás el pedal izquierdo, el timón de dirección (rudder, la parte móvil de la cola vertical) se va a la izquierda y la nariz lo sigue. En vuelo los pedales no sirven para doblar: sirven para que el avión vaya "derechito", alineado con el aire.',
-          anim: 'axes-yaw', foco: 'rudder-pedals', vista: 'exterior'
+          anim: 'axes-yaw', foco: 'rudder-pedals', vista: 'exterior',
+          aire: { flujo: true, giros: true, foco: 'rudder' },
+          acciones: [{ etiqueta: 'Pedal izquierdo', pose: 'guinada-izq' },
+            { etiqueta: 'Pedal derecho', pose: 'guinada-der' }, { etiqueta: 'Pedales parejos', pose: 'nivelado' }]
         }
       ]
     },
@@ -158,22 +196,37 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         {
           titulo: 'Cómo es un ala',
           texto: 'El ala tiene adelante un borde redondeado (borde de ataque) y atrás un borde finito (borde de fuga). La cuerda es una línea recta imaginaria que une los dos bordes. Esa línea es la que vamos a usar para medir ángulos.',
-          anim: 'aoa-stall', foco: null, vista: 'exterior'
+          anim: 'aoa-stall', foco: null, vista: 'exterior',
+          aire: { flujo: true, foco: 'wing' },
+          acciones: [{ etiqueta: 'Ala en crucero', pose: 'nivelado' },
+            { etiqueta: 'Más ángulo de ataque', pose: 'cabeceo-arriba' },
+            { etiqueta: 'Ala en pérdida', pose: 'perdida' }]
         },
         {
           titulo: 'El viento relativo',
           texto: 'El viento relativo es el aire que el ala siente de frente por moverse, siempre en sentido contrario a hacia dónde va el avión. No tiene nada que ver con el viento del pronóstico. Si el avión va bajando, el viento relativo le llega un poquito desde abajo.',
-          anim: 'aoa-stall', foco: null, vista: 'exterior'
+          anim: 'aoa-stall', foco: null, vista: 'exterior',
+          aire: { flujo: true, fuerzas: true },
+          acciones: [{ etiqueta: 'Nivelado', pose: 'nivelado' }, { etiqueta: 'Subiendo', pose: 'ascenso' },
+            { etiqueta: 'Bajando', pose: 'descenso' }]
         },
         {
           titulo: 'El ángulo de ataque',
           texto: 'El ángulo de ataque (angle of attack) es el ángulo entre la cuerda del ala y el viento relativo. Más ángulo, más sustentación... hasta un límite. Cuando tirás del volante, en realidad estás aumentando el ángulo de ataque; cuando empujás, lo bajás.',
-          anim: 'axes-pitch', foco: 'yoke', vista: 'exterior'
+          anim: 'axes-pitch', foco: 'yoke', vista: 'exterior',
+          aire: { flujo: true, fuerzas: true, foco: 'wing' },
+          acciones: [{ etiqueta: 'Poco ángulo', pose: 'cabeceo-abajo' },
+            { etiqueta: 'Ángulo de crucero', pose: 'nivelado' },
+            { etiqueta: 'Mucho ángulo', pose: 'cabeceo-arriba' }, { etiqueta: 'Hasta la pérdida', pose: 'perdida' }]
         },
         {
           titulo: 'La velocidad cuenta al cuadrado',
           texto: 'La sustentación crece con el cuadrado de la velocidad: al doble de velocidad, el ala da cuatro veces más sustentación. Por eso, cuando vas lento, necesitás más ángulo de ataque (nariz más arriba) para sostener el mismo peso. Ángulo y velocidad son las dos perillas del ala.',
-          anim: 'four-forces', foco: 'asi', vista: 'cockpit'
+          anim: 'four-forces', foco: 'asi', vista: 'cockpit',
+          aire: { flujo: true, fuerzas: true },
+          acciones: [{ etiqueta: 'Más velocidad', pose: 'potencia-max' },
+            { etiqueta: 'Velocidad de crucero', pose: 'nivelado' },
+            { etiqueta: 'Menos velocidad', pose: 'potencia-ralenti' }]
         }
       ]
     },
@@ -186,27 +239,40 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         {
           titulo: 'Qué es una pérdida',
           texto: 'Si el ángulo de ataque pasa el ángulo crítico (alrededor de 16 a 18 grados), el aire ya no puede seguir la curva de arriba del ala: se despega y hace remolinos. La sustentación cae de golpe y la nariz tiende a caer. Ojo: el motor sigue andando perfecto; "pérdida" se refiere al ala, no al motor.',
-          anim: 'aoa-stall', foco: null, vista: 'exterior'
+          anim: 'aoa-stall', foco: null, vista: 'exterior',
+          aire: { flujo: true, foco: 'stall' },
+          acciones: [{ etiqueta: 'Ala volando', pose: 'nivelado' }, { etiqueta: 'Ala en pérdida', pose: 'perdida' }]
         },
         {
           titulo: 'Es el ángulo, no la velocidad',
           texto: 'Podés entrar en pérdida a cualquier velocidad, con cualquier actitud y con cualquier potencia, si tirás demasiado. Según el manual (POH), con 1600 lb y sin flaps entra en pérdida a 47 nudos con alas niveladas, pero a 66 nudos en un viraje con 60 grados de inclinación. En un viraje cerrado tirás más, y el ala trabaja con más ángulo.',
-          anim: 'coordinated-turn', foco: 'asi', vista: 'cockpit'
+          anim: 'coordinated-turn', foco: 'asi', vista: 'cockpit',
+          aire: { flujo: true, foco: 'stall' },
+          acciones: [{ etiqueta: 'Viraje', pose: 'viraje-izq' }, { etiqueta: 'Pérdida', pose: 'perdida' },
+            { etiqueta: 'Nivelado', pose: 'nivelado' }]
         },
         {
           titulo: 'La bocina de pérdida',
           texto: 'El 150 tiene una bocina que suena entre 5 y 10 nudos antes de la pérdida. Es neumática: la hace sonar el aire que chupa una tomita en el borde de ataque del ala izquierda, así que funciona aunque no haya electricidad. Si la escuchás sin querer, empujá un poco y dale potencia.',
-          anim: null, foco: 'stall-warning', vista: 'cockpit'
+          anim: null, foco: 'stall-warning', vista: 'cockpit',
+          acciones: [{ etiqueta: 'Acercarse a la pérdida', pose: 'perdida' },
+            { etiqueta: 'Nivelado', pose: 'nivelado' }]
         },
         {
           titulo: 'Cómo salir',
           texto: 'Lo primero: empujá el volante para bajar la nariz y reducir el ángulo de ataque. Después: potencia máxima (y la calefacción del carburador adentro, si estaba puesta), alas niveladas con el volante y pedal para que la nariz no se vaya de costado. Cuando la velocidad vuelve, subí la nariz suave hasta el horizonte.',
-          anim: 'aoa-stall', foco: 'yoke', vista: 'cockpit'
+          anim: 'aoa-stall', foco: 'yoke', vista: 'cockpit',
+          aire: { flujo: true, fuerzas: true },
+          acciones: [{ etiqueta: 'En pérdida', pose: 'perdida' },
+            { etiqueta: 'Bajar la nariz', pose: 'cabeceo-abajo' }, { etiqueta: 'Potencia', pose: 'potencia-max' },
+            { etiqueta: 'Recuperado: nivelado', pose: 'nivelado' }]
         },
         {
           titulo: 'Pies despiertos',
           texto: 'Si llegás a la pérdida sin coordinación (la bolita del coordinador de giro corrida), un ala puede entrar en pérdida antes que la otra y caer: así empieza un tirabuzón (spin). Por eso, cerca de la pérdida, mantené la bolita al centro con los pedales.',
-          anim: null, foco: 'turn-coordinator', vista: 'cockpit'
+          anim: null, foco: 'turn-coordinator', vista: 'cockpit',
+          acciones: [{ etiqueta: 'Pie izquierdo', pose: 'guinada-izq' },
+            { etiqueta: 'Pie derecho', pose: 'guinada-der' }, { etiqueta: 'Pies parejos', pose: 'nivelado' }]
         }
       ]
     },
@@ -219,27 +285,43 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         {
           titulo: 'La guiñada adversa',
           texto: 'Cuando girás el volante a la izquierda, el alerón que baja (el derecho) da más sustentación, pero también más resistencia. Esa resistencia frena el ala derecha y la nariz, al principio, se va para el lado contrario al viraje. Eso se llama guiñada adversa (adverse yaw) y es más fuerte cuando vas lento.',
-          anim: 'adverse-yaw', foco: 'yoke', vista: 'exterior'
+          anim: 'adverse-yaw', foco: 'yoke', vista: 'exterior',
+          aire: { flujo: true, giros: true, foco: 'ailerons' },
+          acciones: [{ etiqueta: 'Sólo volante a la izquierda', pose: 'alabeo-izq' },
+            { etiqueta: 'Sólo volante a la derecha', pose: 'alabeo-der' },
+            { etiqueta: 'Volante y pie juntos', pose: 'viraje-izq' }, { etiqueta: 'Nivelado', pose: 'nivelado' }]
         },
         {
           titulo: 'Volante y pie, juntos',
           texto: 'El remedio es pisar el pedal del mismo lado que girás el volante, al mismo tiempo: volante a la izquierda, pie izquierdo. Así la nariz acompaña el viraje y el avión no "derrapa". A esto le decimos viraje coordinado.',
-          anim: 'coordinated-turn', foco: 'rudder-pedals', vista: 'exterior'
+          anim: 'coordinated-turn', foco: 'rudder-pedals', vista: 'exterior',
+          aire: { flujo: true, giros: true },
+          acciones: [{ etiqueta: 'Viraje coordinado izq.', pose: 'viraje-izq' },
+            { etiqueta: 'Viraje coordinado der.', pose: 'viraje-der' }, { etiqueta: 'Nivelado', pose: 'nivelado' }]
         },
         {
           titulo: 'La bolita',
           texto: 'Abajo del coordinador de giro hay una bolita dentro de un tubo curvo con líquido, como el nivel de un albañil. Si está al centro, vas coordinado. Si se corre a un costado, "pisá la bolita": apretá el pedal de ese lado hasta que vuelva al medio.',
-          anim: null, foco: 'turn-coordinator', vista: 'cockpit'
+          anim: null, foco: 'turn-coordinator', vista: 'cockpit',
+          acciones: [{ etiqueta: 'Viraje coordinado', pose: 'viraje-izq' },
+            { etiqueta: 'Pie izquierdo de más', pose: 'guinada-izq' },
+            { etiqueta: 'Pie derecho de más', pose: 'guinada-der' }, { etiqueta: 'Nivelado', pose: 'nivelado' }]
         },
         {
           titulo: 'Por qué en ascenso va pie derecho',
           texto: 'La hélice gira en sentido horario vista desde tu asiento. Con mucha potencia y poca velocidad (despegue, ascenso, arremetida) eso tira la nariz a la izquierda: el factor P (la pala que baja muerde más aire), la estela de la hélice que golpea la cola de costado y el torque. La solución es simple: pie derecho.',
-          anim: 'left-turning', foco: 'rudder-pedals', vista: 'exterior'
+          anim: 'left-turning', foco: 'rudder-pedals', vista: 'exterior',
+          aire: { flujo: true, giros: true, foco: 'prop' },
+          acciones: [{ etiqueta: 'Ascenso a toda potencia', pose: 'ascenso' },
+            { etiqueta: 'Potencia máxima', pose: 'potencia-max' }, { etiqueta: 'Pie derecho', pose: 'guinada-der' },
+            { etiqueta: 'Nivelado', pose: 'nivelado' }]
         },
         {
           titulo: 'El viraje estándar',
           texto: 'En el coordinador de giro, si el ala del avioncito queda sobre la marca L o R, estás virando a 3 grados por segundo: una vuelta completa en 2 minutos. Eso se llama viraje estándar. Ojo: este instrumento no te dice nada de la nariz arriba o abajo.',
-          anim: 'coordinated-turn', foco: 'turn-coordinator', vista: 'cockpit'
+          anim: 'coordinated-turn', foco: 'turn-coordinator', vista: 'cockpit',
+          acciones: [{ etiqueta: 'Viraje estándar izq.', pose: 'viraje-izq' },
+            { etiqueta: 'Viraje estándar der.', pose: 'viraje-der' }, { etiqueta: 'Nivelado', pose: 'nivelado' }]
         }
       ]
     },
@@ -252,17 +334,23 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         {
           titulo: 'Qué hacen',
           texto: 'Los flaps son las superficies grandes en la parte de atrás del ala, cerca del fuselaje. Al bajarlos, el ala se curva más: da más sustentación y mucha más resistencia. Eso te deja bajar más lento y más empinado, con la nariz más baja, así ves mejor la pista.',
-          anim: 'flaps-extend', foco: null, vista: 'exterior'
+          anim: 'flaps-extend', foco: null, vista: 'exterior',
+          aire: { flujo: true, fuerzas: true, foco: 'flaps' },
+          acciones: [{ etiqueta: 'Flaps 0°', pose: 'flaps-0' }, { etiqueta: 'Flaps 10°', pose: 'flaps-10' },
+            { etiqueta: 'Flaps 20°', pose: 'flaps-20' }, { etiqueta: 'Flaps 40°', pose: 'flaps-40' }]
         },
         {
           titulo: 'El interruptor del 150M 1976',
           texto: 'Es una palanquita de tres posiciones. Para bajarlos, la mantenés apretada hacia abajo (DOWN) y, cuando la soltás, vuelve sola al centro (OFF) y los flaps se quedan donde estaban; de 0 a 40 grados tardan unos 9 segundos. Arriba (UP) queda trabada y los sube del todo en unos 6 segundos. En el 1977 hay en cambio una palanca que preselecciona el ángulo, con topes en 10 y 20 grados.',
-          anim: null, foco: 'flap-switch', vista: 'cockpit'
+          anim: null, foco: 'flap-switch', vista: 'cockpit',
+          acciones: [{ etiqueta: 'Flaps arriba (UP)', pose: 'flaps-0' }, { etiqueta: 'Bajar a 20°', pose: 'flaps-20' }]
         },
         {
           titulo: 'Cómo sabés cuánto bajaron',
           texto: 'En el parante izquierdo del parabrisas (el marco de adelante de tu puerta) hay una escala de 0 a 40 grados con una aguja. Mirala cada vez que muevas los flaps. Son eléctricos: con el master apagado no se mueven.',
-          anim: null, foco: 'flap-indicator', vista: 'cockpit'
+          anim: null, foco: 'flap-indicator', vista: 'cockpit',
+          acciones: [{ etiqueta: 'Flaps 0°', pose: 'flaps-0' }, { etiqueta: 'Flaps 10°', pose: 'flaps-10' },
+            { etiqueta: 'Flaps 20°', pose: 'flaps-20' }, { etiqueta: 'Flaps 40°', pose: 'flaps-40' }]
         },
         {
           titulo: 'El límite: 85 nudos',
@@ -272,7 +360,10 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         {
           titulo: 'Lo que vas a sentir',
           texto: 'Al bajar flaps, el 150 levanta la nariz y quiere subir un poco ("globea"): sostené con un poquito de empuje y recompensá. Para despegar se usan 0 grados (10 sólo en pista blanda o corta; más de 10 no está aprobado). En una arremetida: potencia máxima y enseguida flaps a 20 grados; después los subís de a poco.',
-          anim: 'flaps-extend', foco: 'yoke', vista: 'exterior'
+          anim: 'flaps-extend', foco: 'yoke', vista: 'exterior',
+          aire: { flujo: true, fuerzas: true, foco: 'flaps' },
+          acciones: [{ etiqueta: 'Sin flaps', pose: 'flaps-0' }, { etiqueta: 'Flaps 20°', pose: 'flaps-20' },
+            { etiqueta: 'Flaps 40°', pose: 'flaps-40' }, { etiqueta: 'Aproximación', pose: 'descenso' }]
         }
       ]
     },
@@ -285,17 +376,26 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         {
           titulo: 'Para qué sirve',
           texto: 'Si querés volar más lento o más rápido que antes, tenés que sostener el volante tirando o empujando todo el tiempo. El compensador (trim) borra esa fuerza para que el avión se quede solo. Es como ajustar el resorte de una puerta para que quede donde la dejás.',
-          anim: 'trim-tab', foco: null, vista: 'exterior'
+          anim: 'trim-tab', foco: null, vista: 'exterior',
+          aire: { flujo: true, foco: 'tail' },
+          acciones: [{ etiqueta: 'Trim nariz arriba', pose: 'compensador-arriba' },
+            { etiqueta: 'Trim nariz abajo', pose: 'compensador-abajo' }, { etiqueta: 'Compensado', pose: 'nivelado' }]
         },
         {
           titulo: 'La rueda y su indicador',
           texto: 'Es la rueda negra vertical abajo en el centro del panel, debajo de los comandos del motor. A su izquierda hay un indicador con NOSE DN (nariz abajo), TAKE OFF (despegue) y NOSE UP (nariz arriba). Rueda hacia adelante = nariz abajo; rueda hacia atrás = nariz arriba. En el teclado: T y G.',
-          anim: null, foco: 'trim-wheel', vista: 'cockpit'
+          anim: null, foco: 'trim-wheel', vista: 'cockpit',
+          acciones: [{ etiqueta: 'Rueda hacia atrás', pose: 'compensador-arriba' },
+            { etiqueta: 'Rueda hacia adelante', pose: 'compensador-abajo' },
+            { etiqueta: 'Compensado', pose: 'nivelado' }]
         },
         {
           titulo: 'La aleta compensadora',
           texto: 'Todo el borde de atrás de la mitad derecha del timón de profundidad es una aleta compensadora (trim tab). Se mueve al revés que el timón: para sostener la nariz arriba, la aleta baja, el aire la empuja hacia arriba y ella mantiene el timón levantado.',
-          anim: 'trim-tab', foco: null, vista: 'exterior'
+          anim: 'trim-tab', foco: null, vista: 'exterior',
+          aire: { flujo: true, foco: 'tail' },
+          acciones: [{ etiqueta: 'Trim nariz arriba', pose: 'compensador-arriba' },
+            { etiqueta: 'Trim nariz abajo', pose: 'compensador-abajo' }, { etiqueta: 'Compensado', pose: 'nivelado' }]
         },
         {
           titulo: 'El método',
@@ -318,12 +418,18 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         {
           titulo: 'El motor y la hélice',
           texto: 'El 150M tiene un Continental O-200-A: 4 cilindros, enfriado por aire, con carburador, 100 caballos a 2750 RPM. La hélice es de paso fijo (no cambia su ángulo), así que el tacómetro, que marca las RPM (vueltas por minuto), es tu medidor de potencia. Ojo: si bajás la nariz las RPM suben solas; no pases la raya roja de 2750.',
-          anim: 'propeller-throttle', foco: 'tachometer', vista: 'cockpit'
+          anim: 'propeller-throttle', foco: 'tachometer', vista: 'cockpit',
+          aire: { flujo: true, foco: 'prop' },
+          acciones: [{ etiqueta: 'Motor apagado', pose: 'motor-off' },
+            { etiqueta: 'Motor encendido', pose: 'motor-on' }, { etiqueta: 'Potencia máxima', pose: 'potencia-max' }]
         },
         {
           titulo: 'El acelerador (THROTTLE)',
           texto: 'Es la perilla negra grande del centro. Adentro = más potencia; afuera = ralentí (el mínimo). Movelo suave, en 2 o 3 segundos. Al dar potencia la nariz sube y se va a la izquierda (pie derecho); al sacar potencia baja. Tiene un disco de fricción en la base: girándolo, la perilla queda más dura y no se mueve sola.',
-          anim: 'propeller-throttle', foco: 'throttle', vista: 'cockpit'
+          anim: 'propeller-throttle', foco: 'throttle', vista: 'cockpit',
+          acciones: [{ etiqueta: 'Acelerador afuera: ralentí', pose: 'potencia-ralenti' },
+            { etiqueta: 'Acelerador adentro: a fondo', pose: 'potencia-max' },
+            { etiqueta: 'Crucero', pose: 'nivelado' }]
         },
         {
           titulo: 'La mezcla (MIXTURE)',
@@ -333,17 +439,24 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         {
           titulo: 'El hielo en el carburador',
           texto: 'Dentro del carburador el aire se acelera por un angostamiento y la nafta se evapora: eso lo enfría mucho, aunque afuera haga calor. Si hay humedad, se forma hielo y tapa el paso del aire. Es probable con menos de 21 °C y humedad de más del 80 %, y posible hasta con 38 °C. Es peor con poca potencia, por ejemplo al bajar. Con la humedad de Uruguay, esto pasa de verdad.',
-          anim: 'carb-ice', foco: null, vista: 'exterior'
+          anim: 'carb-ice', foco: null, vista: 'exterior',
+          acciones: [{ etiqueta: 'Motor en marcha', pose: 'motor-on' },
+            { etiqueta: 'Poca potencia: más riesgo', pose: 'potencia-ralenti' },
+            { etiqueta: 'Descenso con poca potencia', pose: 'descenso' }]
         },
         {
           titulo: 'La calefacción del carburador (CARB HEAT)',
           texto: 'Si tirás esta perilla, el motor toma aire caliente de alrededor del escape en lugar de aire frío. Síntoma de hielo: las RPM bajan sin explicación y después el motor anda áspero. Remedio: calefacción toda afuera; si el motor tose un poco, es el hielo derritiéndose: dejala puesta. Regla de oro: calefacción afuera ANTES de sacar potencia para aterrizar. En tierra, evitala: ese aire no pasa por el filtro.',
-          anim: 'carb-ice', foco: 'carb-heat', vista: 'cockpit'
+          anim: 'carb-ice', foco: 'carb-heat', vista: 'cockpit',
+          acciones: [{ etiqueta: 'Poca potencia', pose: 'potencia-ralenti' },
+            { etiqueta: 'Descenso', pose: 'descenso' }, { etiqueta: 'Potencia máxima', pose: 'potencia-max' }]
         },
         {
           titulo: 'Los magnetos',
           texto: 'Las bujías las alimentan dos magnetos, que son generadores propios del motor: no necesitan la batería. Por eso el motor sigue andando aunque apagues el master. Y por eso mismo, si un cable de masa está roto, la hélice puede arrancar con la llave en OFF: tratala siempre como si estuviera viva.',
-          anim: null, foco: 'ignition', vista: 'cockpit'
+          anim: null, foco: 'ignition', vista: 'cockpit',
+          acciones: [{ etiqueta: 'Motor en marcha', pose: 'motor-on' },
+            { etiqueta: 'Motor apagado', pose: 'motor-off' }]
         }
       ]
     },
@@ -356,22 +469,30 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         {
           titulo: 'Pitot y toma estática',
           texto: 'El tubo pitot, debajo del ala izquierda, recibe el aire de frente. La toma estática, un agujerito en el costado izquierdo del fuselaje, cerca de la nariz, siente el aire quieto. El velocímetro usa los dos; el altímetro y el variómetro usan sólo la estática. Ninguno de los tres necesita electricidad.',
-          anim: 'pitot-static', foco: 'asi', vista: 'exterior'
+          anim: 'pitot-static', foco: 'asi', vista: 'exterior',
+          acciones: [{ etiqueta: 'Subir', pose: 'ascenso' }, { etiqueta: 'Bajar', pose: 'descenso' },
+            { etiqueta: 'Acelerar', pose: 'potencia-max' }, { etiqueta: 'Nivelado', pose: 'nivelado' }]
         },
         {
           titulo: 'Qué falla con qué',
           texto: 'Si se tapa el pitot (una funda olvidada, un insecto), falla sólo el velocímetro. Si se tapa la estática, fallan los tres: velocímetro, altímetro y variómetro. Por eso en la inspección de afuera sacás la funda del pitot y mirás que la toma estática esté limpia.',
-          anim: 'pitot-static', foco: 'altimeter', vista: 'exterior'
+          anim: 'pitot-static', foco: 'altimeter', vista: 'exterior',
+          acciones: [{ etiqueta: 'Subir', pose: 'ascenso' }, { etiqueta: 'Bajar', pose: 'descenso' },
+            { etiqueta: 'Nivelado', pose: 'nivelado' }]
         },
         {
           titulo: 'Los giróscopos de vacío',
           texto: 'Una bomba de vacío movida por el motor hace girar los trompos (giróscopos) del horizonte artificial y del direccional. El indicador de succión tiene que marcar entre 4,6 y 5,4 inHg; fuera de eso, no les creas. Si el motor se para, esos dos se van perdiendo de a poco y sin avisar.',
-          anim: null, foco: 'suction', vista: 'cockpit'
+          anim: null, foco: 'suction', vista: 'cockpit',
+          acciones: [{ etiqueta: 'Viraje', pose: 'viraje-izq' },
+            { etiqueta: 'Nariz arriba', pose: 'cabeceo-arriba' }, { etiqueta: 'Nivelado', pose: 'nivelado' }]
         },
         {
           titulo: 'Lo eléctrico',
           texto: 'El coordinador de giro es eléctrico, a propósito: si falla el vacío, te queda un giróscopo. También dependen de la electricidad los indicadores de combustible, la temperatura de aceite (en el 150M), los flaps, el arranque, las radios y las luces. Con el master apagado, todo eso queda muerto.',
-          anim: null, foco: 'turn-coordinator', vista: 'cockpit'
+          anim: null, foco: 'turn-coordinator', vista: 'cockpit',
+          acciones: [{ etiqueta: 'Viraje izquierda', pose: 'viraje-izq' },
+            { etiqueta: 'Viraje derecha', pose: 'viraje-der' }, { etiqueta: 'Nivelado', pose: 'nivelado' }]
         },
         {
           titulo: 'Lo que no necesita nada',
@@ -381,7 +502,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         {
           titulo: 'El altímetro y el QNH en Uruguay',
           texto: 'El altímetro es un barómetro que muestra pies. Con la perilla le ponés el QNH, la presión que te da la torre o el METAR (el informe del tiempo del aeródromo). En Uruguay viene en hectopascales (hPa), pero muchos 150 tienen la ventanilla en pulgadas de mercurio: 1013 hPa = 29,92 inHg, y 1 hPa son unos 30 pies. En tierra, bien ajustado, marca la elevación del aeródromo.',
-          anim: null, foco: 'altimeter', vista: 'cockpit'
+          anim: null, foco: 'altimeter', vista: 'cockpit',
+          acciones: [{ etiqueta: 'Subir', pose: 'ascenso' }, { etiqueta: 'Bajar', pose: 'descenso' }]
         }
       ]
     },
@@ -394,22 +516,31 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         {
           titulo: 'La fórmula',
           texto: 'Actitud es dónde está la nariz respecto del horizonte. Si elegís una actitud y una potencia, el avión te da una velocidad y un ascenso o descenso predecibles. En el auto, el pedal y la pendiente de la calle deciden la velocidad; en el avión, vos elegís la pendiente (actitud) y el pedal (potencia).',
-          anim: 'axes-pitch', foco: null, vista: 'exterior'
+          anim: 'axes-pitch', foco: null, vista: 'exterior',
+          acciones: [{ etiqueta: 'Crucero', pose: 'nivelado' }, { etiqueta: 'Ascenso', pose: 'ascenso' },
+            { etiqueta: 'Descenso', pose: 'descenso' }]
         },
         {
           titulo: 'Números típicos',
           texto: 'Para ascender: potencia máxima y la nariz más o menos un puño arriba del horizonte da unos 65 a 75 nudos. Crucero: unas 2400 a 2500 RPM con la nariz en el horizonte. Planeo: ralentí y la nariz un poco abajo para 60 nudos. Son valores de referencia: tu instructor te va a mostrar la imagen exacta.',
-          anim: null, foco: 'tachometer', vista: 'cockpit'
+          anim: null, foco: 'tachometer', vista: 'cockpit',
+          acciones: [{ etiqueta: 'Crucero', pose: 'nivelado' }, { etiqueta: 'Ascenso', pose: 'ascenso' },
+            { etiqueta: 'Descenso', pose: 'descenso' }]
         },
         {
           titulo: 'Quién controla qué',
           texto: 'A grandes rasgos: la potencia decide si subís o bajás, y la actitud (el volante) decide la velocidad. Si querés subir, primero potencia. Tirar sin potencia no te sube: te frena y te acerca a la pérdida.',
-          anim: 'propeller-throttle', foco: 'throttle', vista: 'cockpit'
+          anim: 'propeller-throttle', foco: 'throttle', vista: 'cockpit',
+          acciones: [{ etiqueta: 'Más potencia', pose: 'potencia-max' },
+            { etiqueta: 'Menos potencia', pose: 'potencia-ralenti' },
+            { etiqueta: 'Nariz arriba', pose: 'cabeceo-arriba' }, { etiqueta: 'Nariz abajo', pose: 'cabeceo-abajo' }]
         },
         {
           titulo: 'Mirá afuera',
           texto: 'Tu referencia principal es el horizonte de verdad: dónde corta el capó del motor. Los instrumentos sólo confirman. Una mirada corta adentro (un segundo) y varios segundos afuera, revisando el cielo por partes en busca de otros aviones. El horizonte artificial es una ventanita al horizonte real: si ves el real, usá el real.',
-          anim: null, foco: 'attitude', vista: 'cockpit'
+          anim: null, foco: 'attitude', vista: 'cockpit',
+          acciones: [{ etiqueta: 'Nivelado', pose: 'nivelado' }, { etiqueta: 'Ascenso', pose: 'ascenso' },
+            { etiqueta: 'Viraje', pose: 'viraje-izq' }]
         },
         {
           titulo: 'El barrido de instrumentos',
@@ -427,12 +558,16 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         {
           titulo: 'Se dobla con los pies',
           texto: 'Los pedales mueven la rueda de nariz unos 8,5 grados para cada lado. Si además frenás de ese lado, girás hasta 30 grados. El volante NO dobla en tierra: el error clásico del primer día es querer doblar con las manos.',
-          anim: 'ground-steering', foco: 'rudder-pedals', vista: 'exterior'
+          anim: 'ground-steering', foco: 'rudder-pedals', vista: 'exterior',
+          acciones: [{ etiqueta: 'Doblar a la izquierda', pose: 'carreteo-izq' },
+            { etiqueta: 'Doblar a la derecha', pose: 'carreteo-der' }]
         },
         {
           titulo: 'Los frenos',
           texto: 'Se frena apretando la parte de arriba de cada pedal: el izquierdo frena la rueda principal izquierda y el derecho la derecha. La rueda de nariz no tiene freno. Carreteá con los talones en el piso, así no frenás sin querer, y probá los frenos apenas empezás a moverte. En el teclado, B frena.',
-          anim: 'ground-steering', foco: 'toe-brakes', vista: 'cockpit'
+          anim: 'ground-steering', foco: 'toe-brakes', vista: 'cockpit',
+          acciones: [{ etiqueta: 'Doblar a la izquierda', pose: 'carreteo-izq' },
+            { etiqueta: 'Doblar a la derecha', pose: 'carreteo-der' }]
         },
         {
           titulo: 'Velocidad y freno de estacionamiento',
@@ -465,7 +600,12 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         {
           titulo: 'La inspección de afuera',
           texto: 'Recorren el avión con la checklist: superficies que se mueven libres, purga de combustible (buscar agua o suciedad), aceite (nunca menos de 4 cuartos; 5 para vuelos cortos), prueba de la bocina de pérdida, funda del pitot afuera, toma estática limpia y hélice sin golpes.',
-          anim: 'controls-check', foco: null, vista: 'exterior'
+          anim: 'controls-check', foco: null, vista: 'exterior',
+          acciones: [{ etiqueta: 'Alerones: izquierda', pose: 'alabeo-izq' },
+            { etiqueta: 'Alerones: derecha', pose: 'alabeo-der' },
+            { etiqueta: 'Profundidad arriba', pose: 'cabeceo-arriba' },
+            { etiqueta: 'Profundidad abajo', pose: 'cabeceo-abajo' },
+            { etiqueta: 'Timón izquierda', pose: 'guinada-izq' }, { etiqueta: 'Timón derecha', pose: 'guinada-der' }]
         },
         {
           titulo: 'En el asiento',
@@ -485,7 +625,10 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         {
           titulo: 'En la zona y de vuelta',
           texto: 'En la zona de práctica vas a probar el efecto de cada comando, vuelo recto y nivelado, virajes suaves, ascensos, descensos y compensar, siempre mirando si hay otros aviones. A la vuelta suele aterrizar el instructor. Apagado: mezcla corte, llave OFF, master OFF y traba de comandos. Al final, charla y anotación en tu libro de vuelo.',
-          anim: 'coordinated-turn', foco: null, vista: 'exterior'
+          anim: 'coordinated-turn', foco: null, vista: 'exterior',
+          acciones: [{ etiqueta: 'Viraje izquierda', pose: 'viraje-izq' },
+            { etiqueta: 'Viraje derecha', pose: 'viraje-der' }, { etiqueta: 'Ascenso', pose: 'ascenso' },
+            { etiqueta: 'Descenso', pose: 'descenso' }]
         }
       ]
     }

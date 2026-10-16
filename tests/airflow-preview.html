@@ -67,6 +67,7 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
 <script src="../src/sim.js"></script>
+<script src="../src/world.js"></script>
 <script src="../src/exterior.js"></script>
 <script src="../src/airflow.js"></script>
 <script src="../src/core.js"></script><!-- pipeline helpers only (Core.configureRenderer / createEnvironment) -->
@@ -83,7 +84,9 @@
   renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
   view.insertBefore(renderer.domElement, view.firstChild);
   C150.Core.configureRenderer(renderer, 'alta');
+  var world = C150.World.create(THREE);   // not drawn here: the exterior's 'cielo' backdrop shows its scenery
   var ext = C150.Exterior.create(THREE);
+  if (ext.setSun) ext.setSun(world.sunDirection);
   if (!ext.scene.environment) ext.scene.environment = C150.Core.createEnvironment(renderer, { cabin: false, studio: true, size: 128 }).texture;
   var flow = C150.Airflow.create(THREE, ext, {});
   ext.scene.traverse(function (o) {
@@ -179,6 +182,7 @@
   function frame(dt) {
     if (mode() === 'flight' || hasTunnel) { applyInputs(); Sim.step(state, dt); if (mode() === 'tunnel' && hasTunnel) { state.flaps = V.flaps; } }
     else applyInputs();
+    world.update(state, dt);
     ext.followAttitude = !(state.air && state.air.onGround);
     ext.update(state, dt);
     var t0 = performance.now();

@@ -9,11 +9,11 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
  *                                                        carries a Spanish message; it is replayed to late listeners)
  *   C150.Core.on(event, fn) → unsubscribe fn            C150.Core.off(event, fn)*
  *     'hover'(id|null, subId|null, {x,y})   'select'(id|null)   'operate'(id, subId|null)   'frame'(state, dt) ~15 Hz
- *     'viewchange'('cockpit'|'exterior')    'pick'(id)          'layout'(rect|null)  'error'(message)
+ *     'viewchange'('cockpit'|'exterior')    'pick'(id)          'layout'(payload, see v3) 'error'(message)
  *     *'preset'(name|null) camera preset (null: the camera left it — user orbit or fly to a control)
  *     *'scenario'(name) sim preset applied (applyPreset)  *'pause'(bool)
  *     *'animend'(animName)  (an exterior animation finished on its own)
- *   select(id|null, {focus}) · focusPreset(name) · setMainView(name) · getMainView() · getInsetRect()
+ *   select(id|null, {focus}) · focusPreset(name, {keepView}*) · setMainView(name) · getMainView() · getInsetRect()
  *   setTargetHighlight(id|ids[]|null) · setExteriorHighlight(parts[]) · playExterior(anim|null, {enlarge, loop})
  *   operate(id, subId, value?) · setInput(path, value) · hold(id, subId, bool) · pickMode(fn|null)
  *   applyPreset(name) · state · setPaused(bool) · isMobile()
@@ -31,6 +31,32 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
  *     *getBackdrop() · *setExteriorView(name | airflow region | {pos, target}) → bool. The flow is updated every frame
  *     while the exterior is on screen (main view, or the inset at density 'baja'), capped by the render quality.
  *   *cockpit, *world, *exterior, *renderer, *camera, *controls (read-only references, for the UI and debugging)
+ *   Contract v3:
+ *   *setLayout('cabina'|'dos'|'afuera') → bool · *getLayout(). 'cabina' = cockpit big + exterior inset, 'afuera' = exterior
+ *     big + cockpit inset, 'dos' = both at the SAME size, side by side when the view is at least as wide as tall (cockpit
+ *     left, exterior right) or stacked (cockpit on top), 2 px divider, no inset; picking, hover and drags work in the
+ *     cockpit half, orbit/zoom in the half under the pointer. setMainView(name) (public) leaves 'dos'; select/focus,
+ *     playExterior({enlarge}) and the C key do not. The 'layout' payload keeps the inset fields (x, y, w, h — absent
+ *     when there is no inset, so old listeners see "no inset") and adds { mode, main, split, rects: { cockpit, exterior,
+ *     inset } } (css px in the container, null when hidden). The UI persists the choice.
+ *   *isInteracting() → true while the student is still moving a control (pointer pressed on a draggable control, a
+ *     press-and-hold from the 3D view or hold(), keyboard flying, a held throttle/trim/flap key, or a UI interaction
+ *     registered with *setInteracting(tag, bool)). Event *'interactionend' when the last one finishes. Camera fly-to
+ *     (select(id,{focus}), focusPreset) never starts while interacting or while a pointer is down on the 3D view: it
+ *     waits and starts 0.25 s after the release (a newer select without focus cancels it).
+ *   *poseExterior(name) → Spanish caption | false (ext.pose: a held movement) · *clearPose() · *getPoses() (ext.POSES)
+ *   *getAnimState() → ext.animState | null · *isMirroring() · event *'mirror'(bool).
+ *     MIRROR: whenever ext.animState.active (a lesson animation or a pose), core snapshots the sim state once, turns on
+ *     state.puppet (sim.js) and every frame copies the animation's bank/pitch/yaw/ias/vs/turnRate/slip into the puppet
+ *     and its yokeRoll/yokePitch/rudder/brakes/throttle/flaps/engineOn into the inputs (engine via Sim.actions.setEngine,
+ *     flaps: the switch shows the direction of travel and the indicator follows exactly), with the master on, the
+ *     gyros spun and, for a flight movement started on the ground, the airplane lifted to 2500 ft AGL. So the cockpit,
+ *     the world through the windshield and every instrument show the movement from inside. When it ends the snapshot is
+ *     restored in place (events and time are not rolled back). The sim keeps stepping during a mirror even if paused.
+ *     applyPreset during a mirror drops the snapshot (the new preset is the base of the next one).
+ *   *setAirPeek(bool) · *getAirPeek() → {region, key, caption, virtual}|null · event *'airpeek'(info|null): moving a flight
+ *     control in the cockpit briefly shows the air around that part in the exterior view with a caption (see "el aire
+ *     en toda la app" below; getCaption() returns the peek caption while no exterior caption runs).
  *
  * Decisions where the contract leaves room (other agents: please read):
  *  - Colour pipeline: physically based (see RENDERING NOTES below). setToneMapping('none') is kept for debugging.
@@ -104,7 +130,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
  *   camera-relative fill and rim, low hemisphere fill.
  *  Shadows: PCFSoftShadowMap ('alta') / PCFShadowMap ('media') / off ('baja'). Only the main sun casts: orthographic
  *   shadow camera ±SHADOW_HALF m around SHADOW_CENTER (the cabin), map 2048² ('alta') / 1024² ('media'),
- *   bias SHADOW_BIAS, normalBias SHADOW_NBIAS (metres). sun.shadow.autoUpdate = false: the map is re-rendered only
+ *   bias SHADOW_BIAS, normalBias SHADOW_NBIAS (metres). sun.shadow.autoUpdate = false: the map is re-rendered (sun-only changes at most every 0.12 s) only
  *   when the sun direction moves or cockpit.motion changes (a door, yoke, pedal… moved). cockpit.js sets
  *   castShadow/receiveShadow on its meshes (glass, decals, gauge faces and the cowling do not cast). world/exterior
  *   meshes do not cast into this map. The exterior key light has its own map (1536² alta / 1024² media, ±6.6 m,
@@ -160,6 +186,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   };
   var SHADOW_CENTER = [0, 0.56, 0.42], SHADOW_HALF = 1.3, SHADOW_DIST = 5;
   var SHADOW_BIAS = -0.00025, SHADOW_NBIAS = 0.0035;
+  var SHADOW_SUN_INTERVAL = 0.12;   // s, slowest refresh of the cabin shadow map while only the sun moves (turns)
   var ENV_STEP = 6, ENV_MIN_INTERVAL = 0.45;
   var QUALITY = {
     alta: { pr: 2, shadow: 2048, soft: true, env: 256, world: 'high', detail: 2 },
@@ -180,6 +207,10 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   var THROTTLE_STEP = 0.05, TRIM_STEP = 0.03;
   var FRAME_EVENT_DT = 1 / 15;
   var INSET_MARGIN = 12;
+  var SPLIT_GAP = 2;               // px between the two halves of the 'dos' layout (a dark divider)
+  var FOCUS_AFTER_RELEASE = 0.25;  // s: a camera move asked for during an interaction starts this long after it ends
+  var LAYOUTS = { cabina: 1, dos: 1, afuera: 1 };
+  var HELD_KEYS = { PageUp: 1, PageDown: 1, '+': 1, '=': 1, '-': 1, '_': 1, t: 1, g: 1, f: 1, r: 1 };
   var LOCK_MSG = 'Primero sacá la traba de comandos.';
   var LOCK_MSG_INTERVAL = 4;
   var SLIDER_NUDGE = 0.25;   // click on a selected slider control: 25 % of its travel
@@ -258,11 +289,15 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   var state = null;
   var scene = null, camera = null, controls = null, world = null, cockpit = null, ext = null, extControls = null;
   var flow = null;   // C150.Airflow on the exterior (airflow.js, optional)
+  var lastOperateAt = -1e9;   // ms of the last operate() (a click on a control): the air peek knows it was the student
   var hemi = null, sun = null, bounce = null;
-  var shadowSun = null, shadowMotion = -1;
+  var shadowSun = null, shadowMotion = -1, shadowAge = 0;
   var envCabin = null, envOutdoor = null, envAge = 1e9, envSun = null, envUp = null, envUpNow = null;
   var quality = 'alta', qualitySetting = 'auto', slowTime = 0, slowFrames = 0, autoSteps = 0;
   var size = { w: 1, h: 1 }, insetRect = null, insetVisible = true, mainView = 'cockpit', enlargeRestore = null;
+  var layout = 'cabina', cockRect = null, extRect = null;   // contract v3: 'cabina' | 'dos' | 'afuera' and the view rects
+  var interactTags = {}, heldKeys = {}, interactingPrev = false, pendingFocus = null;   // isInteracting / deferred fly-to
+  var mirror = null;          // exterior animation / pose mirrored in the cockpit: { snap, simRef, airborne }
   var reducedMotion = false, mqReduced = null, mqCoarse = null;
   var listeners = {}, lastError = null, reported = {};
   var selected = null, hovered = { id: null, sub: null }, targets = {}, pickFn = null;
@@ -582,6 +617,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
 
   function operate(id, subId, value) {
     if (!state || !id) return false;
+    lastOperateAt = nowMs();
     var spec = probarFor(id);
     if (!spec) return false;
     var hasVal = value !== undefined && value !== null;
@@ -731,9 +767,63 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         if (sub && sub !== 'start') return false;
         if (onOff) { ignHeld = true; ignTimer = null; setIgnition('START'); }
         else { ignHeld = false; if (state.ignition === 'START') setIgnition('BOTH'); }
+        if (!onOff) checkInteraction(0);
         return true;
     }
     return false;
+  }
+  function holdAndCheck(id, subId, onOff) {
+    var r = hold(id, subId, onOff);
+    checkInteraction(0);
+    return r;
+  }
+
+  /* ------------------------------------------------------------------ interaction state (contract v3) */
+  /**
+   * True while the student is still moving a control: a pointer pressed on a draggable control (dragging or about to),
+   * a press-and-hold (yoke, pedals, toe brakes, flap switch, ignition START — from the 3D view or from hold()), keyboard
+   * flying (arrows, Z/X, B), a held control key (throttle ±, trim T/G, flaps F/R) or an interaction the UI registered
+   * with setInteracting(tag, true). Checklists must not complete / advance while this is true.
+   */
+  /** A pointer gesture in progress (a lost pointerup never blocks for good: 60 s without movement = stale). */
+  function ptrLive() { return !!ptr && nowMs() - (ptr.tMove || ptr.t0) < 60000; }
+  function isInteracting() {
+    if (ptrLive() && (ptr.mode === 'pending' || ptr.mode === 'drag' || ptr.mode === 'blocked')) return true;
+    var hy = holdState.yoke;
+    if (hy.left || hy.right || hy.pull || hy.push || holdState.rudder.left || holdState.rudder.right) return true;
+    if (holdState.brakeL || holdState.brakeR || dragBrake.L || dragBrake.R || keyBrake) return true;
+    if (flapHolders.key || flapHolders.ui || ignHeld) return true;
+    if (keys.ArrowLeft || keys.ArrowRight || keys.ArrowUp || keys.ArrowDown || keys.z || keys.x) return true;
+    var t = nowMs(), k;
+    for (k in heldKeys) {
+      if (t - heldKeys[k] < 1200) return true;      // auto-repeat refreshes it; a lost keyup expires on its own
+      delete heldKeys[k];
+    }
+    for (k in interactTags) if (interactTags[k]) return true;
+    return false;
+  }
+  /** The camera must not move by itself: an interaction is running or a pointer is down on the 3D view (orbit). */
+  function userBusy() { return ptrLive() || isInteracting(); }
+  /** UI widgets (DOM sliders, pads, hold buttons) register their own interactions: setInteracting('pad', true/false). */
+  function setInteracting(tag, onOff) {
+    tag = String(tag || 'ui');
+    if (onOff) interactTags[tag] = true; else delete interactTags[tag];
+    checkInteraction(0);
+    return isInteracting();
+  }
+  /** Emits 'interactionend' when the last interaction finishes and runs a deferred camera move a moment later. */
+  function checkInteraction(dt) {
+    var now = isInteracting();
+    if (interactingPrev && !now) { interactingPrev = false; emit('interactionend'); }
+    interactingPrev = now;
+    if (pendingFocus && dt > 0) {
+      if (userBusy()) pendingFocus.wait = FOCUS_AFTER_RELEASE;
+      else if ((pendingFocus.wait -= dt) <= 0) {
+        var pf = pendingFocus;
+        pendingFocus = null;
+        if (pf.kind === 'control') focusControl(pf.id); else focusPreset(pf.name, { keepView: pf.keepView });
+      }
+    }
   }
 
   /* ------------------------------------------------------------------ camera: presets, fly-to, constraints */
@@ -780,20 +870,26 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   function focusControl(id) {
     var v = viewFor(id);
     if (!v) return false;
-    if (mainView !== 'cockpit') setMainView('cockpit');
+    // never move the camera under the student's hand: wait until the drag / hold / orbit ends
+    if (userBusy()) { pendingFocus = { kind: 'control', id: id, wait: FOCUS_AFTER_RELEASE }; return true; }
+    if (layout !== 'dos' && mainView !== 'cockpit') setMainView('cockpit');
     flyTo(v.position, v.target, false);
     emit('preset', null);
     return true;
   }
-  function focusPreset(name) {
+  /** opts.keepView: do not bring the cockpit to the main view (a lesson framing the cockpit inset / pane). */
+  function focusPreset(name, opts) {
     var p = presetSpec(name);
     if (!p || !camera) return false;
-    if (mainView !== 'cockpit') setMainView('cockpit');
+    var keep = !!(opts && opts.keepView);
+    if (userBusy()) { pendingFocus = { kind: 'preset', name: name, keepView: keep, wait: FOCUS_AFTER_RELEASE }; return true; }
+    if (layout !== 'dos' && mainView !== 'cockpit' && !keep) setMainView('cockpit');
     flyTo(p.position, p.target, false);
     emit('preset', name);
     return true;
   }
   function updateCameras(dt) {
+    var split = layout === 'dos';
     if (fly) {
       fly.k = Math.min(1, fly.k + dt / FLY_TIME);
       var e = easeInOut(fly.k), tgt = controls ? controls.target : camTarget;
@@ -801,7 +897,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       tgt.lerpVectors(fly.t0, fly.t1, e);
       camera.lookAt(tgt);
       if (fly.k >= 1) { fly = null; if (controls) controls.update(); hoverPos.dirty = true; }
-    } else if (controls && mainView === 'cockpit') {
+    } else if (controls && (mainView === 'cockpit' || split)) {
       controls.update();
     }
     if (controls) clampBox(controls.target, PIVOT);
@@ -809,7 +905,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
 
     if (ext && extControls) {
       var busy = !!ext.cameraBusy;
-      if (mainView === 'exterior' && !busy) {
+      if ((mainView === 'exterior' || split) && !busy) {
         if (extBusyPrev && extControls.target !== ext.target && ext.target) extControls.target.copy(ext.target);
         extControls.update();
       }
@@ -833,17 +929,56 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     w = Math.round(w); h = Math.round(h);
     return { x: W - INSET_MARGIN - w, y: INSET_MARGIN, w: w, h: h };
   }
+  /** The split view is active: layout 'dos', the exterior exists and the view is big enough for two halves. */
+  function isSplit() { return layout === 'dos' && !!ext && size.w >= 200 && size.h >= 150; }
+  /**
+   * View rectangles (css px, container space). 'dos': two equal halves, side by side when the view is at least as wide
+   * as tall (cockpit left, exterior right), stacked otherwise (cockpit on top), SPLIT_GAP divider, no inset.
+   * 'cabina' / 'afuera': the main view fills the container and the other one is the inset (when visible).
+   */
+  function computeRects() {
+    var W = size.w, H = size.h, full = { x: 0, y: 0, w: W, h: H };
+    if (isSplit()) {
+      insetRect = null;
+      if (W >= H) {
+        var w1 = Math.floor((W - SPLIT_GAP) / 2);
+        cockRect = { x: 0, y: 0, w: w1, h: H };
+        extRect = { x: w1 + SPLIT_GAP, y: 0, w: W - w1 - SPLIT_GAP, h: H };
+      } else {
+        var h1 = Math.floor((H - SPLIT_GAP) / 2);
+        cockRect = { x: 0, y: 0, w: W, h: h1 };
+        extRect = { x: 0, y: h1 + SPLIT_GAP, w: W, h: H - h1 - SPLIT_GAP };
+      }
+      return;
+    }
+    insetRect = computeInset();
+    if (mainView === 'exterior' && ext) { extRect = full; cockRect = insetRect; }
+    else { cockRect = full; extRect = insetRect; }
+  }
+  function rectCopy(r) { return r ? { x: r.x, y: r.y, w: r.w, h: r.h } : null; }
+  /** 'layout' payload: the inset rect fields as before (x, y, w, h — absent without an inset) + main, mode and rects. */
+  function layoutPayload() {
+    var p = getInsetRect() || {};
+    p.mode = layout; p.main = mainView; p.split = isSplit();
+    p.rects = { cockpit: rectCopy(cockRect), exterior: rectCopy(extRect), inset: rectCopy(insetRect) };
+    return p;
+  }
   function layoutViews() {
     var W = size.w, H = size.h;
-    insetRect = computeInset();
+    computeRects();
+    var split = isSplit();
     var portraitPhone = isMobile() && H > W;
-    if (camera) {
-      if (mainView === 'cockpit') { camera.aspect = W / Math.max(1, H); camera.fov = portraitPhone ? 70 : 62; }
-      else if (insetRect) { camera.aspect = insetRect.w / insetRect.h; camera.fov = 62; }
+    if (camera && cockRect) {
+      var casp = cockRect.w / Math.max(1, cockRect.h);
+      camera.aspect = casp;
+      // the full cockpit view as before; a tall half gets a wider vertical field of view so the panel still fits
+      if (!split && cockRect === insetRect) camera.fov = 62;
+      else if (split) camera.fov = casp < 1 ? 72 : 62;
+      else camera.fov = portraitPhone ? 70 : 62;
       camera.updateProjectionMatrix();
     }
     if (ext && ext.camera) {
-      var ew = mainView === 'exterior' ? W : (insetRect ? insetRect.w : 4), eh = mainView === 'exterior' ? H : (insetRect ? insetRect.h : 3);
+      var ew = extRect ? extRect.w : 4, eh = extRect ? extRect.h : 3;
       // exterior views are framed for 4:3: on narrower viewports widen the vertical fov to keep the 4:3 horizontal view
       var asp = ew / Math.max(1, eh), half = Math.tan(extBaseFov * Math.PI / 360);
       var margin = 1 + 0.15 * clamp((4 / 3 - asp) / (4 / 3 - 0.75), 0, 1);   // a little extra room on tall screens
@@ -853,13 +988,30 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         else { ext.camera.aspect = asp; }
         // floating labels/panels of the exterior keep clear of the cockpit inset drawn over it
         if (ext.setOccluder) {
-          ext.setOccluder(mainView === 'exterior' && insetRect
+          ext.setOccluder(!split && mainView === 'exterior' && insetRect
             ? { x: insetRect.x, y: insetRect.y, w: insetRect.w, h: insetRect.h, vw: W, vh: H } : null);
         }
       } catch (e) { reportOnce('exterior.setSize', e); }
       ext.camera.updateProjectionMatrix();
     }
-    emit('layout', getInsetRect());
+    if (!ptr) syncControlsEnabled(null);
+    emit('layout', layoutPayload());
+  }
+  /** Which OrbitControls listen: the main view's, or in 'dos' the one under the pointer (where = 'cockpit'|'exterior'). */
+  function syncControlsEnabled(where) {
+    if (isSplit()) {
+      var w = where || 'both';
+      if (controls) controls.enabled = w === 'both' || w === 'cockpit';
+      if (extControls) extControls.enabled = w === 'both' || w === 'exterior';
+      return;
+    }
+    if (controls) controls.enabled = mainView === 'cockpit';
+    if (extControls) extControls.enabled = mainView === 'exterior';
+  }
+  /** The cockpit view rect where controls can be picked (null: the cockpit is only the inset, which swaps on click). */
+  function pickRect() {
+    if (isSplit()) return cockRect;
+    return mainView === 'cockpit' ? cockRect : null;
   }
   function resize() {
     if (!renderer || !container) return;
@@ -876,13 +1028,21 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   function setMainView(name, internal) {
     if (name !== 'cockpit' && name !== 'exterior') return false;
     if (name === 'exterior' && !ext) return false;
-    if (!internal) enlargeRestore = null;
+    if (!internal) {
+      enlargeRestore = null;
+      // an explicit main view leaves the split layout ('dos' -> 'cabina' / 'afuera')
+      if (layout === 'dos') {
+        layout = name === 'cockpit' ? 'cabina' : 'afuera';
+        if (name === mainView) { setHover(null, null); layoutViews(); return true; }
+      }
+    }
     if (name === mainView) return true;
     mainView = name;
-    endDrag(true);
-    if (controls) controls.enabled = name === 'cockpit';
-    if (extControls) extControls.enabled = name === 'exterior';
-    if (name === 'exterior' && extControls && ext && !ext.cameraBusy && ext.target && extControls.target !== ext.target) {
+    if (layout !== 'dos') {
+      layout = name === 'cockpit' ? 'cabina' : 'afuera';
+      endDrag(true);
+    }
+    if ((name === 'exterior' || layout === 'dos') && extControls && ext && !ext.cameraBusy && ext.target && extControls.target !== ext.target) {
       extControls.target.copy(ext.target);
     }
     setHover(null, null);
@@ -893,14 +1053,40 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   function getMainView() { return mainView; }
   function setInsetVisible(v) {
     insetVisible = !!v;
-    if (!insetVisible && mainView === 'exterior') setMainView('cockpit');
+    if (!insetVisible && mainView === 'exterior' && layout !== 'dos') setMainView('cockpit');
     layoutViews();
   }
+  /**
+   * Contract v3: 'cabina' (cockpit big + exterior inset), 'dos' (both at the same size: side by side in landscape,
+   * stacked in portrait, no inset) or 'afuera' (exterior big + cockpit inset). Emits 'layout' {mode, rects, ...}.
+   */
+  function setLayout(mode) {
+    if (!LAYOUTS[mode]) return false;
+    if (mode !== 'cabina' && !ext) return false;
+    enlargeRestore = null;
+    if (mode === 'dos') {
+      if (layout === 'dos') return true;
+      layout = 'dos';
+      endDrag(true);
+      if (extControls && ext && !ext.cameraBusy && ext.target && extControls.target !== ext.target) extControls.target.copy(ext.target);
+      setHover(null, null);
+      layoutViews();
+      return true;
+    }
+    var want = mode === 'cabina' ? 'cockpit' : 'exterior';
+    var wasSplit = layout === 'dos';
+    layout = mode;
+    if (want !== mainView) return setMainView(want, true);
+    if (wasSplit) { setHover(null, null); layoutViews(); }
+    return true;
+  }
+  function getLayout() { return layout; }
 
   /* ------------------------------------------------------------------ picking */
   function raycastAt(x, y, out) {
-    if (!cockpit || !cockpit.pickables || !camera || mainView !== 'cockpit') return null;
-    ndc.set((x / size.w) * 2 - 1, -(y / size.h) * 2 + 1);
+    var r = pickRect();
+    if (!cockpit || !cockpit.pickables || !camera || !r || !inRect(x, y, r)) return null;
+    ndc.set(((x - r.x) / r.w) * 2 - 1, -((y - r.y) / r.h) * 2 + 1);
     raycaster.setFromCamera(ndc, camera);
     hits.length = 0;
     raycaster.intersectObjects(cockpit.pickables, false, hits);
@@ -936,6 +1122,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     var id = null, sub = null, cursor = '';
     if (hoverPos.inside) {
       if (inRect(hoverPos.x, hoverPos.y, insetRect)) cursor = 'pointer';
+      else if (isSplit() && !inRect(hoverPos.x, hoverPos.y, cockRect)) cursor = '';
       else {
         var h = raycastAt(hoverPos.x, hoverPos.y, hoverHit);
         if (h) { id = h.id; sub = h.sub; cursor = DRAG_KIND[id] ? 'grab' : 'pointer'; }
@@ -949,15 +1136,16 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     cockpit.anchors[id].getWorldPosition(vA);
     vB.copy(vA).applyMatrix4(camera.matrixWorldInverse);
     vA.project(camera);
-    var r = mainView === 'cockpit' ? { x: 0, y: 0, w: size.w, h: size.h } : insetRect;
+    var r = cockRect;
     if (!r) return null;
     var x = r.x + (vA.x + 1) / 2 * r.w, y = r.y + (1 - vA.y) / 2 * r.h;
     return { x: x, y: y, visible: vB.z < 0 && Math.abs(vA.x) <= 1 && Math.abs(vA.y) <= 1 };
   }
   /** Screen (css px) of a world point, written into out {x, y}. */
   function toScreen(v, out) {
+    var r = cockRect || { x: 0, y: 0, w: size.w, h: size.h };
     vB.copy(v).project(camera);
-    out.x = (vB.x + 1) / 2 * size.w; out.y = (1 - vB.y) / 2 * size.h;
+    out.x = r.x + (vB.x + 1) / 2 * r.w; out.y = r.y + (1 - vB.y) / 2 * r.h;
     return out;
   }
 
@@ -985,7 +1173,12 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       ev.stopPropagation();
       return;
     }
-    if (mainView === 'cockpit' && ev.button === 0) {
+    if (isSplit()) {
+      // two views: only the OrbitControls of the half under the pointer take this gesture
+      ptr.view = inRect(pxy.x, pxy.y, extRect) ? 'exterior' : 'cockpit';
+      syncControlsEnabled(ptr.view);
+    }
+    if (pickRect() && ev.button === 0) {
       ptr.hit = raycastAt(pxy.x, pxy.y, null);
       if (ptr.hit && DRAG_KIND[ptr.hit.id]) {
         ptr.mode = 'pending';
@@ -999,6 +1192,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   function onPointerMove(ev) {
     if (!inited) return;
     if (ptr && ev.pointerId === ptr.id) {
+      ptr.tMove = nowMs();
       localXY(ev, pxy);
       if (ev.pointerType !== 'touch') { hoverPos.x = pxy.x; hoverPos.y = pxy.y; }
       var dx = pxy.x - ptr.x0, dy = pxy.y - ptr.y0;
@@ -1027,14 +1221,15 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     if (wasDrag) endDrag(false);
     else if (p.mode === 'pending' || p.mode === 'blocked') { try { canvas.releasePointerCapture(p.id); } catch (e) { /* not captured */ } }
     ptr = null;
-    if (controls) controls.enabled = mainView === 'cockpit';
+    syncControlsEnabled(null);
     hoverPos.dirty = true;
+    checkInteraction(0);
     if (isClick) handleClick(p);
   }
 
   function handleClick(p) {
     if (p.mode === 'inset') { setMainView(mainView === 'cockpit' ? 'exterior' : 'cockpit'); return; }
-    if (mainView !== 'cockpit' || !p.hit) return;
+    if (!pickRect() || !p.hit) return;
     var id = p.hit.id, sub = p.hit.sub;
     if (pickFn) {
       var fn = pickFn;
@@ -1054,7 +1249,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   function onWheel(ev) {
     if (ev.target !== canvas || !inited) return;
     localXY(ev, pxy);
-    if (inRect(pxy.x, pxy.y, insetRect)) { ev.stopPropagation(); ev.preventDefault(); }
+    if (inRect(pxy.x, pxy.y, insetRect)) { ev.stopPropagation(); ev.preventDefault(); return; }
+    if (isSplit() && !ptr) syncControlsEnabled(inRect(pxy.x, pxy.y, extRect) ? 'exterior' : 'cockpit');
   }
 
   function pressDragBrake(sub, onOff) {
@@ -1125,7 +1321,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     else if (k === 'knob' && ptr.key === 'primerOut' && num(state.primerOut, 0) < 0.15) state.primerOut = 0;
     if (ptr.hit && ptr.hit.id === 'toe-brakes') pressDragBrake(ptr.hit.sub, false);
     try { canvas.releasePointerCapture(ptr.id); } catch (e) { /* not captured */ }
-    if (controls) controls.enabled = mainView === 'cockpit';
+    if (controls) controls.enabled = isSplit() ? ptr.view !== 'exterior' : mainView === 'cockpit';
     setCursor('');
     if (cancelled) ptr = null;
   }
@@ -1165,13 +1361,14 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       case 'm':
         if (!e.repeat) operate('master', null, !(state.masterBat && state.masterAlt));
         break;
-      case 'c': if (!e.repeat) setMainView(mainView === 'cockpit' ? 'exterior' : 'cockpit'); break;
+      case 'c': if (!e.repeat && layout !== 'dos') setMainView(mainView === 'cockpit' ? 'exterior' : 'cockpit'); break;
       case 'p': if (!e.repeat) setPaused(!state.paused); break;
       case 'Escape': select(null); handled = false; break;
       default:
         if (k >= '1' && k <= '8' && k.length === 1) { if (!e.repeat) focusPreset(PRESET_KEYS[+k - 1]); }
         else handled = false;
     }
+    if (handled && HELD_KEYS[k]) heldKeys[k] = nowMs();
     if (handled) e.preventDefault();
   }
   function onKeyUp(e) {
@@ -1183,9 +1380,15 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       case 'b': if (keyBrake) { keyBrake = false; updateBrakes(); } break;
       case 'f': if (flapHolders.key) holdFlap('key', false); break;
     }
+    // Shift may be released first ('+' pressed, '=' released): clear both spellings
+    if (k === '+' || k === '=') { delete heldKeys['+']; delete heldKeys['=']; }
+    else if (k === '-' || k === '_') { delete heldKeys['-']; delete heldKeys['_']; }
+    else delete heldKeys[k];
+    checkInteraction(0);
   }
   function releaseAllKeys() {
     keys = {};
+    heldKeys = {};
     if (keyBrake) { keyBrake = false; if (state) updateBrakes(); }
     if (flapHolders.key && state) holdFlap('key', false);
   }
@@ -1198,6 +1401,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     if (prev && prev !== id) refreshHighlight(prev);
     if (id) refreshHighlight(id);
     if (id && opts && opts.focus) focusControl(id);
+    else if (prev !== id) pendingFocus = null;               // a camera move still waiting for the old selection
     if (prev !== id) emit('select', id);
     return id;
   }
@@ -1229,7 +1433,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     if (!ok) return false;
     prevPlaying = ext.playing || anim;
     optOutToneMapping();                      // animations may add unlit overlay materials
-    if (opts.enlarge && mainView !== 'exterior') {
+    if (opts.enlarge && mainView !== 'exterior' && layout !== 'dos') {
       var prev = mainView;
       setMainView('exterior', true);
       enlargeRestore = prev;
@@ -1246,6 +1450,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   }
   function applyPreset(name) {
     if (!state) return null;
+    if (mirror) { mirror = null; emit('mirror', false); }   // the next frame starts a fresh mirror if a pose still runs
     if (Sim && Sim.applyPreset) Sim.applyPreset(state, name);
     cancelMomentary();
     releaseAllKeys();
@@ -1489,10 +1694,14 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     }
     if (!haveSun) vSun.set(-0.35, 0.8, -0.5).normalize();
     sun.position.copy(sun.target.position).addScaledVector(vSun, SHADOW_DIST);
-    // shadow map refresh: only when the sun direction moved (> ~0.06°) or a shadow-casting cockpit part moved
-    var motion = cockpit ? cockpit.motion : 0;
-    if (shadowSun.dot(vSun) < 0.9999995 || motion !== shadowMotion || typeof motion !== 'number') {
-      shadowSun.copy(vSun); shadowMotion = motion; sun.shadow.needsUpdate = true;
+    // shadow map refresh: when a shadow-casting cockpit part moved, or the sun direction moved (> ~0.06°). In a turn the
+    // sun sweeps around the cabin every frame: then refresh at most every SHADOW_SUN_INTERVAL s (or after 1.5°), which
+    // keeps turns (and mirrored demonstrations) as cheap as straight flight with no visible stepping.
+    var motion = cockpit ? cockpit.motion : 0, sd = shadowSun.dot(vSun);
+    shadowAge += dt;
+    if (motion !== shadowMotion || typeof motion !== 'number' ||
+        (sd < 0.9999995 && (shadowAge >= SHADOW_SUN_INTERVAL || sd < 0.99966))) {
+      shadowSun.copy(vSun); shadowMotion = motion; sun.shadow.needsUpdate = true; shadowAge = 0;
     }
     // keep the shadow camera's 'up' away from the light direction
     sun.shadow.camera.up.set(Math.abs(vSun.y) > 0.95 ? 1 : 0, Math.abs(vSun.y) > 0.95 ? 0 : 1, 0);
@@ -1523,6 +1732,20 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   function render() {
     var W = size.w, H = size.h;
     renderer.setScissorTest(true);
+    if (isSplit() && cockRect && extRect) {
+      // 'dos': both views at the same size + a dark divider between them
+      var c = cockRect, x = extRect;
+      renderer.setViewport(c.x, H - c.y - c.h, c.w, c.h); renderer.setScissor(c.x, H - c.y - c.h, c.w, c.h);
+      renderCabin();
+      renderer.setViewport(x.x, H - x.y - x.h, x.w, x.h); renderer.setScissor(x.x, H - x.y - x.h, x.w, x.h);
+      renderExterior();
+      renderer.getClearColor(tmpColor);
+      var ca = renderer.getClearAlpha();
+      if (W >= H) fillRect(c.w, 0, SPLIT_GAP, H, colDark); else fillRect(0, H - c.h - SPLIT_GAP, W, SPLIT_GAP, colDark);
+      renderer.setClearColor(tmpColor, ca);
+      renderer.setScissorTest(false);
+      return;
+    }
     renderer.setViewport(0, 0, W, H); renderer.setScissor(0, 0, W, H);
     if (mainView === 'exterior' && ext) renderExterior();
     else renderCabin();
@@ -1568,8 +1791,13 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     }
 
     updateInputs(dt);
-    if (Sim && Sim.step && !state.paused) {
+    updateMirror();
+    if (Sim && Sim.step && (!state.paused || mirror)) {
+      // a demonstration keeps moving the instruments even while the simulation is paused
+      var wasPaused = !!state.paused;
+      if (wasPaused) state.paused = false;
       try { Sim.step(state, dt); } catch (e) { reportOnce('Sim.step', e); }
+      if (wasPaused) state.paused = true;
     }
     if (world) { try { world.update(state, dt); } catch (e) { reportOnce('world.update', e); } }
     if (cockpit) { try { cockpit.update(state, dt); } catch (e) { reportOnce('cockpit.update', e); } }
@@ -1582,11 +1810,14 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       if (prevPlaying && !playing) emit('animend', prevPlaying);
       prevPlaying = playing;
       // the air around the airplane: only while the exterior is on screen (main view or inset; the inset is 'baja')
-      if (flow && (mainView === 'exterior' || insetRect)) {
-        try { flow.update(state, dt, { inset: mainView !== 'exterior', quality: quality }); } catch (e) { reportOnce('airflow.update', e); }
+      var extShown = mainView === 'exterior' || !!insetRect || isSplit();
+      try { updateAirPeek(dt, extShown); } catch (e) { reportOnce('airpeek', e); }
+      if (flow && extShown) {
+        try { flow.update(peek.on && peek.virtual && peek.vstate ? peek.vstate : state, dt, { inset: !(mainView === 'exterior' || isSplit()), quality: quality }); } catch (e) { reportOnce('airflow.update', e); }
       }
     }
     updateLights(dt);
+    checkInteraction(dt);
     updateCameras(dt);
     updateHover();
     try { render(); } catch (e) { reportOnce('render', e); }
@@ -1797,8 +2028,148 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     scene = null; camera = null; world = null; cockpit = null; ext = null; container = null;
     selected = null; hovered = { id: null, sub: null }; targets = {}; pickFn = null; fly = null; ptr = null;
     pointersDown = {}; pointerCount = 0; mainView = 'cockpit'; enlargeRestore = null; insetRect = null;
+    layout = 'cabina'; cockRect = extRect = null; interactTags = {}; heldKeys = {}; interactingPrev = false;
+    pendingFocus = null; mirror = null;
     cancelMomentary(); keys = {};
     Core.cockpit = Core.world = Core.exterior = Core.renderer = Core.camera = Core.controls = Core.airflow = null;
+  }
+
+  /* ------------------------------------------------------------------ "el aire" en toda la app (contract v3, integration)
+   * Moving a flight control in the cockpit (yoke, pedals, throttle, flaps, trim, carb heat) briefly shows the air
+   * around the matching part of the airplane in the exterior view (inset, the 'dos' pane or the main view): the flow
+   * focused on that region, the exterior camera framing it, and a short Spanish caption (getCaption / 'airpeek').
+   * On the ground or slow (< 40 kt) the air is drawn as in flight at 75 kt (a proxy state for the flow only: the sim
+   * is not touched) and the caption says so. It runs only when the UI enabled it (setAirPeek(true)), only for changes
+   * the student made (pointer drag / hold / key / operate click), never during a mirror, in the tunnel, or while the
+   * flow belongs to someone else (the AIRE lab, a lesson). The camera and the flow settings are given back after
+   * PEEK_TIME s without changes. */
+  var PEEK_TIME = 4.5, PEEK_VIRT_KT = 75;
+  var PEEK_INPUTS = [
+    { key: 'yokeRoll', eps: 0.08, region: 'ailerons' },
+    { key: 'yokePitch', eps: 0.08, region: 'elevator' },
+    { key: 'rudder', eps: 0.1, region: 'rudder' },
+    { key: 'throttle', eps: 0.05, region: 'prop' },
+    { key: 'flaps', eps: 0.8, region: 'flaps' },
+    { key: 'trim', eps: 0.06, region: 'tail' },
+    { key: 'carbHeat', eps: 0.2, region: 'prop' }
+  ];
+  var peek = { enabled: false, on: null, key: null, t: 0, ref: {}, cam: null, flowWas: null, caption: '', virtual: false,
+    vstate: null, vbase: null, vaero: null };
+  /** The UI turns the peek on in the modes where the student explores the cockpit (Explorar, Recorrido, Checklists). */
+  function setAirPeek(on) {
+    peek.enabled = !!on;
+    if (!peek.enabled) endAirPeek();
+    return peek.enabled;
+  }
+  function getAirPeek() { return peek.on ? { region: peek.on, key: peek.key, caption: peek.caption, virtual: peek.virtual } : null; }
+  function peekCaption(key, s, dir) {
+    var run = !!(s.engine && s.engine.running), v;
+    switch (key) {
+      case 'yokeRoll':
+        v = num(s.yokeRoll, 0);
+        if (v > 0.05) return 'Volante a la derecha: el alerón derecho sube y el izquierdo baja. El ala izquierda sustenta más y sube: el avión se inclina a la derecha.';
+        if (v < -0.05) return 'Volante a la izquierda: el alerón izquierdo sube y el derecho baja. El ala derecha sustenta más y sube: el avión se inclina a la izquierda.';
+        return 'Volante al centro: los alerones quedan parejos y las dos alas sustentan igual.';
+      case 'yokePitch':
+        v = num(s.yokePitch, 0);
+        if (v > 0.05) return 'Volante hacia vos: el timón de profundidad sube, el aire empuja la cola hacia abajo y la nariz sube (más ángulo de ataque).';
+        if (v < -0.05) return 'Volante hacia adelante: el timón de profundidad baja, el aire empuja la cola hacia arriba y la nariz baja.';
+        return 'Volante al medio: el timón de profundidad queda alineado con el estabilizador.';
+      case 'rudder':
+        v = num(s.rudder, 0);
+        if (v > 0.05) return 'Pedal derecho: el timón de dirección va a la derecha, el aire empuja la cola a la izquierda y la nariz va a la derecha.';
+        if (v < -0.05) return 'Pedal izquierdo: el timón de dirección va a la izquierda, el aire empuja la cola a la derecha y la nariz va a la izquierda.';
+        return 'Pedales parejos: el timón de dirección queda derecho.';
+      case 'throttle':
+        if (!run) return 'Con el motor apagado la hélice no gira y no tira aire: el acelerador cambia el empuje sólo con el motor en marcha.';
+        return dir >= 0 ? 'Más acelerador: la hélice gira más rápido y tira más aire hacia atrás (más empuje). Ese chorro gira en espiral y pega en el lado izquierdo de la deriva: por eso va pie derecho.'
+          : 'Menos acelerador: la hélice gira más lento y tira menos aire hacia atrás: menos empuje.';
+      case 'flaps':
+        v = num(s.flaps, 0);
+        if (v > 1) return 'Flaps a ' + Math.round(v) + '°: el ala se curva más y tira más aire hacia abajo: más sustentación y mucha más resistencia.';
+        return 'Flaps arriba: el ala vuelve a su forma limpia: menos sustentación y menos resistencia.';
+      case 'trim':
+        v = num(s.trim, 0);
+        if (v > 0.05) return 'Compensador nariz arriba: la aletita del timón de profundidad baja; el aire la empuja y sostiene el timón arriba por vos.';
+        if (v < -0.05) return 'Compensador nariz abajo: la aletita sube; el aire la empuja y sostiene el timón de profundidad abajo por vos.';
+        return 'Compensador en TAKE OFF: la aletita queda casi alineada con el timón de profundidad.';
+      case 'carbHeat':
+        if (num(s.carbHeat, 0) > 0.5) return 'Calefacción al carburador: el motor toma aire caliente de al lado del escape. Es menos denso: bajan unas RPM y la hélice empuja un poco menos.' + (run ? '' : ' (Con el motor en marcha.)');
+        return 'Calefacción fría: el motor vuelve a tomar aire frío y filtrado y recupera esas RPM.';
+    }
+    return '';
+  }
+  /** The flow's view of the airplane "as in flight at 75 kt" (prototype = the real state: controls, flaps, engine). */
+  function peekVirtualState(s) {
+    if (!peek.vstate || peek.vbase !== s) {
+      peek.vstate = Object.create(s); peek.vbase = s;
+      peek.vstate.air = {}; peek.vstate.tunnel = { on: false };
+    }
+    var v = peek.vstate, a = s.air || {}, k;
+    for (k in a) if (Object.prototype.hasOwnProperty.call(a, k)) v.air[k] = a[k];
+    var yp = num(s.yokePitch, 0);
+    var aoa = clamp(3 + (yp >= 0 ? 7 : 4) * yp, -2, 12);
+    v.air.ias = PEEK_VIRT_KT; v.air.tas = PEEK_VIRT_KT * 1.02; v.air.aoa = aoa; v.air.vs = 0; v.air.onGround = false;
+    if (Sim && Sim.aero) {
+      peek.vaero = Sim.aero({ ias: PEEK_VIRT_KT, aoa: aoa, beta: 0, flaps: num(s.flaps, 0), rpm: num(s.propRpm, 0),
+        yokeRoll: num(s.yokeRoll, 0), yokePitch: yp, rudder: num(s.rudder, 0), trim: num(s.trim, 0),
+        altitude: 1500, throttle: num(s.throttle, 0) }, peek.vaero || undefined);
+      v.aero = peek.vaero;
+    }
+    return v;
+  }
+  function startAirPeek(it, s, dir) {
+    if (!flow || !ext) return;
+    if (!peek.on) {
+      var cur = null;
+      try { cur = flow.get ? flow.get() : null; } catch (e) { cur = null; }
+      if (cur && cur.enabled) return;                       // the lab or a lesson owns the flow
+      peek.flowWas = cur ? { enabled: !!cur.enabled, streamlines: cur.streamlines, propwash: cur.propwash, vortices: cur.vortices,
+        pressure: cur.pressure, forces: cur.forces, moments: cur.moments, trails: cur.trails } : { enabled: false };
+      peek.cam = ext.camera && ext.target ? { pos: ext.camera.position.toArray(), target: ext.target.toArray(), up: ext.camera.up.toArray() } : null;
+      setAirflow({ enabled: true, streamlines: true, propwash: true, vortices: true, pressure: false, forces: false, moments: true, trails: false });
+    }
+    if (peek.on !== it.region) {
+      try { if (flow.focus) flow.focus(it.region); } catch (e) { reportOnce('airflow.focus', e); }
+      setExteriorView(it.region);
+    }
+    peek.on = it.region; peek.key = it.key; peek.t = PEEK_TIME;
+    peek.virtual = !(s.air && !s.air.onGround && num(s.air.ias, 0) >= 40);
+    if (peek.virtual) peekVirtualState(s);
+    var cap = peekCaption(it.key, s, dir);
+    if (peek.virtual && cap && !(it.key === 'throttle' && !(s.engine && s.engine.running))) cap += ' (Así sería volando a ' + PEEK_VIRT_KT + ' nudos.)';
+    if (cap !== peek.caption) { peek.caption = cap; emit('airpeek', getAirPeek()); }
+  }
+  function endAirPeek() {
+    if (!peek.on) return;
+    peek.on = null; peek.key = null; peek.caption = ''; peek.virtual = false;
+    try { if (flow && flow.focus) flow.focus(null); } catch (e) { reportOnce('airflow.focus', e); }
+    if (peek.flowWas) setAirflow(peek.flowWas);
+    peek.flowWas = null;
+    if (peek.cam && ext && ext.setView) { try { ext.setView(peek.cam); } catch (e) { reportOnce('exterior.setView', e); } }
+    peek.cam = null;
+    emit('airpeek', null);
+  }
+  function updateAirPeek(dt, extShown) {
+    var s = state;
+    if (!s) return;
+    var blocked = !peek.enabled || !flow || !ext || !!mirror || !!(s.tunnel && s.tunnel.on) || !extShown ||
+      ext.backdrop === 'tunel' || !!ext.playing || !!ext.posing;
+    var student = isInteracting() || nowMs() - lastOperateAt < 2500;
+    for (var i = 0; i < PEEK_INPUTS.length; i++) {
+      var it = PEEK_INPUTS[i], v = num(s[it.key], 0), r = peek.ref[it.key];
+      if (r === undefined) { peek.ref[it.key] = v; continue; }
+      var d = v - r;
+      if (Math.abs(d) < it.eps) continue;
+      peek.ref[it.key] = v;
+      // a change the student made (or the one being shown, still moving: the flap motor) starts / extends the peek
+      if (!blocked && (student || peek.key === it.key)) startAirPeek(it, s, d);
+    }
+    if (!peek.on) return;
+    if (blocked) { endAirPeek(); return; }
+    if (peek.virtual) peekVirtualState(s);
+    if (isInteracting()) peek.t = Math.max(peek.t, 1.5);
+    if ((peek.t -= dt) <= 0) endAirPeek();
   }
 
   /* ------------------------------------------------------------------ air lab hooks (airflow.js, exterior backdrops) */
@@ -1824,6 +2195,130 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     try { return ext.setView(v) !== false; } catch (e) { reportOnce('exterior.setView', e); return false; }
   }
 
+  /* ------------------------------------------------------------------ "así se ve desde adentro" (contract v3 mirror) */
+  // While the exterior plays an animation or holds a pose (ext.animState.active), the sim is put in puppet mode and
+  // every frame gets the animation's attitude/speed + control inputs, so the cockpit (yoke, pedals, throttle, flap
+  // switch and indicator, propeller), the world through the windshield and every gauge show the same movement from
+  // inside. The state is snapshotted once when it starts and restored (in place) when it ends.
+  var SNAP_SKIP = { events: 1, time: 1, paused: 1 };
+  function snapCopy(src, top) {
+    var o = {};
+    for (var k in src) {
+      if (!Object.prototype.hasOwnProperty.call(src, k) || (top && SNAP_SKIP[k])) continue;
+      var v = src[k];
+      if (typeof v === 'function') continue;
+      if (v && typeof v === 'object') o[k] = Array.isArray(v) ? v.slice() : snapCopy(v, false);
+      else o[k] = v;
+    }
+    return o;
+  }
+  function snapRestore(dst, src) {
+    for (var k in src) {
+      var v = src[k], d = dst[k];
+      if (v && typeof v === 'object' && !Array.isArray(v) && d && typeof d === 'object' && !Array.isArray(d)) snapRestore(d, v);
+      else dst[k] = Array.isArray(v) ? v.slice() : v;
+    }
+  }
+  function getAnimState() {
+    var a = ext && ext.animState;
+    return (a && typeof a === 'object') ? a : null;
+  }
+  function animAirborne(a) {
+    if (a.ground === true || a.onGround === true) return false;
+    if (a.ground === false || a.onGround === false) return true;
+    return num(a.ias, 0) > 30 || Math.abs(num(a.bank, 0)) > 2 || Math.abs(num(a.vs, 0)) > 50 || Math.abs(num(a.pitch, 0)) > 4;
+  }
+  function startMirror(a) {
+    var air = state.air;
+    mirror = { snap: snapCopy(state, true), simRef: state._sim, airborne: null };
+    cancelMomentary();
+    endDrag(true);
+    // a demonstration needs a live cockpit: unlocked controls, power on, gyros spinning, out of the wind tunnel
+    state.controlLock = false;
+    if (state.tunnel) state.tunnel.on = false;
+    setMaster('bat', true); setMaster('alt', true);
+    if (state.gyro) { state.gyro.aiSpin = 1; state.gyro.hiSpin = 1; }
+    if (state.vacuum) state.vacuum.suctionInHg = Math.max(num(state.vacuum.suctionInHg, 0), 5);
+    if (state.elec && num(state.elec.batteryPct, 100) < 60) state.elec.batteryPct = 80;
+    if (air) air.hiHeading = air.heading;
+    emit('mirror', true);
+  }
+  function endMirror() {
+    var m = mirror;
+    mirror = null;
+    if (!m || !state) return;
+    snapRestore(state, m.snap);
+    if (state.puppet) state.puppet.on = false;
+    cancelMomentary();
+    emit('mirror', false);
+    emit('frame', state, 0);
+  }
+  function applyMirror(a) {
+    var pp = state.puppet, air = state.air, act = actions();
+    var airborne = animAirborne(a);
+    if (airborne && mirror.airborne !== true) {
+      // seen from inside a flight demonstration needs air under the wings: start well above the field
+      if (air.onGround || num(air.altitude, 0) < num(state.fieldElevation, 0) + 300) {
+        air.altitude = num(state.fieldElevation, 0) + 2500;
+        air.onGround = false;
+      }
+    }
+    mirror.airborne = airborne;
+    var ias = num(a.ias, 0);
+    if (airborne && ias < 40) ias = num(a.vs, 0) > 200 ? 68 : 85;      // a flight pose without a speed: Vy / cruise
+    pp.on = true;
+    pp.tau = 0.08;                            // the exterior already eases its movements: stay in step with it
+    pp.onGround = !airborne;
+    pp.bank = num(a.bank, 0); pp.pitch = num(a.pitch, 0);
+    pp.ias = ias; pp.vs = num(a.vs, 0);
+    // exterior.js gives the turn rate INCLUDING the nose swinging on screen (yaw rate): then the yaw is not added again
+    var hasTurn = typeof a.turnRate === 'number' && isFinite(a.turnRate);
+    pp.turnRate = hasTurn ? a.turnRate : null;
+    pp.yaw = hasTurn ? 0 : num(a.yaw, 0);
+    pp.slip = (typeof a.slip === 'number' && isFinite(a.slip)) ? a.slip : null;
+    pp.aoa = (airborne && typeof a.aoa === 'number' && isFinite(a.aoa)) ? a.aoa : null;
+    if (typeof a.trim === 'number' && isFinite(a.trim)) state.trim = clamp(a.trim, -1, 1);
+    if (typeof a.carbHeat === 'number' && isFinite(a.carbHeat)) state.carbHeat = clamp(a.carbHeat, 0, 1);
+    // the hands and feet of the demonstration
+    state.yokeRoll = clamp(num(a.yokeRoll, 0), -1, 1);
+    state.yokePitch = clamp(num(a.yokePitch, 0), -1, 1);
+    state.rudder = clamp(num(a.rudder, 0), -1, 1);
+    state.brakeL = clamp(num(a.brakeL, 0), 0, 1);
+    state.brakeR = clamp(num(a.brakeR, 0), 0, 1);
+    if (airborne || ias > 1) state.parkingBrake = false;
+    if (typeof a.throttle === 'number' && isFinite(a.throttle)) state.throttle = clamp(a.throttle, 0, 1);
+    var engineOn = typeof a.engineOn === 'boolean' ? a.engineOn : (num(a.rpm, 0) > 300 || airborne ? true : null);
+    if (engineOn !== null && act && act.setEngine && !!(state.engine && state.engine.running) !== engineOn) act.setEngine(state, engineOn);
+    if (typeof a.flaps === 'number' && isFinite(a.flaps)) {
+      var f = clamp(a.flaps, 0, 40), cur = num(state.flaps, 0);
+      // the flap switch shows the direction of travel, the indicator follows the exterior exactly
+      setFlapSwitch(f > cur + 0.3 ? 'DOWN' : (f < cur - 0.3 ? 'UP' : 'OFF'));
+      state.flaps = f;
+    }
+  }
+  function updateMirror() {
+    if (!state || !Sim || !Sim.step) return;
+    var a = getAnimState();
+    var active = !!(a && a.active) && !!state.puppet;
+    if (mirror && mirror.simRef !== state._sim) mirror = null;   // a preset was applied behind our back: start over
+    if (active && !mirror) startMirror(a);
+    else if (!active && mirror) endMirror();
+    if (mirror) { try { applyMirror(a); } catch (e) { reportOnce('mirror', e); } }
+  }
+  /** Contract v3: a held exterior movement (ext.POSES ids) → its Spanish caption, or false. */
+  function poseExterior(name) {
+    if (!ext || typeof ext.pose !== 'function') return false;
+    var cap = false;
+    try { cap = ext.pose(name); } catch (e) { reportOnce('exterior.pose', e); return false; }
+    optOutToneMapping();                      // poses may add unlit overlay materials
+    return cap === false ? false : (typeof cap === 'string' ? cap : '');
+  }
+  function clearPose() {
+    if (!ext || typeof ext.clearPose !== 'function') return false;
+    try { ext.clearPose(); } catch (e) { reportOnce('exterior.clearPose', e); return false; }
+    return true;
+  }
+
   /* ------------------------------------------------------------------ public object */
   var Core = {
     init: function (opts) {
@@ -1838,6 +2333,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     setBackdrop: setBackdrop,
     getBackdrop: function () { return ext ? (ext.backdrop || 'estudio') : null; },
     setExteriorView: setExteriorView,
+    setAirPeek: setAirPeek,
+    getAirPeek: getAirPeek,
     on: on,
     off: off,
     select: select,
@@ -1848,9 +2345,18 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     setTargetHighlight: setTargetHighlight,
     setExteriorHighlight: setExteriorHighlight,
     playExterior: playExterior,
+    poseExterior: poseExterior,
+    clearPose: clearPose,
+    getAnimState: getAnimState,
+    getPoses: function () { return ext && Array.isArray(ext.POSES) ? ext.POSES : []; },
+    isMirroring: function () { return !!mirror; },
+    setLayout: setLayout,
+    getLayout: getLayout,
+    isInteracting: function () { return isInteracting(); },
+    setInteracting: setInteracting,
     operate: operate,
     setInput: setInput,
-    hold: hold,
+    hold: holdAndCheck,
     pickMode: pickMode,
     applyPreset: applyPreset,
     setPaused: setPaused,
@@ -1860,7 +2366,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     pickAt: pickAt,
     projectControl: projectControl,
     setInsetVisible: setInsetVisible,
-    getCaption: function () { return ext ? (ext.caption || '') : ''; },
+    getCaption: function () { return (ext && ext.caption) || (peek.on ? peek.caption : '') || ''; },
     setToneMapping: setToneMapping,
     setQuality: setQuality,
     getQuality: function () { return quality; },

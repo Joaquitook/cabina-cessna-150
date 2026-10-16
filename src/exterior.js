@@ -13,6 +13,22 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
  *  - ext.followAttitude defaults to true: bank/pitch from state.air rotate the airplane (heading fixed); when
  *    airborne a faint level horizon ring replaces the ground disk.
  *  - ext.playing is the running animation name (string) or null. play() with an unknown name returns false.
+ *    The animations run TIME_STRETCH = 1.6× slower than authored (calmer, contract v3): a 10 s script lasts 16 s; the
+ *    caption (ext.caption) changes with each phase. Airborne animations without an RPM keep the engine at cruise.
+ *  - Held movements (contract v3): ext.pose(id) → Spanish caption (false if unknown), ext.clearPose(), ext.posing (id |
+ *    null), ext.POSES = [{id, etiqueta, descripcion}] (also C150.Exterior.POSES). The airplane eases from where it is to
+ *    the held state and keeps it ALIVE (light turbulence, the pilot's small corrections, a banked wing keeps turning —
+ *    the scenery turns under it —, a climb keeps climbing, the prop spins; flaps move at the real ≈ 4.4°/s, trim at
+ *    0.45/s). A pose changes only its own channels (attitude / engine / flaps / trim / carb heat): 'flaps-20' keeps the
+ *    turn you were in. Leaving the ground starts the engine at cruise; 'carreteo-*' puts it on the ground at taxi power.
+ *    play() clears the pose; pose() stops the animation. Pure helpers for Node tests: C150.Exterior.poseSpec,
+ *    specFromState, poseFrame, rpmFor, thrFor, aoaFor, perfLevel (tests/exterior.test.js).
+ *  - ext.animState (read-only, updated every frame): what the airplane is doing in the running animation or pose, in
+ *    the sim's units and signs, for the cockpit mirror (core): { active, kind ('animacion'|'pose'|null), name, bank,
+ *    pitch, yaw (° on screen, + nose right), yokeRoll, yokePitch (+ pulled), rudder (−1..1, + right), throttle (0..1),
+ *    flaps (°), rpm, ias (kt), vs (ft/min), turnRate (°/s, + right: the nose turning on screen + the turn of a banked
+ *    wing / of the nose wheel), slip (the ball, + right), brakeL, brakeR, engineOn, onGround, trim (+ nose up), carbHeat,
+ *    aoa (°), stallWarn }. active = false when neither runs (the other values then keep their last state).
  *  - Camera: setView() eases the camera (instant with prefers-reduced-motion). ext.target is the look-at point
  *    and ext.cameraBusy is true while a transition runs; if core drives ext.camera with OrbitControls, copy
  *    ext.target into controls.target when cameraBusy turns false (and do not call controls.update while busy).
@@ -28,17 +44,25 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
  *    opts the unlit helpers (MeshBasic/Sprite/Line) out of tone mapping.
  *  - "Configurator" look: clearcoated white enamel (paintMat, MeshPhysicalMaterial), tinted acrylic glass with a
  *    clearcoat Fresnel reflection, metal spinner/prop/hardware, matte rubber. Studio rig: key light = the WORLD sun
- *    (ext.setSun(world.sunDirection), turned by state.air.heading because the airplane's nose stays toward -Z here)
+ *    (ext.setSun(world.sunDirection), turned by the scenery's heading: world → scene = R_y(+heading), as in world.js)
  *    casting a PCF-soft shadow map onto the airplane and onto a ShadowMaterial catcher; soft camera-side fill and a
  *    rim light opposite the camera (the fill backs off when the sun is already behind the camera); low hemisphere.
  *    Floor: light concrete slabs fading into the backdrop gradient (seamless cyclorama) + painted ambient-contact
  *    blobs under the tyres/fuselage; with shadow maps off ('baja') a painted planform shadow is pushed along the sun.
  *    The lights demo (dusk) dims lights, backdrop, floor, shadows and the environment reflections (setEnvDim).
- *  - Backdrops (contract v2 §3): ext.setBackdrop('estudio' (default, the configurator) | 'cielo' (open sky: deep blue,
- *    hazy horizon, ground below it, cloud puffs streaming past in flight) | 'tunel' (dark blue wind-tunnel stage:
+ *  - Backdrops: ext.setBackdrop('cielo' (DEFAULT, contract v3) | 'estudio' (the configurator) | 'tunel' (dark blue wind-tunnel stage:
  *    ring-grid platform with an orange inlet mark, light pool and soft shadow, sting mount, test-section hoops, light
  *    shafts, faint wind reference lines whose dashes move downstream at ext.visWindSpeed(ias) and a "Viento relativo
  *    N kt" label)). Every value (sky, light levels, rim colour, environment reflections) blends in ≈ 0.4 s; ext.backdrop.
+ *    'cielo' shows the cockpit's REAL scenery: world.createExteriorView() of C150.World.current (same sky, aerial haze,
+ *    Uruguayan fields, the practice airfield with runway, taxiway, apron, hangar and windsock, cumulus clouds; geometry
+ *    and textures shared, no extra GPU memory) placed by the sim's position / heading / height, so the airplane sits
+ *    where it really is (parked on the apron, on the runway, 3000 ft over the fields) with its sun shadow on the ground;
+ *    in flight the ground falls away below with the haze. While an animation or pose runs the scenery follows the
+ *    airplane's own motion (heading from animState.turnRate, position from its speed, height from its climb) and an
+ *    airborne movement over a parked airplane lifts it to ≈ 1500 ft. ext.worldVisible = true while it shows; camera.far
+ *    becomes 60000 (500 otherwise). Without a world (standalone previews) 'cielo' falls back to the gradient sky with a
+ *    grass-tinted floor. The lights demo (dusk) darkens the scenery with a veil dome around the camera.
  *  - Wind tunnel (sim state.tunnel.on): the airplane is drawn pitched by the AoA (state.aero.aoa, else tunnel.aoa) in a
  *    horizontal wind, yawed by the sideslip, wings level, no ground stance.
  *  - Air-lab views: 'lado', 'frente', 'arriba', 'tres-cuartos', 'persecucion' (chase: behind and above, the horizon
@@ -167,6 +191,291 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     return pts;
   }
 
+  /* ================================================== POSES: held movements (pure, no THREE: Node tests) */
+  // A pose is a state the airplane moves to smoothly and then HOLDS (alive: light turbulence, a turn keeps turning,
+  // a climb keeps climbing, the prop spins) until another pose or clearPose(). The pose spec has independent
+  // channels: attitude ('att' + 'air' + 'side'), engine ('engine' + 'thr'), 'flaps', 'trim', 'carbHeat'. A pose
+  // changes only its own channels (flaps 20° keeps the turn you were in), except that leaving the ground starts the
+  // engine at cruise power and a taxi pose puts the airplane on the ground with the engine at taxi power.
+  // Numbers from the 1977 150M POH (research numbers.md): cruise ≈ 2400 RPM / 88 kt, Vy 68 kt (≈ 650 ft/min at full
+  // throttle), best glide 60 kt, Vfe 85 kt, clean stall 47 kt (pneumatic horn 5–10 kt before), static RPM ≈ 2500,
+  // nose-wheel steering 8.5° with the pedals, electric flaps ≈ 9 s from 0 to 40°.
+  var TIME_STRETCH = 1.6;   // the scripted animations run 1.6× slower than authored: calmer, time to look
+  var FLAP_RATE = 4.4;      // °/s
+  var TRIM_RATE = 0.45;     // trim units per second
+  var WHEELBASE = 1.47;     // m (nose tyre → main tyres)
+  function sgn(x) { return x > 0 ? 1 : (x < 0 ? -1 : 0); }
+  function bump(u) { return u <= 0 || u >= 1 ? 0 : Math.sin(Math.PI * u); }
+  function toward(a, b, d) { return a < b ? Math.min(b, a + d) : Math.max(b, a - d); }
+  /** RPM of the fixed-pitch prop for a throttle position (0..1), airspeed (kt) and ground/flight. */
+  function rpmFor(thr, ias, ground) {
+    thr = clamp(thr, 0, 1);
+    return ground ? 650 + 1850 * thr : clamp(650 + 1800 * thr + ias * (4 - 2.2 * thr), 0, 2700);
+  }
+  /** Throttle (0..1) that gives this RPM (inverse of rpmFor). */
+  function thrFor(rpm, ias, ground) {
+    if (rpm < 300) return 0;
+    return ground ? clamp((rpm - 650) / 1850, 0, 1) : clamp((rpm - 650 - 4 * ias) / (1800 - 2.2 * ias), 0, 1);
+  }
+  /** Rough angle of attack (°) of the 150 in 1 g flight at ias kt (clean: 16° at the 47 kt stall). */
+  function aoaFor(ias, flaps) {
+    var vs = 47 - 5 * clamp(flaps / 40, 0, 1);
+    return clamp(-1 + 17 * Math.pow(vs / Math.max(ias, 30), 2), -2, 20);
+  }
+  /** Straight and level with this power: {ias, vs, pitch}. Too little power → it glides (best glide 60 kt). */
+  function perfLevel(pw, flaps) {
+    var hi = pw >= 0.55;
+    var ias = (hi ? 72 + 66 * (pw - 0.55) : 62 + 10 * pw / 0.55) - 0.45 * flaps;
+    var vs = hi ? 0 : -700 * (1 - pw / 0.55);
+    var pitch = (hi ? 2 - (ias + 0.45 * flaps - 88) * 0.08 : -3 + 5 * pw / 0.55) - 0.06 * flaps;
+    return { ias: ias, vs: vs, pitch: pitch };
+  }
+  /** Held targets for an attitude channel: bank/pitch/yaw (°), held control inputs, airspeed (kt), climb (ft/min). */
+  function attTargets(S, pw, flaps, t) {
+    var side = S.side || 1, L = perfLevel(pw, flaps);
+    var A = { bank: 0, pitch: L.pitch, yaw: 0, ail: 0, elev: 0, rud: 0, ias: L.ias, vs: L.vs, coord: false, gs: 0 };
+    switch (S.att) {
+      case 'ground': A.pitch = 0; A.ias = 0; A.vs = 0; break;
+      case 'taxi':
+        A.pitch = 0; A.vs = 0; A.rud = 0.8 * side; A.ias = 5; A.gs = 5 * 0.514444; break;
+      case 'roll': A.bank = 25 * side; A.ias = L.ias - 1; A.pitch = L.pitch + 0.4; A.elev = 0.08; break;
+      case 'turn': A.bank = 30 * side; A.ias = L.ias - 2; A.pitch = L.pitch + 0.8; A.elev = 0.18; A.rud = 0.06 * side; A.coord = true; break;
+      case 'pitchUp':
+        A.pitch = 10 - 0.05 * flaps; A.ias = lerp(52, 68, pw) - 0.15 * flaps; A.vs = lerp(-350, 700, pw) - 5 * flaps; A.elev = 0.32; break;
+      case 'climb':
+        A.pitch = 8.5 - 0.05 * flaps; A.ias = lerp(55, 68, pw) - 0.15 * flaps; A.vs = lerp(-250, 650, pw) - 5 * flaps; A.elev = 0.22;
+        A.rud = 0.4 * clamp((pw - 0.6) / 0.4, 0, 1); break;
+      case 'pitchDown':
+        A.pitch = -6; A.ias = lerp(96, 118, pw) - 0.6 * flaps; A.vs = -lerp(1100, 900, pw); A.elev = -0.28; break;
+      case 'descent':
+        A.pitch = -2 - 0.05 * flaps; A.ias = 76 - 0.3 * flaps; A.vs = -500 - 600 * clamp(0.45 - pw, 0, 0.45) - 4 * flaps; A.elev = -0.05; break;
+      case 'yaw': A.yaw = 10 * side; A.bank = 5 * side; A.ias = L.ias - 3; A.rud = 0.6 * side; break;
+      case 'stall': {
+        var u = clamp(t / 5.5, 0, 1), post = smooth(clamp((t - 5.5) / 1.2, 0, 1));
+        A.ias = lerp(80, 47, smooth(u)) - 3 * post - 0.12 * flaps;
+        A.pitch = lerp(L.pitch, 15 - 0.05 * flaps, smooth(u)) - post * (3 - 2.5 * Math.sin(0.9 * (t - 5.5)));
+        A.vs = lerp(-150, 100, u) * (1 - post) - 700 * post;
+        A.elev = lerp(0.2, 1, smooth(u));
+        A.bank = post * 3 * Math.sin(1.15 * t);
+        break;
+      }
+    }
+    return A;
+  }
+  var POSE_LIST = [
+    { id: 'nivelado', etiqueta: 'Nivelado', ch: { air: true, att: 'level' },
+      descripcion: 'Alas niveladas, la nariz apenas arriba del horizonte y potencia de crucero: el avión no sube ni baja.' },
+    { id: 'alabeo-izq', etiqueta: 'Alabeo a la izquierda', ch: { air: true, att: 'roll', side: -1 },
+      descripcion: 'Volante a la izquierda: sube el alerón izquierdo, baja el derecho y el avión se inclina a la izquierda.' },
+    { id: 'alabeo-der', etiqueta: 'Alabeo a la derecha', ch: { air: true, att: 'roll', side: 1 },
+      descripcion: 'Volante a la derecha: sube el alerón derecho, baja el izquierdo y el avión se inclina a la derecha.' },
+    { id: 'cabeceo-arriba', etiqueta: 'Nariz arriba', ch: { air: true, att: 'pitchUp' },
+      descripcion: 'Volante hacia atrás: el timón de profundidad sube, la cola baja y la nariz sube.' },
+    { id: 'cabeceo-abajo', etiqueta: 'Nariz abajo', ch: { air: true, att: 'pitchDown' },
+      descripcion: 'Volante hacia adelante: el timón de profundidad baja, la cola sube y la nariz baja.' },
+    { id: 'guinada-izq', etiqueta: 'Guiñada a la izquierda', ch: { air: true, att: 'yaw', side: -1 },
+      descripcion: 'Pedal izquierdo: el timón de dirección va a la izquierda y la nariz gira a la izquierda.' },
+    { id: 'guinada-der', etiqueta: 'Guiñada a la derecha', ch: { air: true, att: 'yaw', side: 1 },
+      descripcion: 'Pedal derecho: el timón de dirección va a la derecha y la nariz gira a la derecha.' },
+    { id: 'motor-on', etiqueta: 'Motor encendido', ch: { engine: true },
+      descripcion: 'El motor gira la hélice y la hélice tira del avión hacia adelante.' },
+    { id: 'motor-off', etiqueta: 'Motor apagado', ch: { engine: false },
+      descripcion: 'Sin motor no hay empuje: en tierra la hélice se para; en vuelo sigue girando por el viento y el avión planea.' },
+    { id: 'potencia-max', etiqueta: 'Potencia máxima', ch: { engine: true, thr: 1, carbHeat: 0 },
+      descripcion: 'Acelerador a fondo (empujado): máximas RPM y máximo empuje.' },
+    { id: 'potencia-ralenti', etiqueta: 'Ralentí', ch: { engine: true, thr: 0 },
+      descripcion: 'Acelerador afuera (tirado): el motor queda en mínimo y casi no empuja.' },
+    { id: 'flaps-0', etiqueta: 'Flaps 0°', ch: { flaps: 0 }, descripcion: 'Flaps arriba: el ala limpia, con menos resistencia.' },
+    { id: 'flaps-10', etiqueta: 'Flaps 10°', ch: { flaps: 10 }, descripcion: 'Flaps 10°: un poco más de sustentación (lo máximo para despegar).' },
+    { id: 'flaps-20', etiqueta: 'Flaps 20°', ch: { flaps: 20 }, descripcion: 'Flaps 20°: más sustentación y bastante más resistencia.' },
+    { id: 'flaps-40', etiqueta: 'Flaps 40°', ch: { flaps: 40 }, descripcion: 'Flaps 40°: máxima resistencia; bajás más empinado y más lento (aterrizaje).' },
+    { id: 'viraje-izq', etiqueta: 'Viraje a la izquierda', ch: { air: true, att: 'turn', side: -1 },
+      descripcion: 'Volante y pedal izquierdos juntos: se inclina unos 30° y la nariz acompaña el giro, con la bolita centrada.' },
+    { id: 'viraje-der', etiqueta: 'Viraje a la derecha', ch: { air: true, att: 'turn', side: 1 },
+      descripcion: 'Volante y pedal derechos juntos: se inclina unos 30° y la nariz acompaña el giro, con la bolita centrada.' },
+    { id: 'ascenso', etiqueta: 'Ascenso', ch: { air: true, att: 'climb', engine: true, thr: 1, carbHeat: 0 },
+      descripcion: 'Potencia máxima y la nariz arriba a 68 nudos: sube unos 650 pies por minuto.' },
+    { id: 'descenso', etiqueta: 'Descenso', ch: { air: true, att: 'descent', engine: true, thr: 0.45, carbHeat: 1 },
+      descripcion: 'Calefacción al carburador, unas 1700 RPM y la nariz un poco abajo: baja unos 500 pies por minuto a 75 nudos.' },
+    { id: 'perdida', etiqueta: 'Pérdida', ch: { air: true, att: 'stall', engine: true, thr: 0, carbHeat: 1 },
+      descripcion: 'Sin potencia y tirando del volante, el ala pasa unos 16° de ángulo de ataque: el aire se despega, suena la bocina y el avión se sacude y baja.' },
+    { id: 'carreteo-izq', etiqueta: 'Carreteo a la izquierda', ch: { air: false, att: 'taxi', side: -1, engine: true, thr: 0.15 },
+      descripcion: 'En tierra doblás con los pedales: pedal izquierdo y la rueda de nariz dobla a la izquierda. Despacio, a paso de hombre.' },
+    { id: 'carreteo-der', etiqueta: 'Carreteo a la derecha', ch: { air: false, att: 'taxi', side: 1, engine: true, thr: 0.15 },
+      descripcion: 'En tierra doblás con los pedales: pedal derecho y la rueda de nariz dobla a la derecha. Despacio, a paso de hombre.' },
+    { id: 'compensador-arriba', etiqueta: 'Compensador nariz arriba', ch: { trim: 0.6 },
+      descripcion: 'Rueda de compensador hacia atrás: la aleta baja y el timón de profundidad sube solo; la nariz sube sin hacer fuerza.' },
+    { id: 'compensador-abajo', etiqueta: 'Compensador nariz abajo', ch: { trim: -0.6 },
+      descripcion: 'Rueda de compensador hacia adelante: la aleta sube y el timón de profundidad baja solo; la nariz baja sin hacer fuerza.' }
+  ];
+  var POSE_BY_ID = {};
+  POSE_LIST.forEach(function (p) { POSE_BY_ID[p.id] = p; });
+
+  /** New pose spec = the previous one with the channels of pose `id` changed (see the rules above). */
+  function poseSpec(prev, id) {
+    var def = POSE_BY_ID[id];
+    if (!def) return null;
+    var S = {}, k;
+    for (k in prev) S[k] = prev[k];
+    for (k in def.ch) S[k] = def.ch[k];
+    if (S.air && !prev.air && !('engine' in def.ch)) { S.engine = true; S.thr = Math.max(num(S.thr, 0), 0.8); }
+    if (S.air && !prev.air && 'engine' in def.ch && !('thr' in def.ch) && S.engine) S.thr = Math.max(num(S.thr, 0), 0.8);
+    if (!S.air && prev.air && !('att' in def.ch)) S.att = 'ground';
+    if (S.air && S.att === 'ground') S.att = 'level';
+    if (!S.air && S.att !== 'taxi') S.att = 'ground';
+    if (id === 'motor-on' && num(S.thr, 0) < 0.15) S.thr = S.air ? 0.8 : 0.12;
+    if (def.ch.att && def.ch.att !== 'taxi' && S.att !== 'taxi' && prev.att === 'taxi') S.thr = Math.max(num(S.thr, 0), 0.8);
+    if (id === 'nivelado' && S.thr < 0.55 && S.engine && prev.att === 'stall') S.thr = 0.8;
+    S.id = id;
+    return S;
+  }
+  /** Spec for "where the airplane is now" (sim state), the starting point of the first pose. */
+  function specFromState(state) {
+    state = state || {};
+    var air = state.air || {}, eng = state.engine || {};
+    var flying = air.onGround === false || !!(state.tunnel && state.tunnel.on);
+    return { id: null, air: flying, att: flying ? 'level' : 'ground', side: 1, engine: eng.running !== false && num(state.propRpm, 0) > 300,
+      thr: clamp(num(state.throttle, 0), 0, 1), flaps: clamp(num(state.flaps, 0), 0, 40), trim: clamp(num(state.trim, 0), -1, 1),
+      carbHeat: clamp(num(state.carbHeat, 0), 0, 1) };
+  }
+
+  /**
+   * One frame of a held pose. S = spec, t = seconds since the pose started, F = where the airplane was then
+   * ({bank, pitch, yaw, ias, vs, flaps, trim, air, engineOn, rpm}). Writes the same fields as the animation frames
+   * (ail, elevCmd, rudCmd, flaps, pitch, bank, yaw, rpm, ground, nose, caption, arrows…) plus ias, vs, thr, engineOn,
+   * slip (null = derived), carbHeat, stallWarn, trim, elevOffset, rollSpeed, steadyTurn (true = the turn rate comes from
+   * the bank / the nose wheel, the airplane is not yawed on screen).
+   */
+  function poseFrame(S, t, F, P) {
+    var pw = S.engine ? clamp(num(S.thr, 0), 0, 1) : 0;
+    var fl = toward(num(F.flaps, 0), num(S.flaps, 0), FLAP_RATE * t);
+    var flapDir = Math.abs(fl - S.flaps) > 0.01 ? sgn(S.flaps - F.flaps) : 0;
+    var A = attTargets(S, pw, fl, t);
+    var air = !!S.air;
+    P.ground = !air;
+    P.flaps = fl;
+    // attitude: eased from where the airplane was, the control deflected while the attitude changes (roll rate ∝ aileron)
+    var dB = A.bank - F.bank, rollT = Math.max(1.6, Math.abs(dB) / 9), ur = t / rollT;
+    var dP = A.pitch - F.pitch, pitchT = Math.max(1.8, Math.abs(dP) / 2.5), up = t / pitchT;
+    var dY = A.yaw - F.yaw, yawT = Math.max(1.8, Math.abs(dY) / 6), uy = t / yawT;
+    if (S.att === 'stall') { P.pitch = A.pitch; P.bank = F.bank + (0 - F.bank) * smooth(ur) + A.bank; }
+    else { P.pitch = F.pitch + dP * smooth(up); P.bank = F.bank + dB * smooth(ur); }
+    P.yaw = F.yaw + dY * smooth(uy);
+    P.ail = A.ail + (Math.abs(dB) > 0.5 ? sgn(dB) * Math.min(0.75, 0.25 + Math.abs(dB) / 45) * bump(ur) : 0);
+    P.elevCmd = A.elev + (S.att !== 'stall' && Math.abs(dP) > 0.5 ? sgn(dP) * Math.min(0.5, 0.15 + Math.abs(dP) / 30) * bump(up) : 0);
+    P.rudCmd = A.rud + (A.coord ? 0.55 * (P.ail - A.ail) : 0);
+    if (S.att === 'taxi') P.rudCmd = A.rud * smooth(t / 1.2);
+    if (S.att === 'yaw') P.rudCmd = A.rud * smooth(t / 0.8);
+    // alive: light turbulence and the small corrections of the pilot's hands
+    if (air) {
+      var tb = S.att === 'stall' ? 1.6 : 1;
+      P.bank += tb * (0.45 * Math.sin(0.61 * t + 0.3) + 0.2 * Math.sin(1.73 * t + 1.1));
+      P.pitch += tb * (0.22 * Math.sin(0.47 * t + 2.1) + 0.1 * Math.sin(1.31 * t));
+      P.ail += -0.035 * Math.sin(0.61 * t + 1.2);
+      P.elevCmd += -0.02 * Math.sin(0.47 * t + 2.9);
+      if (S.att === 'stall' && t > 5) {   // buffet: the separated air shakes the airplane
+        var bf = smooth(clamp((t - 5) / 0.8, 0, 1));
+        P.pitch += bf * 0.35 * Math.sin(t * 17.3); P.bank += bf * 0.6 * Math.sin(t * 13.1 + 1);
+      }
+      // flaps moving: the 150 balloons (nose up) when they go down, sinks when they come up
+      P.pitch += 1.6 * flapDir;
+    }
+    // trim: the wheel turns slowly; the tab deflects and the elevator floats the other way (hands off)
+    var tr = toward(num(F.trim, 0), num(S.trim, 0), TRIM_RATE * t);
+    P.trim = tr;
+    P.rawTab = tr > 0 ? 20 * tr : 10 * tr;
+    P.elevOffset = -12 * tr;
+    if (air) P.pitch += 3 * tr;
+    // airspeed / vertical speed: they follow the attitude and power with the airplane's inertia
+    var iasT = A.ias - (air ? 8 * tr : 0), tauI = F.air !== air ? 0.5 : 3.2;
+    P.ias = S.att === 'stall' ? A.ias : F.ias + (iasT - F.ias) * (1 - Math.exp(-t / tauI));
+    P.vs = air ? F.vs + (A.vs - F.vs) * (1 - Math.exp(-t / (F.air !== air ? 0.5 : 1.6))) : 0;
+    P.aoa = air ? aoaFor(P.ias, fl) : 0;
+    P.stallWarn = air && P.aoa > 12.5;
+    // engine
+    var rpm;
+    if (!S.engine) rpm = air ? clamp(9 * P.ias, 0, 900) : 0;
+    else if (F.engineOn === false && !F.air && !air && t < 1.4) rpm = 170;   // the starter cranks the engine, then it catches
+    else rpm = rpmFor(pw, air ? P.ias : 0, !air);
+    P.rpm = rpm;
+    P.thr = S.engine ? pw : num(S.thr, 0);
+    P.engineOn = !!S.engine && !(F.engineOn === false && !F.air && !air && t < 1.4);
+    P.carbHeat = num(S.carbHeat, 0);
+    // ground: pedals steer the nose wheel; full power on the ground = brakes held (run-up)
+    P.nose = S.att === 'taxi' ? 8.5 * P.rudCmd : 0;
+    P.rollSpeed = A.gs * smooth(t / 1.5);
+    var holdBrakes = !air && S.att !== 'taxi' && pw > 0.45;
+    P.brakeL = holdBrakes ? 1 : 0; P.brakeR = holdBrakes ? 1 : 0;
+    P.steadyTurn = true;
+    P.slip = null;
+    // teaching arrows (the input arcs) while the control is deflected
+    P.arrows = { roll: Math.abs(P.ail) > 0.12 ? P.ail : 0, pitch: Math.abs(P.elevCmd) > 0.15 ? P.elevCmd : 0, yaw: Math.abs(P.rudCmd) > 0.2 ? P.rudCmd : 0 };
+    P.caption = poseCaption(S, t, P, { rollT: rollT, pitchT: pitchT, flapDir: flapDir, trimMoving: tr !== S.trim, F: F });
+    return P;
+  }
+  function poseCaption(S, t, P, x) {
+    var id = S.id, air = !!S.air, side = S.side || 1, R = side > 0 ? 'DERECHA' : 'IZQUIERDA', r = side > 0 ? 'derecha' : 'izquierda';
+    var r2 = side > 0 ? 'derecho' : 'izquierdo', o2 = side > 0 ? 'izquierdo' : 'derecho';
+    switch (id) {
+      case 'nivelado':
+        if (S.engine && S.thr >= 0.55) return t < 2.5 ? 'Alas niveladas y la nariz apenas arriba del horizonte' : 'Vuelo recto y nivelado: no sube ni baja. Variómetro en cero, altímetro quieto';
+        return 'Alas niveladas, pero con tan poca potencia no se mantiene la altura: el avión planea y baja despacio';
+      case 'alabeo-izq': case 'alabeo-der':
+        if (t < x.rollT * 0.5) return 'Volante a la ' + R + ': el alerón ' + r2 + ' SUBE y el ' + o2 + ' BAJA…';
+        if (t < x.rollT + 0.4) return '…el ala ' + (side > 0 ? 'izquierda' : 'derecha') + ' sube: el avión se inclina a la ' + r + ' (alabeo)';
+        return 'Volante al centro: la inclinación queda y el avión va girando a la ' + r + '. Mirá el horizonte y el coordinador de giro';
+      case 'viraje-izq': case 'viraje-der':
+        if (t < x.rollT + 0.3) return 'Volante y pedal ' + (side > 0 ? 'DERECHOS' : 'IZQUIERDOS') + ' juntos: se inclina y la nariz acompaña';
+        return 'Viraje de 30° a la ' + r + ': un poco de presión atrás para no perder altura y la bolita centrada';
+      case 'cabeceo-arriba':
+        if (t < x.pitchT + 0.3) return 'Volante hacia ATRÁS: el timón de profundidad SUBE, la cola baja y la nariz sube';
+        return 'Nariz arriba: el avión sube y la velocidad baja. Si aflojás, la nariz vuelve a bajar';
+      case 'cabeceo-abajo':
+        if (t < x.pitchT + 0.3) return 'Volante hacia ADELANTE: el timón de profundidad BAJA, la cola sube y la nariz baja';
+        return 'Nariz abajo: el avión baja y la velocidad sube. Ojo con el arco amarillo del velocímetro';
+      case 'guinada-izq': case 'guinada-der':
+        if (t < 2.2) return 'Pedal ' + (side > 0 ? 'DERECHO' : 'IZQUIERDO') + ': el timón de dirección va a la ' + r + ' y la nariz gira a la ' + r + ' (guiñada)';
+        return 'La bolita se va para el otro lado: el avión derrapa. En vuelo el pedal sirve para coordinar, no para doblar';
+      case 'motor-on':
+        if (!air && x.F.engineOn === false) return t < 1.4 ? 'Arranque: el motor de arranque hace girar la hélice…' : 'El motor arrancó: queda en ralentí, unas 900 RPM. La baliza avisa "motor en marcha"';
+        return air ? 'Motor en marcha: la hélice tira del avión hacia adelante' : 'Motor en marcha en ralentí: la hélice gira y tira apenas';
+      case 'motor-off':
+        return air ? 'Motor apagado en vuelo: la hélice sigue girando por el viento (molinete). Planeá a 60 nudos y elegí un campo'
+          : 'Motor apagado: la hélice se detiene';
+      case 'potencia-max':
+        return air ? 'Acelerador a fondo: máximas RPM y máximo empuje. Más potencia → la nariz quiere ir a la izquierda: pedal derecho'
+          : 'Acelerador a fondo con los frenos puestos: unas 2500 RPM en tierra';
+      case 'potencia-ralenti':
+        return air ? 'Ralentí: casi sin empuje. Para no perder velocidad, la nariz baja un poco y el avión planea' : 'Acelerador afuera: ralentí, unas 700 RPM';
+      case 'flaps-0': case 'flaps-10': case 'flaps-20': case 'flaps-40': {
+        var n = S.flaps;
+        if (x.flapDir) return (x.flapDir > 0 ? 'Flaps bajando' : 'Flaps subiendo') + ' a ' + n + '°: el motor eléctrico tarda unos segundos' +
+          (air ? (x.flapDir > 0 ? '. La nariz tiende a subir' : '. El avión se hunde un poco') : '');
+        return n === 0 ? 'Flaps arriba: ala limpia, menos resistencia' + (air ? ', vuela más rápido' : '')
+          : n === 10 ? 'Flaps 10°: un poco más de sustentación. Es lo máximo para despegar'
+            : n === 20 ? 'Flaps 20°: más sustentación y bastante más resistencia. ' + (air ? 'El avión vuela más lento' : 'Por debajo de 85 nudos')
+              : 'Flaps 40°: máxima resistencia. Bajás más empinado y más lento (aterrizaje)';
+      }
+      case 'compensador-arriba': case 'compensador-abajo': {
+        var upT = S.trim > 0;
+        if (x.trimMoving) return 'Rueda de compensador hacia ' + (upT ? 'ATRÁS (nariz arriba): la aleta compensadora BAJA…' : 'ADELANTE (nariz abajo): la aleta compensadora SUBE…');
+        return '…el aire la empuja y el timón de profundidad ' + (upT ? 'SUBE' : 'BAJA') + ' solo: la nariz ' + (upT ? 'sube' : 'baja') + ' sin hacer fuerza';
+      }
+      case 'ascenso':
+        return t < 3 ? 'Potencia máxima, calefacción al carburador en frío y la nariz arriba' : 'Ascenso a 68 nudos (Vy): sube unos 650 pies por minuto. Un poco de pedal derecho: bolita centrada';
+      case 'descenso':
+        return t < 3 ? 'Calefacción al carburador y potencia reducida, unas 1700 RPM' : 'Descenso a 75 nudos: baja unos 500 pies por minuto';
+      case 'perdida':
+        if (t < 2.5) return 'Ralentí y tirás del volante de a poco: la nariz sube y la velocidad baja';
+        if (t < 5.5) return 'El ángulo de ataque crece… suena la bocina de pérdida (5 a 10 nudos antes)';
+        return 'PÉRDIDA: el aire se despega del ala, el avión se sacude y baja aunque la nariz esté arriba. Para salir: volante adelante y potencia';
+      case 'carreteo-izq': case 'carreteo-der':
+        return t < 3 ? 'Pedal ' + (side > 0 ? 'DERECHO' : 'IZQUIERDO') + ': la rueda de nariz dobla a la ' + r + ' (hasta unos 8,5°)'
+          : 'Carreteo despacio, a paso de hombre. Para un giro más cerrado: un toque de freno ' + r2;
+    }
+    return '';
+  }
+
   /* ======================================================================== */
   function create(THREE) {
     var V3 = THREE.Vector3;
@@ -219,7 +528,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       lastHeading = heading;
       var h = heading * DEG, c = Math.cos(h), s = Math.sin(h);
       // world → exterior scene = rotation about +Y by the heading (the nose, world R_y(-h)·(-Z), maps to -Z)
-      sunScene.set(sunWorld.x * c - sunWorld.z * s, Math.max(0.12, sunWorld.y), sunWorld.x * s + sunWorld.z * c).normalize();
+      sunScene.set(sunWorld.x * c + sunWorld.z * s, Math.max(0.12, sunWorld.y), -sunWorld.x * s + sunWorld.z * c).normalize();
       sun.position.copy(sunScene).multiplyScalar(20);
       sun.shadow.needsUpdate = true;
     }
@@ -413,17 +722,19 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     // mount, faint wind reference lines with dashes moving downstream, test-section hoops and soft light shafts, where
     // the glowing airflow (airflow.js) reads best. Every value blends smoothly (≈ 0.4 s) when the backdrop changes.
     var STAGE_Y = -2.35;
+    // k.floor = the light concrete studio floor, k.world = the real scenery (world.js view: sky, fields, airfield),
+    // k.ground = the contact / sun shadows under the wheels, k.env = environment reflections on the paint.
     var BACKDROPS = {
-      estudio: { sky: [0x7eaedb, 0xdde7ee, 0xd0d4d1], rimCol: 0xeef3ff,
-        k: { hemi: 1, key: 1, fill: 1, rim: 1, env: 1, glow: 1, stage: 0, ground: 1, clouds: 0, horizon: 1 } },
-      cielo: { sky: [0x2a66b8, 0xcfe1f0, 0x6e7d63], rimCol: 0xeef3ff,
-        k: { hemi: 1.1, key: 1, fill: 1, rim: 1, env: 1, glow: 1.3, stage: 0, ground: 1, clouds: 1, horizon: 0 } },
-      tunel: { sky: [0x07142a, 0x14305a, 0x050b16], rimCol: 0x8ec9ff,
-        k: { hemi: 0.55, key: 0.85, fill: 0.9, rim: 2.3, env: 0.5, glow: 0, stage: 1, ground: 0, clouds: 0, horizon: 0 } }
+      estudio: { sky: [0x7eaedb, 0xdde7ee, 0xd0d4d1], rimCol: 0xeef3ff, hemiGround: 0x8f897d,
+        k: { hemi: 1, key: 1, fill: 1, rim: 1, env: 1, glow: 1, stage: 0, ground: 1, clouds: 0, horizon: 1, floor: 1, world: 0 } },
+      cielo: { sky: [0x2b61ab, 0xc7d4de, 0x6f7f52], rimCol: 0xfff6e8, hemiGround: 0x66734a,
+        k: { hemi: 1.15, key: 1.08, fill: 0.75, rim: 0.85, env: 0.85, glow: 1.3, stage: 0, ground: 1, clouds: 1, horizon: 0, floor: 0, world: 1 } },
+      tunel: { sky: [0x07142a, 0x14305a, 0x050b16], rimCol: 0x8ec9ff, hemiGround: 0x23324a,
+        k: { hemi: 0.55, key: 0.85, fill: 0.9, rim: 2.3, env: 0.5, glow: 0, stage: 1, ground: 0, clouds: 0, horizon: 0, floor: 0, world: 0 } }
     };
-    var bd = { name: 'estudio', k: {}, sky: [new THREE.Color(), new THREE.Color(), new THREE.Color()], rimCol: new THREE.Color(0xeef3ff),
+    var bd = { name: 'cielo', hemiGround: new THREE.Color(0x66734a), tHemi: new THREE.Color(), k: {}, sky: [new THREE.Color(), new THREE.Color(), new THREE.Color()], rimCol: new THREE.Color(0xeef3ff),
       tSky: [new THREE.Color(), new THREE.Color(), new THREE.Color()], tRim: new THREE.Color(), windT: 0, init: false };
-    (function () { var b = BACKDROPS.estudio; for (var key in b.k) bd.k[key] = b.k[key]; b.sky.forEach(function (h, i) { bd.sky[i].setHex(h); }); })();
+    (function () { var b = BACKDROPS.cielo; for (var key in b.k) bd.k[key] = b.k[key]; b.sky.forEach(function (h, i) { bd.sky[i].setHex(h); }); })();
     /** Visual speed (m/s in the scene) of air moving at iasKt: the flow is slowed down so the eye can follow it. */
     function visWindSpeed(iasKt) { return iasKt > 0.5 ? (1.6 + 0.032 * Math.min(iasKt, 160)) * clamp(iasKt / 6, 0, 1) : 0; }
 
@@ -578,6 +889,60 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       }
     })();
 
+    var envView = null;
+    // dusk veil (lights demo) over the world view: a dark dome around the camera, first in the transparent pass, so it
+    // darkens the unlit scenery (no depth) but not the airplane in front of it
+    var veil = new THREE.Mesh(new THREE.SphereGeometry(140, 24, 12),
+      new THREE.MeshBasicMaterial({ color: 0x0d1226, transparent: true, opacity: 0, depthWrite: false, side: THREE.BackSide }));
+    veil.renderOrder = -20;
+    veil.visible = false;
+    veil.frustumCulled = false;
+    scene.add(veil);
+    /** The exterior view of the cockpit's world (world.js createExteriorView), created on first use; null without a world. */
+    function worldView() {
+      if (envView) return envView;
+      var W = C150.World && C150.World.current;
+      if (!W || !W.createExteriorView) return null;
+      try { envView = W.createExteriorView(); envView.group.visible = false; scene.add(envView.group); } catch (e) { envView = null; }
+      return envView;
+    }
+    // Where the scenery is drawn: the sim's position / heading / height, except while an animation or pose runs —
+    // then the airplane "flies" on its own (heading from animState.turnRate, position from its speed, height from its
+    // climb), and an airborne movement over a parked airplane lifts it to ≈ 1500 ft so the ground falls away below.
+    var FT_M = 0.3048;
+    var venv = { on: false, vx: 0, vz: 0, vh: 0, va: 0, floor: 0, x: 0, z: 0, h: 0, a: 0, init: false };
+    function simAgl(state) {
+      var a = state.air || {};
+      if (a.onGround !== false) return 0;
+      var elev = isFinite(state.fieldElevation) ? state.fieldElevation : 100;
+      return Math.max(0, (num(a.altitude, elev) - elev) * FT_M);
+    }
+    function trackScenery(state, dt, active, gsMs) {
+      var a = state.air || {}, pos = state.pos || {};
+      var tx = num(pos.x, 0), tz = num(pos.z, 0), th = num(a.heading, 0), ta = simAgl(state);
+      if (state.tunnel && state.tunnel.on) ta = Math.max(ta, 450);
+      if (active) {
+        if (!venv.on) { venv.on = true; venv.vx = tx; venv.vz = tz; venv.vh = th; venv.va = ta; }
+        venv.vh = (venv.vh + animState.turnRate * dt + 360) % 360;
+        var gs = animState.onGround ? gsMs : animState.ias * 0.514444;
+        var hr = venv.vh * DEG;
+        venv.vx += gs * Math.sin(hr) * dt; venv.vz -= gs * Math.cos(hr) * dt;
+        venv.va = clamp(venv.va + animState.vs / 196.85 * dt, 0, 3000);
+        if (animState.onGround) venv.va = 0;
+        tx = venv.vx; tz = venv.vz; th = venv.vh - disp.yaw; ta = venv.va;
+      } else venv.on = false;
+      var floorT = active && !animState.onGround ? 450 : 0;
+      venv.floor += (floorT - venv.floor) * (dt > 0 ? k(dt, 1.3) : 1);
+      ta = Math.max(ta, venv.floor);
+      if (!venv.init || dt === 0 || Math.hypot(tx - venv.x, tz - venv.z) > 150) { venv.x = tx; venv.z = tz; }
+      else { var kp = k(dt, 0.25); venv.x += (tx - venv.x) * kp; venv.z += (tz - venv.z) * kp; }
+      var dh = ((th - venv.h) % 360 + 540) % 360 - 180;
+      if (!venv.init || dt === 0) venv.h = th; else venv.h += dh * k(dt, 0.3);
+      venv.h = (venv.h + 360) % 360;
+      if (!venv.init) venv.a = ta; else venv.a += (ta - venv.a) * (dt > 0 ? k(dt, 0.5) : 1);
+      venv.init = true;
+    }
+
     function setBackdrop(name) {
       if (!BACKDROPS[name]) return false;
       bd.name = name;
@@ -591,6 +956,19 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       for (var i = 0; i < 3; i++) { bd.tSky[i].setHex(b.sky[i]); bd.sky[i].lerp(bd.tSky[i], kk); }
       bd.tRim.setHex(b.rimCol); bd.rimCol.lerp(bd.tRim, kk);
       rim.color.copy(bd.rimCol);
+      bd.tHemi.setHex(b.hemiGround); bd.hemiGround.lerp(bd.tHemi, kk); hemi.groundColor.copy(bd.hemiGround);
+      // the real scenery (sky, haze, fields, the practice airfield) shared with the cockpit's world.js
+      var wantWorld = b.k.world > 0.5 || bd.k.world > 0.5;
+      var wv = wantWorld ? worldView() : null;
+      var showWorld = !!wv && bd.k.world > 0.5;
+      if (envView) envView.group.visible = showWorld;
+      ext.worldVisible = showWorld;
+      skyDome.visible = !showWorld;
+      var far = showWorld ? 60000 : 500;
+      if (camera.far !== far) { camera.far = far; camera.updateProjectionMatrix(); }
+      if (showWorld) {
+        wv.update({ x: venv.x, z: venv.z, heading: venv.h, agl: venv.a, groundY: GROUND_Y, eyeH: camera.position.y - GROUND_Y + venv.a, far: far });
+      }
       var tun = state && state.tunnel && state.tunnel.on;
       var ias = tun ? num(state.tunnel.ias, 0) : num(state.air && state.air.ias, 0);
       var ts = clamp(num(ext.flowTimeScale, 1), 0, 1);
@@ -602,14 +980,14 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         bd.windT += visWindSpeed(ias) * dt * ts;
         if (bd.windT > 2400) bd.windT -= 2400;
         windLineMat.uniforms.uT.value = bd.windT;
-        windLineMat.uniforms.uOp.value = 0.55 * ks * (ias > 1 ? 1 : 0.45);
+        windLineMat.uniforms.uOp.value = 0.3 * ks * (ias > 1 ? 1 : 0.6);   // quiet: the airflow is the show
         if (windLabel) {
           windLabel.visible = ks > 0.5 && !ext.playing;
           setLabelText(windLabel, ias > 1 ? 'Viento relativo ' + Math.round(ias) + ' kt' : 'Sin viento');
         }
       } else if (windLabel) windLabel.visible = false;
       // clouds (flight)
-      var kc = bd.k.clouds * airborneVis;
+      var kc = bd.k.clouds * airborneVis * (ext.worldVisible ? 0.35 : 1);   // with the real sky: only a hint of speed
       cloudGroup.visible = kc > 0.01;
       if (cloudGroup.visible) {
         var v = visWindSpeed(ias) * 3.2 * ts, climb = num(state && state.air && state.air.vs, 0) / 196.85 * 0.15 * ts;
@@ -2196,10 +2574,13 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
 
     /* ========================================================= ANIMATIONS */
     function P0() {
-      return { ail: 0, elevCmd: 0, rudCmd: 0, tab: 0, flaps: 0, pitch: 0, bank: 0, yaw: 0, rpm: 0, nose: 0,
+      // rpm null = engine at cruise when airborne, stopped on the ground; ias / vs / thr / slip / engineOn null =
+      // derived from the attitude and the RPM (deriveLive) — the cockpit mirror reads them through ext.animState
+      return { ail: 0, elevCmd: 0, rudCmd: 0, tab: 0, flaps: 0, pitch: 0, bank: 0, yaw: 0, rpm: null, nose: 0,
         ground: true, lights: { nav: false, beacon: false, strobe: false, landing: false, taxi: false },
         arrows: { roll: 0, pitch: 0, yaw: 0 }, caption: '', doorL: 0, doorR: 0, windowL: 0, emph: [], dusk: 0,
-        brakeL: 0, brakeR: 0, roll: 0, rawElev: null, rawTab: null };
+        brakeL: 0, brakeR: 0, roll: 0, rawElev: null, rawTab: null, ias: null, vs: null, thr: null, engineOn: null,
+        slip: null, carbHeat: 0, stallWarn: null, trim: 0, elevOffset: 0, rollSpeed: null, steadyTurn: false };
     }
     var ANIMS = {
       'axes-roll': {
@@ -2265,6 +2646,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
           P.pitch = kf(t, [[0, 2], [1, 2], [6.2, 18.5], [8.4, 18.5], [9.4, 3], [12, 2]]);
           P.elevCmd = kf(t, [[0, 0], [1, 0], [2, 0.6], [6.2, 0.95], [8.4, 0.95], [8.8, -0.6], [9.6, 0], [12, 0]]);
           P.aoa = P.pitch;
+          P.ias = kf(t, [[0, 80], [1, 80], [6.2, 48], [8.4, 46], [9.4, 55], [12, 68]]);
+          P.stallWarn = t > 4.2 && t < 9.2;
           P.caption = stepKeys(t, [[0, 'Ángulo de ataque: el ángulo entre la cuerda del ala y el viento relativo'],
             [1.5, 'Tirás del volante: sube la nariz y aumenta el ángulo de ataque → más sustentación…'],
             [4.2, '…hasta un límite. Cerca de ese límite suena la bocina de aviso de pérdida'],
@@ -2321,6 +2704,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
           P.rpm = kf(t, [[0, 1700], [1, 1700], [2, 2500], [11, 2500]]);
           P.pitch = kf(t, [[0, 0], [1, 0], [2.5, 10], [11, 10]]);
           P.elevCmd = kf(t, [[0, 0], [1, 0], [2, 0.35], [11, 0.35]]);
+          P.ias = kf(t, [[0, 85], [1, 85], [4.5, 68], [11, 68]]);
+          P.vs = kf(t, [[0, 0], [1, 0], [3, 650], [11, 650]]);
           P.yaw = kf(t, [[0, 0], [2, 0], [4.2, -10], [5.4, -10], [7.4, 0], [11, 0]]);
           P.rudCmd = kf(t, [[0, 0], [5.4, 0], [6.2, 0.5], [11, 0.5]]);
           P.arrows.yaw = t > 2.2 && t < 4.6 ? -0.8 : (t > 5.6 && t < 7.4 ? 0.6 : 0);
@@ -2338,7 +2723,6 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
           P.bank = kf(t, [[0, 0], [1.2, 0], [3.7, 30], [8.8, 30], [11.3, 0], [13, 0]]);
           P.rudCmd = kf(t, [[0, 0], [1, 0], [1.5, 0.35], [3.5, 0.35], [4, 0.08], [8.6, 0.08], [9.1, -0.35], [10.8, -0.35], [11.3, 0], [13, 0]]);
           P.elevCmd = kf(t, [[0, 0], [3, 0], [4, 0.25], [8.8, 0.25], [10.5, 0], [13, 0]]);
-          P.yaw = kf(t, [[0, 0], [1.5, 0], [11.3, 55], [13, 55]]);
           P.arrows.roll = P.ail; P.arrows.yaw = Math.abs(P.rudCmd) > 0.2 ? P.rudCmd * 1.5 : 0;
           P.arrows.pitch = P.elevCmd > 0.2 ? 0.5 : 0;
           P.caption = stepKeys(t, [[0, 'Viraje coordinado a la derecha'],
@@ -2453,12 +2837,139 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     };
 
     /* ========================================================= STATE */
-    var disp = { aileronL: 0, aileronR: 0, elevator: 0, rudder: 0, trimTab: 0, flaps: 0, pitch: 0, bank: 0, yaw: 0, nose: 0,
+    var disp = { aileronL: 0, aileronR: 0, elevator: 0, rudder: 0, trimTab: 0, flaps: 0, pitch: 0, bank: 0, yaw: 0, nose: 0, rpm: 0,
       doorL: 0, doorR: 0, windowL: 0, dusk: 0, stance: STANCE };
     var anim = { name: null, t: 0, loop: false, prevView: null, lastViewKey: null };
     var clock = 0;
     var track = { trim: null, trimT: -10, trimDir: 0, flaps: null, flapsT: -10, flapsDir: 0, rpm: null, rpmT: -10, rpmDir: 0 };
     var poseTmp = P0();
+    var lastState = null;
+
+    /* ---------------------------------------------- held poses + what the airplane is doing (ext.animState) */
+    var pose = { S: null, t: 0, F: null };
+    var live = { ias: 0, vs: 0, turn: 0, slip: 0, rpm: 0, ail: 0, elev: 0, rud: 0, prevYaw: 0, init: false };
+    var animState = { active: false, kind: null, name: null, bank: 0, pitch: 0, yaw: 0, yokeRoll: 0, yokePitch: 0, rudder: 0,
+      throttle: 0, flaps: 0, rpm: 0, ias: 0, vs: 0, turnRate: 0, slip: 0, brakeL: 0, brakeR: 0, engineOn: false,
+      onGround: true, trim: 0, carbHeat: 0, aoa: 0, stallWarn: false };
+    function resetP(P) {
+      var fresh = P0();
+      for (var key in fresh) P[key] = fresh[key];
+      P.forceFocus = null; P.aoa = null; P.viewKeys = null; P.ice = 0; P.heat = 0; P.carbRpm = 0; P.lightText = null;
+      P.pitotFlow = 0; P.staticFlow = 0; P.yawRate = 0; P.brakeSide = 0; P.highlightCarb = false;
+    }
+    /** Animation / pose frame (P) → displayed surface targets (same deflection laws as surfacesFromInputs). */
+    function targetsFromP(P, target) {
+      var ail = clamp(P.ail, -1, 1), ec = clamp(P.elevCmd, -1, 1);
+      target.aileronL = ail < 0 ? 20 * ail : 14 * ail;
+      target.aileronR = ail < 0 ? -14 * ail : -20 * ail;
+      target.elevator = P.rawElev !== null ? P.rawElev : (ec > 0 ? -25 * ec : -15 * ec) + num(P.elevOffset, 0);
+      target.rudder = 23 * clamp(P.rudCmd, -1, 1);
+      target.trimTab = P.rawTab !== null ? P.rawTab : 0;
+      target.flaps = P.flaps; target.pitch = P.pitch; target.bank = P.bank; target.yaw = P.yaw;
+      target.nose = P.nose || 8.5 * clamp(P.rudCmd, -1, 1) * (P.ground ? 1 : 0);
+      target.rpm = num(P.rpm, 0);
+    }
+    function stateLights(state) {
+      var powered = !state.elec || num(state.elec.busVolts, 12) > 8;
+      var L = state.lights || {};
+      curLights.nav = powered && !!L.nav; curLights.beacon = powered && !!L.beacon; curLights.strobe = powered && !!L.strobe;
+      curLights.landing = powered && !!L.landing; curLights.taxi = powered && !!L.taxi;
+      return curLights;
+    }
+    /** Where the airplane is right now (start of a pose): the displayed attitude and the live values. */
+    function poseFrom(prevSpec) {
+      var st = lastState || {}, a = st.air || {};
+      var running = live.init && animState.active ? animState.engineOn : (!st.engine || st.engine.running !== false) && num(st.propRpm, 0) > 300;
+      return { bank: disp.bank, pitch: disp.pitch, yaw: disp.yaw, flaps: disp.flaps, trim: prevSpec ? num(prevSpec.trim, 0) : clamp(num(st.trim, 0), -1, 1),
+        ias: animState.active ? live.ias : num(a.ias, 0), vs: animState.active ? live.vs : num(a.vs, 0),
+        air: prevSpec ? !!prevSpec.air : a.onGround === false, engineOn: running, rpm: disp.rpm };
+    }
+    /**
+     * Hold a movement: 'alabeo-der', 'flaps-20', 'motor-off'… (ext.POSES). The airplane moves there smoothly and stays,
+     * alive, until another pose or clearPose(); a running animation stops. Returns the Spanish caption (false if unknown).
+     */
+    function setPose(name) {
+      var def = POSE_BY_ID[name];
+      if (!def) return false;
+      if (anim.name) stop();
+      var prev = pose.S || specFromState(lastState);
+      if (!pose.S) { prev.flaps = disp.flaps; }
+      var S = poseSpec(prev, name);
+      pose.F = poseFrom(pose.S ? prev : null);
+      pose.F.air = !!prev.air;
+      pose.S = S; pose.t = 0;
+      ext.posing = name;
+      return def.descripcion;
+    }
+    /**
+     * Live values of the running animation / pose (airspeed, climb, turn rate, ball, control inputs…) → ext.animState.
+     * Same units and signs as the sim state: bank + = right wing down, pitch + = nose up, yaw + = nose right (on screen),
+     * yokeRoll + = right, yokePitch + = pulled (nose up), rudder + = right pedal, turnRate °/s + = right, slip + = ball right,
+     * vs ft/min, ias kt, flaps °, trim + = nose up.
+     */
+    function updateLive(P, active, kind, dt, ground) {
+      var st = lastState || {}, a = st.air || {};
+      if (!active) {
+        live.init = false;
+        animState.active = false; animState.kind = null; animState.name = null;
+        return;
+      }
+      if (!live.init) {   // start from where the airplane is, so nothing jumps in the cockpit
+        live.ias = num(a.ias, 0); live.vs = num(a.vs, 0); live.turn = 0; live.slip = num(a.slip, 0);
+        live.ail = clamp(num(st.yokeRoll, 0), -1, 1); live.elev = clamp(num(st.yokePitch, 0), -1, 1); live.rud = clamp(num(st.rudder, 0), -1, 1);
+        live.prevYaw = disp.yaw;
+        live.init = true;
+      }
+      var ks = dt > 0 ? k(dt, 0.07) : 1, isPose = kind === 'pose';
+      live.ail += (clamp(P.ail, -1, 1) - live.ail) * ks;
+      live.elev += (clamp(P.elevCmd, -1, 1) - live.elev) * ks;
+      live.rud += (clamp(P.rudCmd, -1, 1) - live.rud) * ks;
+      var iasT, vsT;
+      if (P.ias !== null) iasT = P.ias;
+      else iasT = ground ? (P.roll || P.rollSpeed ? num(P.rollSpeed, 1.2) / 0.514444 : 0) : clamp(88 - 1.1 * (disp.pitch - 2), 45, 130);
+      if (P.vs !== null) vsT = P.vs;
+      else if (ground) vsT = 0;
+      else vsT = clamp(101.27 * live.ias * Math.sin((disp.pitch - aoaFor(live.ias, disp.flaps)) * DEG), -1500, 1500);
+      live.ias += (iasT - live.ias) * (dt > 0 ? k(dt, isPose ? 0.15 : 1.4) : 1);   // poses already ease airspeed and climb
+      live.vs += (vsT - live.vs) * (dt > 0 ? k(dt, isPose ? 0.15 : 0.9) : 1);
+      // turn rate: the nose turning on screen + the steady turn of a banked wing (or of the nose wheel on the ground)
+      var yawRate = dt > 0 ? (disp.yaw - live.prevYaw) / dt : 0;
+      live.prevYaw = disp.yaw;
+      var steady = 0;
+      if (!ground) steady = 1091 * Math.tan(clamp(disp.bank, -80, 80) * DEG) / Math.max(live.ias, 40);
+      else if (P.rollSpeed) steady = P.rollSpeed * Math.tan(disp.nose * DEG) / WHEELBASE / DEG;
+      else if (P.yawRate) steady = P.yawRate;
+      live.turn += (clamp(yawRate + steady, -60, 60) - live.turn) * (dt > 0 ? k(dt, 0.25) : 1);
+      // the ball (+ = right): adverse yaw of the ailerons, rudder (skids to the outside), left-turning tendency
+      var slipT;
+      if (P.slip !== null) slipT = P.slip;
+      else if (ground) slipT = clamp(-num(P.rollSpeed, P.roll ? 1.2 : 0) * live.turn * DEG / 9.81 * 3, -1, 1);
+      else {
+        var pf = smooth((disp.rpm - 1900) / 600) * clamp((95 - live.ias) / 30, 0, 1);
+        slipT = clamp(0.35 * live.ail - 0.6 * live.rud + 0.35 * pf, -1, 1);
+      }
+      live.slip += (slipT - live.slip) * (dt > 0 ? k(dt, 0.3) : 1);
+      var AS = animState;
+      AS.active = true; AS.kind = kind; AS.name = isPose ? pose.S.id : anim.name;
+      AS.bank = disp.bank; AS.pitch = disp.pitch; AS.yaw = disp.yaw;
+      AS.yokeRoll = live.ail; AS.yokePitch = live.elev; AS.rudder = live.rud;
+      AS.flaps = disp.flaps; AS.rpm = disp.rpm; AS.ias = Math.max(0, live.ias); AS.vs = live.vs;
+      AS.turnRate = live.turn; AS.slip = live.slip;
+      AS.engineOn = P.engineOn !== null ? !!P.engineOn : num(P.rpm, 0) > 300;
+      AS.throttle = P.thr !== null ? clamp(P.thr, 0, 1) : (AS.engineOn ? thrFor(num(P.rpm, 0), ground ? 0 : live.ias, ground) : 0);
+      AS.brakeL = clamp(num(P.brakeL, 0), 0, 1); AS.brakeR = clamp(num(P.brakeR, 0), 0, 1);
+      AS.onGround = !!ground;
+      AS.trim = P.rawTab !== null ? (P.rawTab > 0 ? P.rawTab / 20 : P.rawTab / 10) : num(P.trim, 0);
+      AS.carbHeat = P.heat ? 1 : num(P.carbHeat, 0);
+      AS.aoa = ground ? 0 : (P.aoa !== null && P.aoa !== undefined ? P.aoa : aoaFor(live.ias, disp.flaps));
+      AS.stallWarn = P.stallWarn !== null && P.stallWarn !== undefined ? !!P.stallWarn : (!ground && AS.aoa > 12.5);
+    }
+    function clearPose() {
+      if (!pose.S) return false;
+      pose.S = null; pose.F = null; pose.t = 0;
+      ext.posing = null;
+      return true;
+    }
 
     function surfacesFromInputs(state, out) {
       var yr = num(state.yokeRoll, 0), yp = num(state.yokePitch, 0), rd = num(state.rudder, 0), tr = num(state.trim, 0);
@@ -2679,6 +3190,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       });
     }
     scene.onBeforeRender = function (renderer, sc, cam) {
+      if (!disk.visible) disk.onBeforeRender(renderer);   // shadow-map settings (the floor may be hidden)
       try { labelBudget(renderer, cam); clampLabels(cam); } catch (e) { /* never break a frame for a label */ }
     };
 
@@ -2695,8 +3207,10 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       state = state || {};
       var P = poseTmp;
       var playing = !!anim.name;
+      var posing = !playing && !!pose.S;
       var caption = '';
       var air = state.air || {};
+      lastState = state;
 
       // ----- choose the pose: animation or state
       var target = { aileronL: 0, aileronR: 0, elevator: 0, rudder: 0, trimTab: 0, flaps: 0, pitch: 0, bank: 0, yaw: 0, nose: 0, rpm: 0 };
@@ -2705,31 +3219,31 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       if (playing) {
         var A = ANIMS[anim.name];
         anim.t += dt;
-        if (anim.t >= A.dur) {
-          if (anim.loop) anim.t %= A.dur;
+        if (anim.t >= A.dur * TIME_STRETCH) {
+          if (anim.loop) anim.t %= A.dur * TIME_STRETCH;
           else { stop(); return update(state, 0); }
         }
-        var fresh = P0();
-        for (var key in fresh) P[key] = fresh[key];
-        P.forceFocus = null; P.aoa = null; P.viewKeys = null; P.ice = 0; P.heat = 0; P.carbRpm = 0; P.lightText = null;
-        P.pitotFlow = 0; P.staticFlow = 0; P.yawRate = 0; P.brakeSide = 0; P.highlightCarb = false;
-        A.frame(anim.t, P);
-        var ail = clamp(P.ail, -1, 1), ec = clamp(P.elevCmd, -1, 1);
-        target.aileronL = ail < 0 ? 20 * ail : 14 * ail;
-        target.aileronR = ail < 0 ? -14 * ail : -20 * ail;
-        target.elevator = P.rawElev !== null ? P.rawElev : (ec > 0 ? -25 * ec : -15 * ec);
-        target.rudder = 23 * clamp(P.rudCmd, -1, 1);
-        target.trimTab = P.rawTab !== null ? P.rawTab : 0;
-        target.flaps = P.flaps; target.pitch = P.pitch; target.bank = P.bank; target.yaw = P.yaw;
-        target.nose = P.nose || 8.5 * clamp(P.rudCmd, -1, 1) * (P.ground ? 1 : 0);
-        if (P.nose) target.nose = P.nose;
-        target.rpm = P.rpm;
+        resetP(P);
+        var ta = anim.t / TIME_STRETCH;   // authored time (the animations run TIME_STRETCH× slower)
+        A.frame(ta, P);
+        if (P.rpm === null) P.rpm = P.ground ? 0 : 2350;
+        targetsFromP(P, target);
         lightsOn = P.lights; ground = P.ground; arrowsV = P.arrows; emph = P.emph; dusk = P.dusk;
         caption = P.caption;
         if (P.viewKeys) {
-          var vk = stepKeys(anim.t, P.viewKeys);
+          var vk = stepKeys(ta, P.viewKeys);
           if (vk !== anim.lastViewKey) { anim.lastViewKey = vk; setView(vk); }
         }
+      } else if (posing) {
+        pose.t += dt;
+        resetP(P);
+        poseFrame(pose.S, pose.t, pose.F, P);
+        targetsFromP(P, target);
+        ground = P.ground; arrowsV = P.arrows;
+        caption = P.caption;
+        lightsOn = stateLights(state);
+        doorTargets.doorL = state.doorLeftOpen ? 1 : 0; doorTargets.doorR = state.doorRightOpen ? 1 : 0;
+        doorTargets.windowL = state.windowLeftOpen ? 1 : 0;
       } else {
         var sf = state.surfaces;
         if (!sf || !isFinite(sf.aileronL)) sf = surfacesFromInputs(state, surfTmp);
@@ -2749,11 +3263,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         }
         target.nose = num(state.noseWheelAngle, 0);
         target.rpm = num(state.propRpm, 0);
-        var powered = !state.elec || num(state.elec.busVolts, 12) > 8;
-        var L = state.lights || {};
-        curLights.nav = powered && !!L.nav; curLights.beacon = powered && !!L.beacon; curLights.strobe = powered && !!L.strobe;
-        curLights.landing = powered && !!L.landing; curLights.taxi = powered && !!L.taxi;
-        lightsOn = curLights;
+        lightsOn = stateLights(state);
         doorTargets.doorL = state.doorLeftOpen ? 1 : 0; doorTargets.doorR = state.doorRightOpen ? 1 : 0;
         doorTargets.windowL = state.windowLeftOpen ? 1 : 0;
         arrowsV = {
@@ -2766,8 +3276,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       }
       ext.caption = caption;
 
-      // ----- smoothing
-      var ks = k(dt, 0.07), ka = k(dt, 0.18), kd = k(dt, 0.35);
+      // ----- smoothing (poses ease the attitude a little more: they already ramp it realistically)
+      var ks = k(dt, 0.07), ka = k(dt, posing ? 0.3 : 0.18), kd = k(dt, 0.35);
       disp.aileronL += (target.aileronL - disp.aileronL) * ks;
       disp.aileronR += (target.aileronR - disp.aileronR) * ks;
       disp.elevator += (target.elevator - disp.elevator) * ks;
@@ -2783,6 +3293,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       disp.doorR += (doorTargets.doorR - disp.doorR) * kd;
       disp.windowL += (doorTargets.windowL - disp.windowL) * kd;
       disp.dusk += (dusk - disp.dusk) * k(dt, 0.4);
+      disp.rpm += (target.rpm - disp.rpm) * (dt > 0 ? k(dt, playing || posing ? 0.45 : 0.08) : 1);
+      updateLive(P, playing || posing, playing ? 'animacion' : (posing ? 'pose' : null), dt, ground);
       if (dt === 0) {   // first frame / after stop: snap
         disp.stance = ground ? STANCE : 0;
       }
@@ -2804,14 +3316,14 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       wheels.nose.steer.rotation.y = -disp.nose * DEG;
 
       // ----- wheels roll with ground speed (or animation)
-      var gsMs = playing ? (P.roll ? 1.2 : 0) : num(air.groundSpeed, 0) * 0.514444 * (ground ? 1 : 0);
+      var gsMs = (playing || posing) ? num(P.rollSpeed, P.roll ? 1.2 : 0) : num(air.groundSpeed, 0) * 0.514444 * (ground ? 1 : 0);
       mainRollAngle -= gsMs / 0.2225 * dt;
       noseRollAngle -= gsMs / 0.18 * dt;
       wheels.main.forEach(function (w) { w.spin.rotation.x = mainRollAngle; });
       wheels.nose.spin.rotation.x = noseRollAngle;
 
       // ----- propeller
-      var rpm = target.rpm;
+      var rpm = disp.rpm;
       var visRpm = Math.min(rpm, 380);
       prop.angle -= visRpm / 60 * Math.PI * 2 * dt;
       prop.blades.rotation.z = prop.angle;
@@ -2836,9 +3348,12 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       tmpE.set((disp.pitch + disp.stance) * DEG, -disp.yaw * DEG, -disp.bank * DEG, 'YXZ');
       attitude.quaternion.setFromEuler(tmpE);
       var airborneVis = 1 - clamp(disp.stance / STANCE, 0, 1);
+      trackScenery(state, dt, playing || posing, gsMs);
       updateBackdrop(state, dt, airborneVis);
       var groundVis = (1 - airborneVis) * bd.k.ground;
-      disk.material.opacity = groundVis;
+      // the studio floor; without the world view (no world.js) 'cielo' falls back to a grass-tinted floor
+      var grassK = ext.worldVisible ? 0 : bd.k.world, floorK = ext.worldVisible ? bd.k.floor : Math.max(bd.k.floor, bd.k.world);
+      disk.material.opacity = groundVis * floorK;
       shadow.material.opacity = groundVis * (1 - 0.5 * disp.dusk);
       catcher.visible = shadowsOn;
       catcherMat.opacity = 0.5 * groundVis * (1 - 0.8 * disp.dusk);
@@ -2847,6 +3362,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       planShadow.position.x = -sunScene.x / sunScene.y * 1.3;
       planShadow.position.z = -sunScene.z / sunScene.y * 1.3;
       groundGroup.visible = groundVis > 0.01;
+      disk.visible = disk.material.opacity > 0.01;
       var horizonVis = airborneVis * bd.k.horizon;
       horizonRing.visible = horizonVis > 0.02;
       horizonRing.children.forEach(function (c) { c.material.opacity = (c.isLine ? 0.55 : 0.12) * horizonVis; });
@@ -2872,11 +3388,14 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       ['uTop', 'uMid', 'uBottom'].forEach(function (u, i) { skyMat.uniforms[u].value.copy(bd.sky[i]).lerp(SKY_DUSK[i], dk); });
       hemi.intensity = (1 - 0.6 * dk) * LIGHTS.hemi * bd.k.hemi; sun.intensity = (1 - 0.85 * dk) * LIGHTS.key * bd.k.key;
       skyMat.uniforms.uGlowAmt.value = (1 - dk) * bd.k.glow;
-      diskMat.color.setScalar(1 - 0.65 * dk);
+      diskMat.color.setRGB(lerp(1, 0.42, grassK), lerp(1, 0.56, grassK), lerp(1, 0.3, grassK)).multiplyScalar(1 - 0.65 * dk);
       setEnvDim((1 - 0.78 * dk) * bd.k.env);   // the studio reflections dim with the light (paint, glass, metal)
 
+      veil.visible = !!ext.worldVisible && dk > 0.01;
+      if (veil.visible) { veil.material.opacity = 0.8 * dk; veil.position.copy(camera.position); }
+
       // ----- key light = world sun (turns with the heading), camera-relative fill/rim, shadow map refresh
-      aimKey(air.heading);
+      aimKey(Math.round(venv.h * 2) / 2);   // the scenery's heading (0.5° steps: fewer shadow-map refreshes in a turn)
       aimCameraLights(dk);
       refreshShadow(blur);
 
@@ -3143,6 +3662,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     /* ============================================================ PUBLIC */
     function play(name, opts) {
       if (!ANIMS[name]) return false;
+      if (pose.S) clearPose();
       if (!anim.name) anim.prevView = cam.view;
       anim.name = name; anim.t = 0; anim.loop = !!(opts && opts.loop); anim.lastViewKey = null;
       ext.playing = name;
@@ -3196,6 +3716,14 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     ext.labelsVisible = false;
     ext.update = update;
     ext.play = play;
+    /** Held movements (contract v3): ext.pose(id) → Spanish caption, ext.clearPose(), ext.POSES, ext.posing (id | null). */
+    ext.pose = setPose;
+    ext.clearPose = clearPose;
+    ext.posing = null;
+    ext.POSES = POSE_LIST.map(function (p) { return { id: p.id, etiqueta: p.etiqueta, descripcion: p.descripcion }; });
+    /** What the airplane is doing in the running animation or pose (read-only, updated every frame; see updateLive). */
+    ext.animState = animState;
+    ext.TIME_STRETCH = TIME_STRETCH;
     ext.stop = stop;
     ext.setHighlight = setHighlight;
     ext.setView = function (name) { return setView(name, false); };
@@ -3232,7 +3760,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     stage.add(windLabel);
     /** 'estudio' (configurator, default) | 'cielo' (open sky, clouds in flight) | 'tunel' (dark wind-tunnel stage). */
     ext.setBackdrop = setBackdrop;
-    ext.backdrop = 'estudio';
+    ext.backdrop = 'cielo';
+    ext.worldVisible = false;       // true while the 'cielo' backdrop shows the world.js scenery
     ext.BACKDROPS = Object.keys(BACKDROPS);
     ext.STAGE_Y = STAGE_Y;
     /** Visual speed (scene m/s) used for air moving at iasKt (the flow is slowed so the eye can follow it). */
@@ -3268,5 +3797,9 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
 
   var lights = {};
   var geoRefs = {};
-  C150.Exterior = { create: create, VIEWS: PUBLIC_VIEWS, ANIMATIONS: ANIM_NAMES, PARTS: PART_IDS };
+  C150.Exterior = { create: create, VIEWS: PUBLIC_VIEWS, ANIMATIONS: ANIM_NAMES, PARTS: PART_IDS,
+    POSES: POSE_LIST.map(function (p) { return { id: p.id, etiqueta: p.etiqueta, descripcion: p.descripcion }; }),
+    // pure pose helpers (Node tests)
+    poseSpec: poseSpec, specFromState: specFromState, poseFrame: poseFrame, rpmFor: rpmFor, thrFor: thrFor, aoaFor: aoaFor,
+    perfLevel: perfLevel, TIME_STRETCH: TIME_STRETCH };
 })(root.C150);

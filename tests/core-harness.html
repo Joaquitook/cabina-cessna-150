@@ -179,7 +179,7 @@
     for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i].nombre;
     return id;
   }
-  ['hover', 'select', 'operate', 'viewchange', 'pick', 'layout', 'error', 'preset', 'pause', 'animend'].forEach(function (ev) {
+  ['hover', 'select', 'operate', 'viewchange', 'pick', 'layout', 'error', 'preset', 'pause', 'animend', 'interactionend', 'mirror'].forEach(function (ev) {
     Core.on(ev, function (a, b, c) {
       events.push({ ev: ev, a: a, b: b, c: c, t: performance.now() });
       if (ev !== 'hover' || a) log(ev + ' ' + JSON.stringify([a, b].filter(function (x) { return x !== undefined; })));
@@ -193,7 +193,13 @@
     tip.style.left = (p.x + 14) + 'px'; tip.style.top = (p.y + 10) + 'px'; tip.style.display = 'block';
   });
   Core.on('layout', function (r) {
-    if (!r) { insetLabel.style.display = 'none'; return; }
+    if (r && r.mode === 'dos' && r.rects && r.rects.exterior) {   // contract v3: two equal views
+      var xr = r.rects.exterior;
+      insetLabel.style.display = 'block'; insetLabel.style.left = xr.x + 'px'; insetLabel.style.top = xr.y + 'px';
+      insetLabel.textContent = Core.isMirroring && Core.isMirroring() ? 'Afuera · la cabina muestra cómo se ve desde adentro' : 'Afuera';
+      return;
+    }
+    if (!r || !(r.w > 0)) { insetLabel.style.display = 'none'; return; }
     insetLabel.style.display = 'block';
     insetLabel.style.left = r.x + 'px'; insetLabel.style.top = r.y + 'px';
     insetLabel.textContent = r.main === 'cockpit' ? 'Exterior · clic para agrandar' : 'Cabina · clic para volver';
@@ -538,6 +544,101 @@
       var pc = Core.projectControl('throttle'); assert(pc && isFinite(pc.x) && isFinite(pc.y), 'projectControl');
       Core.applyPreset('parked');
     }],
+    ['v3 isInteracting: arrastrando el acelerador no se mueve la cámara; interactionend; fly-to diferido', async function () {
+      Core.applyPreset('runup'); Core.select(null);
+      var p = await viewFor('throttle', ['center', 'pilot', 'panel']); assert(p, 'acelerador no visible');
+      var d = screenDir('throttle'), t0 = performance.now(), info = {};
+      await drag(p, d.x * 40, d.y * 40, { during: async function () {
+        info.during = Core.isInteracting();
+        info.cam0 = Core.camera.position.clone();
+        Core.select('mixture', { focus: true });            // what a checklist used to do when the value passed the target
+        await wait(450);
+        info.moved = Core.camera.position.distanceTo(info.cam0);
+        info.thr = state.throttle;
+      } });
+      assert(info.during === true, 'isInteracting() durante el arrastre: ' + info.during);
+      assert(info.moved < 0.002, 'la cámara se movió durante el arrastre (' + info.moved.toFixed(3) + ' m)');
+      assert(Core.isInteracting() === false, 'sigue interactuando después de soltar');
+      assert(eventsSince('interactionend', t0).length >= 1, 'sin evento interactionend');
+      await wait(1400);
+      var v = Core.cockpit.views.mixture.position;
+      assert(Core.camera.position.distanceTo(v) < 0.03, 'el fly-to diferido no llegó a la mezcla (' + Core.camera.position.distanceTo(v).toFixed(3) + ' m)');
+      Core.select(null);
+    }],
+    ['v3 isInteracting: hold, teclas mantenidas y setInteracting', async function () {
+      Core.applyPreset('cruise');
+      var t0 = performance.now();
+      Core.hold('yoke', 'left', true); assert(Core.isInteracting(), 'hold volante');
+      Core.hold('yoke', 'left', false); assert(!Core.isInteracting(), 'hold volante suelto');
+      assert(eventsSince('interactionend', t0).length >= 1, 'interactionend tras el hold');
+      key('keydown', 'PageUp'); assert(Core.isInteracting(), 'PageUp mantenida');
+      key('keyup', 'PageUp'); assert(!Core.isInteracting(), 'PageUp suelta');
+      key('keydown', '+'); key('keyup', '='); assert(!Core.isInteracting(), '+ con shift soltado primero');
+      key('keydown', 'ArrowLeft'); assert(Core.isInteracting(), 'flecha');
+      key('keyup', 'ArrowLeft'); assert(!Core.isInteracting(), 'flecha suelta');
+      Core.setInteracting('pad', true); assert(Core.isInteracting(), 'setInteracting(pad)');
+      Core.setInteracting('pad', false); assert(!Core.isInteracting(), 'setInteracting(pad) off');
+      Core.applyPreset('parked');
+    }],
+    ['v3 layout "dos": mitades iguales, picking en la cabina, vuelve con setMainView/setLayout', async function () {
+      var t0 = performance.now();
+      assert(Core.setLayout('dos') === true, 'setLayout(dos)');
+      await wait(100);
+      var ev = eventsSince('layout', t0).pop(), pl = ev && ev.a;
+      assert(pl && pl.mode === 'dos' && pl.rects && pl.rects.cockpit && pl.rects.exterior, 'payload ' + JSON.stringify(pl));
+      var c = pl.rects.cockpit, x = pl.rects.exterior, W = canvas.clientWidth, H = canvas.clientHeight;
+      assert(Math.abs(c.w * c.h - x.w * x.h) <= Math.max(c.w, c.h) + 2, 'mitades de distinto tamaño ' + JSON.stringify(pl.rects));
+      assert(W >= H ? (c.h === H && x.x > c.x) : (c.w === W && x.y > c.y), 'orientación de las mitades');
+      assert(Core.getInsetRect() === null && !(pl.w > 0), 'no hay inset en "dos"');
+      Core.focusPreset('center'); await wait(1000);
+      var pc = Core.projectControl('throttle');
+      assert(pc && pc.visible && pc.x >= c.x && pc.x < c.x + c.w && pc.y >= c.y && pc.y < c.y + c.h, 'projectControl en la mitad de la cabina ' + JSON.stringify(pc));
+      var hit = Core.pickAt(pc.x, pc.y);
+      assert(hit && hit.id === 'throttle', 'pickAt en la mitad de la cabina: ' + JSON.stringify(hit));
+      assert(Core.pickAt(x.x + x.w / 2, x.y + x.h / 2) === null, 'pickAt en la mitad exterior debería ser null');
+      key('keydown', 'c'); key('keyup', 'c');
+      assert(Core.getLayout() === 'dos', 'la tecla C no sale de "dos"');
+      Core.setMainView('exterior');
+      assert(Core.getLayout() === 'afuera' && Core.getMainView() === 'exterior' && Core.getInsetRect(), 'setMainView(exterior) → afuera');
+      assert(Core.setLayout('cabina') && Core.getMainView() === 'cockpit' && Core.getLayout() === 'cabina', 'setLayout(cabina)');
+      assert(Core.getInsetRect(), 'inset de vuelta');
+    }],
+    ['v3 espejo: una pose del exterior mueve la cabina e instrumentos y se restaura al terminar', async function () {
+      try { await mirrorTest(); } finally { Core.setPaused(false); Core.clearPose(); Core.setLayout('cabina'); await wait(300); }
+    }],
+  ];
+  async function mirrorTest() {
+    {
+      Core.setLayout('dos');
+      Core.applyPreset('parked'); await wait(200);
+      var t0 = performance.now(), field = state.fieldElevation;
+      var cap = Core.poseExterior('alabeo-der');
+      assert(typeof cap === 'string' && cap.length > 5, 'poseExterior devolvió ' + cap);
+      await wait(2500);
+      var A = Core.getAnimState();
+      assert(A && A.active, 'animState.active');
+      assert(Core.isMirroring() && state.puppet.on, 'no está espejando');
+      assert(eventsSince('mirror', t0).some(function (e) { return e.a === true; }), 'evento mirror(true)');
+      assert(Math.abs(state.air.bank - A.bank) < 3 && state.air.bank > 8, 'alabeo cabina ' + state.air.bank.toFixed(1) + ' vs exterior ' + A.bank.toFixed(1));
+      assert(!state.controlLock && state.engine.running && state.air.altitude > field + 1000, 'cabina viva en vuelo');
+      assert(state.air.ias > 50 && Math.abs(state.air.turnRate - A.turnRate) < 1.5, 'ias/turn ' + state.air.ias.toFixed(0) + ' ' + state.air.turnRate.toFixed(1));
+      assert(state.gyro.aiSpin > 0.9 && state.gyro.tcPowered, 'giróscopos y coordinador');
+      Core.poseExterior('flaps-20'); await wait(4000);
+      A = Core.getAnimState();
+      assert(Math.abs(state.flaps - A.flaps) < 0.5 && state.flaps > 5, 'flaps cabina ' + state.flaps.toFixed(1) + ' vs ' + A.flaps.toFixed(1));
+      Core.setPaused(true);
+      Core.poseExterior('alabeo-izq'); await wait(5500);          // from +25° to −25°: a calm, realistic roll
+      A = Core.getAnimState();
+      assert(state.air.bank < -8 && Math.abs(state.air.bank - A.bank) < 3, 'con pausa el espejo sigue: ' + state.air.bank.toFixed(1));
+      Core.setPaused(false);
+      Core.clearPose(); await wait(1200);
+      assert(!Core.isMirroring() && !state.puppet.on, 'sigue espejando tras clearPose');
+      assert(eventsSince('mirror', t0).some(function (e) { return e.a === false; }), 'evento mirror(false)');
+      assert(state.air.onGround && state.air.altitude === field && state.controlLock && !state.engine.running && state.flaps === 0,
+        'no se restauró el estado (alt ' + state.air.altitude + ', traba ' + state.controlLock + ')');
+    }
+  }
+  TESTS.push(
     ['resize: el inset se recalcula (ResizeObserver)', async function () {
       var t0 = performance.now();
       view.style.flex = '0 0 600px'; await wait(600);
@@ -548,7 +649,7 @@
       e = expectedInset(); r = Core.getInsetRect();
       assert(r.w === e.w, 'inset tras restaurar ' + r.w + ' vs ' + e.w);
     }]
-  ];
+  );
 
   async function runTests() {
     var out = $('tests'); out.textContent = '';

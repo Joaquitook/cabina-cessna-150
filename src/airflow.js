@@ -33,8 +33,18 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
  *    The wingtip vortex swirl is drawn ×1.6 and the slipstream swirl is exaggerated so both are easy to see.
  *  - Visual time: air at V knots moves at ext.visWindSpeed(V) m/s in the scene (≈ 4.2 m/s at 80 kt) × slowmo, so the
  *    eye can follow it; the colours use the TRUE speed ratio |v|/V∞ (blue slow, cyan-white free stream, amber fast).
- *  - Streaks: one instanced quad per trail segment, screen-space width, additive glow on the dark tunnel backdrop
- *    ('tunel'), darker saturated colours with normal blending on light backdrops. Trail samples are taken at a fixed
+ *  - Look (contract v3 polish): the STRUCTURE is drawn by continuous streamlines (CPU-traced through the field, re-traced
+ *    a few per frame when the flow changes) with bright comet pulses travelling at the LOCAL speed — chord-wise smoke
+ *    rakes at a flap station and an aileron station of each wing (upwash ahead, fast amber air over the top, slow blue
+ *    air under it, the downwash behind bending much more with flaps), lines through the wingtips, the tail and the fin,
+ *    propeller slipstream spirals (orange, faster with throttle) and two analytic strands per tip vortex (violet
+ *    helices). Free particles are only a quiet dust next to them, plus the slipstream sparks, the helix sparks and the
+ *    red separation eddies over the stalled wing. Colour = true speed ratio |v|/V∞: deep blue < 0.92 < pale cyan (free
+ *    stream) < amber from ≈ 1.1 < orange beyond 1.25. Far-side wing lines are dimmed. Every line and streak has a dark
+ *    halo pass under it (same geometry, wider, normal blending) so it stays readable over the white airplane, the
+ *    blue sky and the fields: on the dark tunnel the core glows additively; on light backdrops ('cielo', 'estudio') the
+ *    same bright colours are drawn with normal blending over a lighter outline.
+ *  - Streaks: one instanced quad per trail segment, screen-space width. Trail samples are taken at a fixed
  *    visual interval (all particles on the same tick, slot-major ring buffer → one contiguous upload per tick).
  *  - Force arrows: length ∝ √kgf (so drag and thrust stay visible next to lift and weight; the labels give the true
  *    numbers). With aileron the two half-wing lift arrows appear and their difference is drawn ×2.5.
@@ -484,16 +494,16 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   /* ================================================================ particles: emitters */
   // n = [alta, media, baja]; kind 0 = air, 1 = slipstream, 2 = stall eddy, 3 = wingtip vortex helix
   var EMITTERS = [
-    { id: 'wing', region: REG.wing, kind: 0, n: [40, 24, 12] },
-    { id: 'flaps', region: REG.flaps, kind: 0, n: [34, 20, 10] },
-    { id: 'ailerons', region: REG.ailerons, kind: 0, n: [30, 18, 8] },
-    { id: 'wingtips', region: REG.wingtips, kind: 0, n: [56, 32, 14] },
-    { id: 'tail', region: REG.tail, kind: 0, n: [22, 12, 6] },
-    { id: 'rudder', region: REG.rudder, kind: 0, n: [18, 10, 6] },
-    { id: 'body', region: REG.body, kind: 0, n: [16, 8, 0] },
-    { id: 'prop', region: REG.prop, kind: 1, n: [110, 64, 30] },
-    { id: 'stall', region: REG.stall, kind: 2, n: [96, 54, 26] },
-    { id: 'helix', region: REG.wingtips, kind: 3, n: [56, 32, 16] }
+    { id: 'wing', region: REG.wing, kind: 0, n: [10, 6, 0] },
+    { id: 'flaps', region: REG.flaps, kind: 0, n: [10, 6, 2] },
+    { id: 'ailerons', region: REG.ailerons, kind: 0, n: [8, 5, 2] },
+    { id: 'wingtips', region: REG.wingtips, kind: 0, n: [18, 10, 4] },
+    { id: 'tail', region: REG.tail, kind: 0, n: [6, 4, 0] },
+    { id: 'rudder', region: REG.rudder, kind: 0, n: [6, 4, 0] },
+    { id: 'body', region: REG.body, kind: 0, n: [0, 0, 0] },
+    { id: 'prop', region: REG.prop, kind: 1, n: [96, 56, 26] },
+    { id: 'stall', region: REG.stall, kind: 2, n: [110, 60, 28] },
+    { id: 'helix', region: REG.wingtips, kind: 3, n: [26, 16, 8] }
   ];
   var LEVEL = { alta: 0, media: 1, baja: 2 };
   var Z0 = -6.4, Z_END = 8.6;
@@ -509,10 +519,10 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     'uniform vec3 uProp; uniform vec3 uHeat; uniform vec3 uTip; uniform vec3 uSmoke;',
     'varying vec4 vCol; varying float vSide;',
     'vec3 ramp(float s) {',
-    '  if (s < 0.9) return mix(uC0, uC1, smoothstep(0.55, 0.9, s));',
-    '  if (s < 1.02) return mix(uC1, uC2, smoothstep(0.9, 1.02, s));',
-    '  if (s < 1.18) return mix(uC2, uC3, smoothstep(1.02, 1.18, s));',
-    '  return mix(uC3, uC4, smoothstep(1.18, 1.45, s));',
+    '  if (s < 0.92) return mix(uC0, uC1, smoothstep(0.7, 0.92, s));',
+    '  if (s < 1.0) return mix(uC1, uC2, smoothstep(0.92, 1.0, s));',
+    '  if (s < 1.12) return mix(uC2, uC3, smoothstep(1.02, 1.12, s));',
+    '  return mix(uC3, uC4, smoothstep(1.14, 1.3, s));',
     '}',
     'void main() {',
     '  float e = position.x; float side = position.y;',
@@ -538,7 +548,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     '  gl_Position = c;',
     '  float spd = mix(dA.y, dB.y, e); float heat = mix(dA.z, dB.z, e);',
     '  vec3 col; float a = 1.0;',
-    '  if (kind < 0.5) col = ramp(spd);',
+    '  if (kind < 0.5) { col = ramp(spd); a = 0.6; }',
     '  else if (kind < 1.5) { col = mix(ramp(spd), uProp, 0.8); a = 1.15; }',
     '  else if (kind < 2.5) col = uHeat;',
     '  else if (kind < 3.5) { col = uTip; a = clamp(spd, 0.0, 1.0); }',
@@ -562,7 +572,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     '  vec3 col = vCol.rgb * (1.0 + 0.15 * (1.0 - uLight)) + vec3(hot * 0.22);',
     '  gl_FragColor = vec4(col, vCol.a * glow);',
     '#ifdef HALO',
-    '  gl_FragColor = vec4(0.01, 0.025, 0.06, min(1.0, vCol.a) * (1.0 - smoothstep(0.2, 1.0, d)) * 0.42);',
+    '  gl_FragColor = vec4(0.008, 0.02, 0.05, min(1.0, vCol.a) * (1.0 - smoothstep(0.25, 1.0, d)) * (0.42 + 0.2 * uLight));',
     '#endif',
     '  #include <encodings_fragment>',
     '}'
@@ -571,14 +581,14 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   // travel time from the seed: the pulses bunch where the air is slow and stretch where it is fast)
   var LINE_VS = [
     'attribute vec3 pA; attribute vec3 pB; attribute vec3 dA; attribute vec3 dB; attribute vec3 meta;',
-    'uniform float uWidth; uniform vec2 uView; uniform float uGlobal; uniform vec4 uFade; uniform float uTime; uniform float uPeriod;',
-    'uniform vec3 uC0; uniform vec3 uC1; uniform vec3 uC2; uniform vec3 uC3; uniform vec3 uC4; uniform vec3 uProp; uniform vec3 uHeat;',
+    'uniform float uWidth; uniform vec2 uView; uniform float uGlobal; uniform vec4 uFade; uniform float uTime; uniform float uPeriod; uniform float uLight;',
+    'uniform vec3 uC0; uniform vec3 uC1; uniform vec3 uC2; uniform vec3 uC3; uniform vec3 uC4; uniform vec3 uProp; uniform vec3 uHeat; uniform vec3 uTip;',
     'varying vec4 vCol; varying float vSide; varying float vTau; varying float vPh;',
     'vec3 ramp(float s) {',
-    '  if (s < 0.9) return mix(uC0, uC1, smoothstep(0.55, 0.9, s));',
-    '  if (s < 1.02) return mix(uC1, uC2, smoothstep(0.9, 1.02, s));',
-    '  if (s < 1.18) return mix(uC2, uC3, smoothstep(1.02, 1.18, s));',
-    '  return mix(uC3, uC4, smoothstep(1.18, 1.45, s));',
+    '  if (s < 0.92) return mix(uC0, uC1, smoothstep(0.7, 0.92, s));',
+    '  if (s < 1.0) return mix(uC1, uC2, smoothstep(0.92, 1.0, s));',
+    '  if (s < 1.12) return mix(uC2, uC3, smoothstep(1.02, 1.12, s));',
+    '  return mix(uC3, uC4, smoothstep(1.14, 1.3, s));',
     '}',
     'void main() {',
     '  float e = position.x; float side = position.y;',
@@ -590,19 +600,20 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     '  float emph = meta.y;',
     '  float tv = mix(dA.x, dB.x, e); float phv = fract((uTime - tv) / uPeriod + meta.z);',
     '  float pv = exp(-phv * 5.0);',
-    '  float w = uWidth * (emph > 1.05 ? 1.3 : (emph < 0.5 ? 0.7 : 1.0)) * (meta.x > 0.5 ? 1.1 : 1.0) * (0.5 + 1.3 * pv);',
+    '  float w = uWidth * (emph > 1.05 ? 1.3 : (emph < 0.5 ? 0.75 : 1.0)) * (meta.x > 0.5 ? 1.1 : 1.0) * (0.8 + 1.15 * pv);',
     '#ifdef HALO',
-    '  w = w * 2.2 + 2.0;',
+    '  w = w * (2.0 - 0.4 * uLight) + 2.5 - uLight;',
     '#endif',
     '  vec4 c = e < 0.5 ? ca : cb;',
     '  c.xy += (nrm * side * w * 0.5 + dir * (e < 0.5 ? -0.5 : 0.5) * w * 0.5) / (uView * 0.5) * c.w;',
     '  gl_Position = c;',
     '  float spd = mix(dA.y, dB.y, e); float heat = mix(dA.z, dB.z, e);',
-    '  vec3 col = meta.x > 0.5 ? mix(ramp(spd), uProp, 0.78) : ramp(spd);',
+    '  vec3 col = meta.x > 2.5 ? uTip : (meta.x > 0.5 ? mix(ramp(spd), uProp, 0.78) : ramp(spd));',
     '  col = mix(col, uHeat, clamp(heat, 0.0, 1.0));',
     '  vec3 pw = e < 0.5 ? pA : pB;',
     '  float fz = smoothstep(uFade.x, uFade.y, pw.z) * (1.0 - smoothstep(uFade.z, uFade.w, pw.z));',
-    '  if (meta.x > 0.5) fz = 1.0 - smoothstep(uFade.z, uFade.w, pw.z);',
+    '  if (meta.x > 0.5) fz = 1.0 - smoothstep(4.2, 6.6, pw.z);',
+    '  if (meta.x > 2.5) fz = (1.0 - smoothstep(uFade.z, uFade.w, pw.z)) * clamp(spd, 0.0, 1.0);',
     '  vCol = vec4(col, fz * emph * uGlobal); vSide = side; vTau = mix(dA.x, dB.x, e); vPh = meta.z;',
     '}'
   ].join('\n');
@@ -614,18 +625,18 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     '  float pulse = exp(-ph * 5.0) * smoothstep(0.0, 0.025, ph) * uPulse;',
     '  float d = abs(vSide);',
     '  float glow = uLight > 0.5 ? 1.0 - smoothstep(0.5, 1.0, d) : (1.0 - smoothstep(0.0, 1.0, d)) * (1.0 - smoothstep(0.0, 1.0, d));',
-    '  float hot = pow(max(0.0, 1.0 - d * 1.8), 3.0) * pulse * (1.0 - uLight);',
-    '  vec3 col = vCol.rgb * (0.7 + 0.8 * pulse) + vec3(hot * 0.6);',
+    '  float hot = pow(max(0.0, 1.0 - d * 1.8), 3.0) * pulse;',
+    '  vec3 col = vCol.rgb * (0.75 + 0.75 * pulse) + vec3(hot * (0.6 - 0.35 * uLight));',
     '  gl_FragColor = vec4(col, vCol.a * glow * (uBase + (1.0 - uBase) * pulse));',
     '#ifdef HALO',
-    '  gl_FragColor = vec4(0.01, 0.025, 0.06, min(1.0, vCol.a) * (1.0 - smoothstep(0.2, 1.0, d)) * (0.2 + 0.4 * pulse));',
+    '  gl_FragColor = vec4(0.008, 0.02, 0.05, min(1.0, vCol.a) * (1.0 - smoothstep(0.25, 1.0, d)) * (0.75 * uBase + 0.45 * pulse) * (0.75 - 0.2 * uLight));',
     '#endif',
     '  #include <encodings_fragment>',
     '}'
   ].join('\n');
   var PALETTE = {
     dark: { c0: 0x3341ff, c1: 0x2c86ff, c2: 0x38c6ff, c3: 0xffb43a, c4: 0xff5f24, prop: 0xff8a26, heat: 0xff3b2f, tip: 0xb48cff, smoke: 0xe6eeff },
-    light: { c0: 0x1230b0, c1: 0x1a66d6, c2: 0x0b8db0, c3: 0xd98200, c4: 0xd4470b, prop: 0xe0650f, heat: 0xd7261e, tip: 0x6c3fd2, smoke: 0xffffff }
+    light: { c0: 0x3352ff, c1: 0x2f96ff, c2: 0x9be9ff, c3: 0xffb02e, c4: 0xff5a1e, prop: 0xff8a26, heat: 0xff3b2f, tip: 0xcaa6ff, smoke: 0xffffff }
   };
   // pressure tint on the wing skins: upper = blue (baja presión), lower = red (alta presión)
   var TINT_VS = [
@@ -766,7 +777,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       streakMat.blending = light ? THREE.NormalBlending : THREE.AdditiveBlending;
       trailMat.blending = streakMat.blending;
       lineMat.blending = streakMat.blending;
-      haloMeshes.forEach(function (m) { m.userData.allowed = !light; });
+      haloMeshes.forEach(function (m) { m.userData.allowed = true; });
+      lineUniforms.uBase.value = light ? 0.44 : 0.34;
       tintMat.uniforms.uLow.value.setHex(light ? 0x1f63e8 : 0x2f86ff);
       tintMat.uniforms.uHigh.value.setHex(light ? 0xe0332a : 0xff4a3a);
       arrowSet.forEach(function (a) { a.userData.glow.visible = !light; a.userData.outline.visible = light; });
@@ -1010,18 +1022,16 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     var SEEDS = [];
     (function buildSeeds() {
       // left and right planes use interleaved heights, so a side view shows distinct lines instead of doubled ones
-      var DYS = { '-1': [-0.66, -0.27, -0.03, 0.17, 0.46, 0.95], '1': [-0.44, -0.12, 0.08, 0.3, 0.68, 1.3] };
-      [1.55, 3.4].forEach(function (ax, ia) {
+      var DYS = [-0.8, -0.46, -0.24, -0.1, 0.03, 0.15, 0.3, 0.52, 0.86], LVS = [2, 1, 0, 0, 0, 0, 0, 1, 2];
+      [1.7, 3.6].forEach(function (ax) {
         [-1, 1].forEach(function (sx) {
-          DYS[String(sx)].forEach(function (dy, j) {
-            SEEDS.push({ x: sx * ax, y: dy, ref: 'wing', reg: ax < BREAK ? REG.flaps : REG.ailerons, kind: 0, lv: (j + ia) % 3 === 2 ? 1 : 0 });
+          DYS.forEach(function (dy, j) {
+            SEEDS.push({ x: sx * ax, y: dy, ref: 'wing', reg: ax < BREAK ? REG.flaps : REG.ailerons, kind: 0, lv: LVS[j] });
           });
         });
       });
-      [4.86, 5.36].forEach(function (ax, ia) {
-        [-1, 1].forEach(function (sx) {
-          [-0.22, -0.07, 0.09].forEach(function (dy, j) { SEEDS.push({ x: sx * ax, y: dy, ref: 'tip', reg: REG.wingtips, kind: 0, lv: (ia + j) % 2 ? 1 : 0 }); });
-        });
+      [-1, 1].forEach(function (sx) {
+        [-0.2, -0.05, 0.1].forEach(function (dy, j) { SEEDS.push({ x: sx * (WB - 0.12), y: dy, ref: 'tip', reg: REG.wingtips, kind: 0, lv: j === 1 ? 0 : 1 }); });
       });
       [0.75, 1.3].forEach(function (ax, ia) {
         [-1, 1].forEach(function (sx) {
@@ -1031,24 +1041,24 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       [-0.22, 0.22].forEach(function (x, ia) {
         [0.7, 1.12].forEach(function (y, j) { SEEDS.push({ x: x, y: y + ia * 0.12, ref: 'fin', reg: REG.rudder, kind: 0, lv: (ia + j) % 2 ? 1 : 0 }); });
       });
-      for (var a = 0; a < 6; a++) {
+      [-1, 1].forEach(function (sx) {
+        [0, Math.PI].forEach(function (ph0, j) { SEEDS.push({ x: sx, y: ph0, ref: 'helix', reg: REG.wingtips, kind: 3, lv: j }); });
+      });
+      for (var a = 0; a < 4; a++) {
         [0.5, 0.86].forEach(function (rr, j) {
-          var an = a / 6 * Math.PI * 2 + j * 0.5;
+          var an = a / 4 * Math.PI * 2 + j * 0.8;
           SEEDS.push({ x: Math.cos(an) * rr, y: Math.sin(an) * rr, ref: 'prop', reg: REG.prop, kind: 1, lv: (a + j) % 2 ? 1 : 0 });
         });
       }
-      [[-6.4, -1.0], [6.4, 1.6], [0, 2.5], [0, -1.8]].forEach(function (p, j) {
-        SEEDS.push({ x: p[0], y: p[1], ref: 'free', reg: REG.body, kind: 0, lv: j % 2 ? 2 : 1 });
-      });
     })();
-    var NL = SEEDS.length, LK = 84;
+    var NL = SEEDS.length, LK = 110;
     var lineGeo = quadGeometry(NL * (LK - 1));
     var lineArr = lineGeo.userData.ib.array;
     for (var li0 = 0; li0 < lineArr.length; li0 += STRIDE) lineArr[li0 + 12] = -1;
     var lineUniforms = {
-      uTime: { value: 0 }, uPeriod: { value: 0.85 }, uBase: { value: 0.11 }, uPulse: { value: 1 },
+      uTime: { value: 0 }, uPeriod: { value: 0.85 }, uBase: { value: 0.34 }, uPulse: { value: 1 },
       uWidth: uniforms.uWidth, uView: uniforms.uView, uGlobal: { value: 0 }, uFade: uniforms.uFade, uLight: uniforms.uLight,
-      uC0: uniforms.uC0, uC1: uniforms.uC1, uC2: uniforms.uC2, uC3: uniforms.uC3, uC4: uniforms.uC4, uProp: uniforms.uProp, uHeat: uniforms.uHeat
+      uC0: uniforms.uC0, uC1: uniforms.uC1, uC2: uniforms.uC2, uC3: uniforms.uC3, uC4: uniforms.uC4, uProp: uniforms.uProp, uHeat: uniforms.uHeat, uTip: uniforms.uTip
     };
     var lineMat = new THREE.ShaderMaterial({ uniforms: lineUniforms, vertexShader: LINE_VS, fragmentShader: LINE_FS,
       transparent: true, depthWrite: false, depthTest: true, blending: THREE.AdditiveBlending });
@@ -1085,7 +1095,32 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       out[0] = x - ux * d * 0.6; out[1] = y - uy * d; out[2] = Z0;
       return out;
     }
+    /**
+     * Tip vortex strand: the path of the air leaving the wingtip as it winds around the vortex core (same twist as the
+     * helix particles: the pulses travel along it at the visual speed, so the spiral seems to turn and drift back).
+     */
+    function traceHelix(li) {
+      var sd = SEEDS[li], base = li * (LK - 1), side = sd.x, gt = side < 0 ? field.gOutL : field.gOutR;
+      var str = clamp(Math.abs(gt) / 0.22, 0, 1), dir = gt >= 0 ? 1 : -1, adv = Math.max(0.2, visK * field.U0 * 0.95);
+      var twist = (4.2 + 7 * str) / adv, W = field.dW, L = 8.5, emph = lineEmph(li), rnd = lineRnd[li];
+      var dwn = 0.03 * Math.max(0, field.downwash * 3);
+      var px = 0, py = 0, pz = 0, pt = 0, ps = 0;
+      for (var j = 0; j < LK; j++) {
+        var d = L * j / (LK - 1), rad = 0.05 + 0.3 * (1 - Math.exp(-d / 1.7)), ph = sd.y + side * dir * twist * d;
+        var x = side * (WB - 0.06) - side * 0.085 * d + W[0] * d + Math.cos(ph) * rad;
+        var y = wingY(WB) - 0.02 + W[1] * d - dwn * d + Math.sin(ph) * rad;
+        var z = wingLE(WB) + 0.35 + W[2] * d, tau = d / adv, sp = str * smooth(0, 0.6, d);
+        if (j > 0) {
+          var o = (base + j - 1) * STRIDE;
+          lineArr[o] = px; lineArr[o + 1] = py; lineArr[o + 2] = pz; lineArr[o + 3] = x; lineArr[o + 4] = y; lineArr[o + 5] = z;
+          lineArr[o + 6] = pt; lineArr[o + 7] = ps; lineArr[o + 8] = 0; lineArr[o + 9] = tau; lineArr[o + 10] = sp; lineArr[o + 11] = 0;
+          lineArr[o + 12] = 3; lineArr[o + 13] = emph; lineArr[o + 14] = rnd;
+        }
+        px = x; py = y; pz = z; pt = tau; ps = sp;
+      }
+    }
     function traceLine(li) {
+      if (SEEDS[li].ref === 'helix') { traceHelix(li); return; }
       var sd = SEEDS[li], base = li * (LK - 1);
       var p = lineStart(sd, _lp), tau = 0, n = 0, inv = 1 / Math.max(field.U0, 0.75 * field.w, 1e-3);
       var px = p[0], py = p[1], pz = p[2], prevX = 0, prevY = 0, prevZ = 0, prevT = 0, prevS = 0, prevH = 0;
@@ -1106,7 +1141,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         if (pz > Z_END || sp < 1e-3 || Math.abs(px) > 12 || py < -5 || py > 7) break;
         prevX = px; prevY = py; prevZ = pz; prevT = tau; prevS = spd; prevH = heat;
         var near = Math.abs(px) < 6.2 && pz > -2.6 && pz < 6.2 && py > -1.6 && py < 2.4;
-        var ds = near ? 0.15 : 0.34, h = ds / sp;
+        var ds = near ? (kind === 1 ? 0.09 : 0.13) : 0.34, h = ds / sp;
         field.velocity(px + _lv[0] * h * 0.5, py + _lv[1] * h * 0.5, pz + _lv[2] * h * 0.5, _lm);
         _lq[0] = px; _lq[1] = py; _lq[2] = pz;
         _lp[0] = px + _lm[0] * h; _lp[1] = py + _lm[1] * h; _lp[2] = pz + _lm[2] * h;
@@ -1124,12 +1159,14 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     function lineEmph(li) {
       var set = focusName ? FOCUS[focusName] : null, sd = SEEDS[li];
       if (set) return set.indexOf(sd.reg) >= 0 ? 1.25 : 0.14;
+      if (sd.ref === 'helix') return sd.x * camSide < 0 ? 0.6 : 1;
       return (sd.ref === 'wing' || sd.ref === 'tip') && sd.x * camSide < 0 ? 0.42 : 1;
     }
     function lineWanted(li) {
       var sd = SEEDS[li];
       if (!field.active || sd.lv > (2 - level)) return false;
       if (sd.kind === 1) return settings.propwash && field.w > 0.04;
+      if (sd.kind === 3) return settings.vortices && field.U0 > 0.15;
       return settings.streamlines && field.U0 > 0.15;
     }
     var _cs = new V3();
@@ -1151,7 +1188,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       for (var i = 0; i < 18; i++) if (Math.abs(sigNow[i] - lastSig[i]) > 2e-4 * (1 + Math.abs(lastSig[i]))) { changed = true; break; }
       if (changed) { lastSig.set(sigNow); for (var a = 0; a < NL; a++) lineDirty[a] = 1; }
       var stallLive = f.stall > 0.04;
-      var budget = [34, 22, 12][level], done = 0, any = false;
+      var budget = [24, 16, 10][level], done = 0, any = false;
       for (var c = 0; c < NL && done < budget; c++) {
         var li = (lineCursor + c) % NL, want = lineWanted(li);
         if (!want) { if (lineOn[li]) { hideLine(li); lineOn[li] = 0; any = true; } lineDirty[li] = 0; continue; }
@@ -1581,7 +1618,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       updateLines();
       lineUniforms.uTime.value = vclock % (lineUniforms.uPeriod.value * 1000);
       lineUniforms.uGlobal.value = globalA * (field.active ? 1 : 0);
-      lineMesh.visible = settings.streamlines || settings.propwash;
+      lineMesh.visible = settings.streamlines || settings.propwash || settings.vortices;
       haloMeshes[0].visible = haloMeshes[1].visible = histMesh.visible && haloMeshes[0].userData.allowed !== false;
       haloMeshes[2].visible = lineMesh.visible && haloMeshes[2].userData.allowed !== false;
 

@@ -994,6 +994,284 @@ test('airfoil model: NACA 2412-like section, Kutta lift, flaps, streamlines neve
   });
 });
 
+/* ================================================================== puppet mode (contract v3) */
+function puppetOn(s, o) {
+  var p = s.puppet;
+  p.on = true; p.bank = 0; p.pitch = 0; p.yaw = 0; p.ias = 0; p.vs = 0; p.turnRate = null; p.slip = null; p.onGround = null;
+  for (var k in o) p[k] = o[k];
+}
+test('puppet: bank/pitch/ias/vs follow the targets, heading turns coordinated, every instrument agrees', function () {
+  var s = Sim.createState('cruise');
+  var h0 = s.air.heading, alt0 = s.air.altitude, p0 = { x: s.pos.x, z: s.pos.z };
+  puppetOn(s, { bank: 30, pitch: 4, ias: 80, vs: 500, onGround: false });
+  run(s, 0.35);
+  assert.ok(s.air.bank > 12 && s.air.bank < 28, 'bank eases toward 30 (tau 0.35 s): ' + s.air.bank.toFixed(1));
+  run(s, 4);
+  inRange(s.air.bank, 29.5, 30.5, 'bank');
+  inRange(s.air.pitch, 3.5, 4.5, 'pitch');
+  inRange(s.air.ias, 79, 81, 'ias');
+  inRange(s.air.vs, 480, 520, 'vs (VSI)');
+  assert.ok(s.air.altitude > alt0 + 20, 'altitude integrates the vs: ' + (s.air.altitude - alt0).toFixed(0) + ' ft');
+  // coordinated 30 deg turn at 80 KIAS (TAS ~ 85 kt = 43.7 m/s): g*tan(30)/V = 7.4 deg/s, right turn -> heading increases
+  inRange(s.air.turnRate, 6.8, 8.0, 'turn rate');
+  assert.ok(wrap180(s.air.heading - h0) > 10, 'heading increases in a right bank');
+  inRange(Math.abs(s.air.slip), 0, 0.15, 'ball centred (coordinated, no rudder)');
+  inRange(s.air.gLoad, 1.1, 1.2, 'load factor 1/cos(30)');
+  inRange(s.air.aoa, 0, 12, 'aoa consistent with pitch - path');
+  assert.ok(!s.air.stallWarning && !s.air.stalled, 'no stall horn at 80 kt');
+  assert.ok(Math.abs(wrap180(s.air.hiHeading - s.air.heading)) < 2, 'heading indicator follows');
+  inRange(s.air.indicatedAlt - s.air.altitude, -1, 1, 'altimeter reads the altitude (29.92)');
+  assert.ok(Math.hypot(s.pos.x - p0.x, s.pos.z - p0.z) > 100, 'position moves with the ground speed');
+  assert.ok(s.engine.running && s.engine.rpm > 2000, 'engine keeps running from the normal inputs');
+  aeroFinite(s.aero, 'puppet aero');
+  // yaw offset and rudder: heading swings, ball goes opposite to the rudder, turn needle moves
+  puppetOn(s, { bank: 0, pitch: 2, ias: 90, onGround: false });
+  run(s, 3);
+  var hb = s.air.heading;
+  s.rudder = 0.8; s.puppet.yaw = 15;
+  run(s, 0.3);
+  assert.ok(s.air.turnRate > 3, 'turn coordinator shows the yaw rate: ' + s.air.turnRate.toFixed(1));
+  run(s, 3);
+  inRange(wrap180(s.air.heading - hb), 13, 17, 'yaw offset turns the nose right');
+  assert.ok(s.air.slip < -0.4, 'right rudder with no bank: the ball goes left (' + s.air.slip.toFixed(2) + ')');
+  // stall demo: high pitch, low speed, sinking -> horn and stalled
+  s.rudder = 0;
+  puppetOn(s, { bank: 0, pitch: 12, ias: 45, vs: -500, onGround: false });
+  run(s, 3);
+  assert.ok(s.air.stallWarning && s.air.stalled && s.aero.stallBlend > 0.6, 'stall horn and stall in the stall demo');
+  // the events are muted during the demonstration
+  var nEv = s.events.length;
+  run(s, 2);
+  assert.strictEqual(s.events.length, nEv, 'no sim events in puppet mode');
+});
+
+test('puppet: on the ground (taxi turn), leaving it continues with the normal flight model', function () {
+  var s = Sim.createState('parked');
+  Sim.actions.setEngine(s, true);
+  s.controlLock = false; s.parkingBrake = false;
+  var h0 = s.air.heading;
+  puppetOn(s, { ias: 8, turnRate: -10, onGround: true, bank: 20 });
+  run(s, 3);
+  assert.ok(s.air.onGround && Math.abs(s.air.bank) < 0.5, 'no bank on the ground');
+  assert.ok(wrap180(s.air.heading - h0) < -20, 'turns left at the given turn rate');
+  assert.ok(s.air.slip > 0.05, 'left turn on the ground: the ball swings to the right (outside)');
+  inRange(s.air.altitude, s.fieldElevation, s.fieldElevation, 'stays on the ground');
+  inRange(s.air.vs, 0, 0, 'vs 0 on the ground');
+  assert.ok(s.engine.running, 'setEngine(true) runs the engine');
+  Sim.actions.setEngine(s, false);
+  run(s, 3);
+  assert.ok(!s.engine.running && s.mixture === 0 && s.ignition === 'OFF', 'setEngine(false): cut-off, mags off');
+  // flight puppet, then release: the normal model takes over smoothly
+  var c = Sim.createState('cruise');
+  puppetOn(c, { bank: 20, pitch: 1, ias: 86, vs: 0, onGround: false });
+  run(c, 4);
+  c.puppet.on = false;
+  var b0 = c.air.bank, a0 = c.air.altitude;
+  run(c, 0.5);
+  inRange(c.air.bank, b0 - 3, b0 + 3, 'bank does not jump when the puppet lets go');
+  inRange(c.air.altitude, a0 - 15, a0 + 15, 'altitude does not jump');
+  run(c, 20);
+  assert.ok(isFinite(c.air.altitude) && isFinite(c.air.ias) && c.air.ias > 50, 'flies on normally');
+  // applyPreset turns it off
+  puppetOn(c, { bank: 10 });
+  Sim.applyPreset(c, 'cruise');
+  assert.strictEqual(c.puppet.on, false, 'applyPreset resets the puppet');
+});
+
+test('puppet wins over the wind tunnel; no NaN with garbage targets', function () {
+  var s = Sim.createState('cruise');
+  Sim.applyPreset(s, 'tunnel');
+  puppetOn(s, { bank: 25, pitch: 5, ias: 85, vs: 300, onGround: false });
+  run(s, 3);
+  inRange(s.air.bank, 24, 26, 'bank in puppet mode even with the tunnel on');
+  inRange(s.air.vs, 280, 320, 'vs');
+  puppetOn(s, { bank: NaN, pitch: Infinity, ias: -5, vs: 'x', yaw: 1e9, turnRate: NaN, slip: 7, onGround: 'maybe' });
+  run(s, 2);
+  ['bank', 'pitch', 'ias', 'vs', 'heading', 'altitude', 'turnRate', 'slip'].forEach(function (k) {
+    assert.ok(isFinite(s.air[k]), 'air.' + k + ' finite');
+  });
+  aeroFinite(s.aero, 'puppet garbage');
+});
+
+/* ================================================================== failures (contract v3, situations) */
+test('failures: all false after every preset; fail() validates the name', function () {
+  var s = Sim.createState('cruise');
+  Object.keys(s.failures).forEach(function (k) { assert.strictEqual(s.failures[k], false, k); });
+  assert.strictEqual(Object.keys(s.failures).length, 10, '10 failures');
+  assert.strictEqual(Sim.actions.fail(s, 'nope', true), null, 'unknown failure');
+  assert.strictEqual(Sim.actions.fail(s, 'vacuum', true), true);
+  Sim.applyPreset(s, 'approach');
+  assert.strictEqual(s.failures.vacuum, false, 'applyPreset clears the failures');
+});
+
+test('failure engine: quits, windmills, oil pressure 0, no restart until cleared', function () {
+  var s = Sim.createState('cruise');
+  Sim.actions.fail(s, 'engine', true);
+  assert.ok(!s.engine.running, 'engine stopped at once');
+  assert.ok(hasEvent(s, /motor se par/i), 'event');
+  run(s, 8);
+  assert.ok(s.engine.rpm > 300 && s.engine.rpm < 900, 'propeller windmills (' + s.engine.rpm.toFixed(0) + ' rpm)');
+  inRange(s.engine.oilPressPsi, 0, 1, 'oil pressure');
+  assert.ok(!s.engine.running, 'does not restart while windmilling');
+  assert.ok(s.air.vs < -200, 'the airplane comes down without power');
+  Sim.actions.setIgnition(s, 'START');
+  run(s, 3);
+  assert.ok(!s.engine.running, 'the starter does not restart it either');
+  Sim.actions.setIgnition(s, 'BOTH');
+  Sim.actions.fail(s, 'engine', false);
+  s._sim.V = Math.max(s._sim.V, 70 * KT);
+  run(s, 4);
+  assert.ok(s.engine.running, 'cleared: the windmilling propeller restarts it');
+});
+
+test('failure engineRough: RPM sags and wobbles, roughness', function () {
+  var s = Sim.createState('cruise');
+  run(s, 3);
+  var r0 = s.engine.rpm;
+  Sim.actions.fail(s, 'engineRough', true);
+  var lo = 1e9, hi = 0;
+  run(s, 6, function (st, t) { if (t > 2) { lo = Math.min(lo, st.engine.rpm); hi = Math.max(hi, st.engine.rpm); } });
+  assert.ok(s.engine.roughness >= 0.45, 'roughness ' + s.engine.roughness.toFixed(2));
+  assert.ok(r0 - (lo + hi) / 2 > 80, 'RPM sags (' + r0.toFixed(0) + ' -> ' + ((lo + hi) / 2).toFixed(0) + ')');
+  assert.ok(hi - lo > 40, 'RPM wobbles (' + (hi - lo).toFixed(0) + ' rpm)');
+  assert.ok(hasEvent(s, /spero/), 'event');
+});
+
+test('failure alternator: discharge on the ammeter, battery drains, events', function () {
+  var s = Sim.createState('cruise');
+  run(s, 2);
+  assert.ok(s.elec.ammeterAmps >= 0, 'charging before');
+  Sim.actions.fail(s, 'alternator', true);
+  run(s, 5);
+  assert.ok(s.elec.ammeterAmps < -5, 'ammeter shows a discharge (' + s.elec.ammeterAmps.toFixed(1) + ' A)');
+  assert.ok(s.elec.busVolts < 12.6, 'bus on the battery (' + s.elec.busVolts.toFixed(2) + ' V)');
+  assert.ok(hasEvent(s, /marca descarga/), 'discharge event');
+  var b0 = s.elec.batteryPct;
+  run(s, 60);
+  assert.ok(s.elec.batteryPct < b0 - 3, 'battery drains (' + b0.toFixed(1) + ' -> ' + s.elec.batteryPct.toFixed(1) + ' %)');
+  s.elec.batteryPct = 14;
+  run(s, 2);
+  assert.ok(hasEvent(s, /Voltaje bajo/), 'low-voltage event');
+  assert.ok(s.engine.running, 'the engine keeps running (magnetos)');
+});
+
+test('failure vacuum: suction 0, gyros spin down, AI/HI stop telling the truth, TC still works', function () {
+  var s = Sim.createState('cruise');
+  Sim.actions.fail(s, 'vacuum', true);
+  run(s, 6);
+  assert.ok(s.vacuum.suctionInHg < 0.3, 'suction ' + s.vacuum.suctionInHg.toFixed(2));
+  assert.ok(hasEvent(s, /cayó a cero/), 'event');
+  run(s, 40);
+  assert.ok(s.gyro.aiSpin < 0.4 && s.gyro.hiSpin < 0.4, 'gyros spun down (' + s.gyro.aiSpin.toFixed(2) + ')');
+  // turn: the heading indicator is frozen/lying, the turn coordinator still shows the turn
+  var hi0 = s.air.hiHeading, h0 = s.air.heading;
+  run(s, 10, function (st) { st.yokeRoll = Math.abs(st.air.bank) < 20 ? 0.3 : 0; });
+  assert.ok(Math.abs(wrap180(s.air.heading - h0)) > 15, 'the airplane turned');
+  assert.ok(Math.abs(wrap180(s.air.hiHeading - hi0)) < 2, 'the heading indicator did not follow');
+  assert.ok(s.gyro.tcPowered && Math.abs(s.air.turnRate) > 1, 'turn coordinator (electric) shows the turn');
+});
+
+test('failure oilPress: pressure falls, temperature rises', function () {
+  var s = Sim.createState('cruise');
+  run(s, 2);
+  var t0 = s.engine.oilTempF;
+  Sim.actions.fail(s, 'oilPress', true);
+  run(s, 60);
+  assert.ok(s.engine.oilPressPsi < 12, 'oil pressure ' + s.engine.oilPressPsi.toFixed(1));
+  assert.ok(s.engine.oilTempF > t0 + 30, 'oil temperature ' + t0.toFixed(0) + ' -> ' + s.engine.oilTempF.toFixed(0));
+  assert.ok(hasEvent(s, /presión de aceite baja/), 'event');
+});
+
+test('failure magLeft/magRight: big drop and roughness on that magneto, slight on BOTH', function () {
+  ['magLeft', 'magRight'].forEach(function (mag) {
+    var bad = mag === 'magLeft' ? 'L' : 'R', good = mag === 'magLeft' ? 'R' : 'L';
+    var s = Sim.createState('runup');
+    // 1700 rpm run-up
+    for (var i = 0; i < 60; i++) {
+      var err = 1700 - s.engine.rpm; s.throttle = clamp(s.throttle + err * 0.0002, 0, 1); run(s, 0.25);
+    }
+    var both0 = s.engine.rpm;
+    Sim.actions.fail(s, mag, true);
+    run(s, 3);
+    var both = s.engine.rpm, roughBoth = s.engine.roughness;
+    Sim.actions.setIgnition(s, bad); run(s, 3);
+    var dropBad = both - s.engine.rpm, roughBad = s.engine.roughness;
+    Sim.actions.setIgnition(s, 'BOTH'); run(s, 3);
+    Sim.actions.setIgnition(s, good); run(s, 3);
+    var dropGood = both - s.engine.rpm;
+    Sim.actions.setIgnition(s, 'BOTH'); run(s, 2);
+    assert.ok(dropBad > 250, mag + ': drop on the bad mag ' + dropBad.toFixed(0));
+    assert.ok(dropGood < 150, mag + ': normal drop on the good mag ' + dropGood.toFixed(0));
+    assert.ok(roughBad > 0.6, mag + ': rough on the bad mag ' + roughBad.toFixed(2));
+    assert.ok(roughBoth > 0.08 && roughBoth < 0.4 && both < both0 - 5, mag + ': slight roughness and drop on BOTH (' +
+      roughBoth.toFixed(2) + ', ' + both0.toFixed(0) + ' -> ' + both.toFixed(0) + ')');
+  });
+});
+
+test('failure door: pops open with an event, adds drag, closing it clears it', function () {
+  var s = Sim.createState('cruise');
+  run(s, 2);
+  Sim.actions.fail(s, 'door', true);
+  assert.ok(s.doorRightOpen, 'right door open');
+  assert.ok(hasEvent(s, /abrió la puerta/), 'event');
+  var c = Sim.createState('cruise');
+  run(s, 40); run(c, 42);
+  // trimmed (same angle of attack): the extra drag shows as a sink, not as a slower airspeed
+  assert.ok(c.air.altitude - s.air.altitude > 15, 'drag: the airplane sinks with the door open (' +
+    (c.air.altitude - s.air.altitude).toFixed(0) + ' ft lower)');
+  s.doorRightOpen = false;
+  run(s, 0.2);
+  assert.strictEqual(s.failures.door, false, 'cleared when closed');
+  assert.ok(hasEvent(s, /Puerta cerrada/), 'closed event');
+});
+
+test('failure pitotBlocked: the ASI reads like an altimeter; pitot heat clears it', function () {
+  var s = Sim.createState('cruise');
+  run(s, 2);
+  var ias0 = s.air.ias;
+  Sim.actions.fail(s, 'pitotBlocked', true);
+  run(s, 1);
+  inRange(s.air.ias, ias0 - 2, ias0 + 2, 'reads right at the moment of the blockage');
+  // climb at reduced speed: the true IAS falls but the ASI climbs
+  run(s, 25, function (st) { st.yokePitch = 0.35; st.throttle = 1; });
+  assert.ok(s.air.altitude > 3100, 'climbed ' + (s.air.altitude - 3000).toFixed(0) + ' ft');
+  assert.ok(s.air.iasTrue < ias0 - 5, 'true IAS fell (' + s.air.iasTrue.toFixed(0) + ')');
+  assert.ok(s.air.ias > ias0 + 15, 'the ASI rose like an altimeter (' + s.air.ias.toFixed(0) + ')');
+  assert.ok(hasEvent(s, /Pitot tapado/), 'event');
+  s.pitotHeat = true;
+  run(s, 21, function (st) { st.yokePitch = 0; });
+  assert.strictEqual(s.failures.pitotBlocked, false, 'pitot heat cleared it');
+  inRange(s.air.ias, s.air.iasTrue - 0.01, s.air.iasTrue + 0.01, 'ASI right again');
+});
+
+test('failure carbIce: fast ice accumulation even in cruise, carb heat fixes it', function () {
+  var s = Sim.createState('cruise');
+  run(s, 2);
+  var r0 = s.engine.rpm;
+  Sim.actions.fail(s, 'carbIce', true);
+  assert.ok(s.carbIceEnabled, 'carbIceEnabled');
+  run(s, 25);
+  assert.ok(s.engine.carbIce > 0.5, 'ice ' + s.engine.carbIce.toFixed(2));
+  assert.ok(r0 - s.engine.rpm > 120, 'RPM loss ' + (r0 - s.engine.rpm).toFixed(0));
+  assert.ok(hasEvent(s, /hielo en el carburador/), 'event');
+  s.carbHeat = 1;
+  run(s, 40);
+  assert.ok(s.engine.carbIce < 0.05, 'carb heat melted it');
+});
+
+test('failures: no NaN with every failure on, from every preset', function () {
+  ['parked', 'runup', 'runway', 'cruise', 'approach', 'tunnel'].forEach(function (p) {
+    var s = Sim.createState(p);
+    Object.keys(s.failures).forEach(function (k) { Sim.actions.fail(s, k, true); });
+    run(s, 30, function (st, t) { st.yokeRoll = Math.sin(t) * 0.3; st.yokePitch = Math.cos(t * 0.7) * 0.3; });
+    ['ias', 'iasTrue', 'altitude', 'bank', 'pitch', 'vs', 'heading'].forEach(function (k) {
+      assert.ok(isFinite(s.air[k]), p + ': air.' + k);
+    });
+    assert.ok(isFinite(s.engine.rpm) && isFinite(s.engine.oilPressPsi) && isFinite(s.elec.busVolts), p + ': engine/elec');
+    aeroFinite(s.aero, p + ' failures');
+  });
+});
+
 /* ================================================================== summary */
 console.log('\nC150.Sim tests');
 console.table(results);

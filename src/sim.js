@@ -46,6 +46,40 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
  *    trim, altitude, throttle }, the same formulas as the tunnel), Sim.clCurve(flaps) → [{aoa, cl}] −8…+22° every
  *    0.5° (drops past the stall), Sim.stallAoa(flaps) → deg. The wing CL is linear (CLA) up to the stall AoA,
  *    then breaks to STALL_LIFT·CLmax over 2°.
+ *
+ * PUPPET MODE + FAILURES (contract v3, "Así se ve desde adentro" and "Situaciones"):
+ *  - INPUT state.puppet = { on, bank, pitch, yaw, ias, vs, turnRate, slip, onGround, aoa, tau }: while on, step() does not fly
+ *    the airplane with the flight model; it drives air.bank / air.pitch / IAS / VS smoothly toward these targets
+ *    (tau, default 0.35 s), integrates the heading from turnRate (deg/s) or, when turnRate is null, from a coordinated turn at
+ *    that bank and speed, adds `yaw` (deg) as a heading offset (guiñada demos), integrates the altitude from vs (ft/min,
+ *    never below 50 ft AGL in the air) and moves the position along the heading at the ground speed (at most 6 km
+ *    from where the puppet started). aoa = puppet.aoa when given, else pitch − flight-path angle + 3° (rigging), so
+ *    the stall horn, state.aero,
+ *    slip (from the rudder and the roll rate, or `slip` −1..1 when given), turn coordinator, gyros, gLoad and every
+ *    instrument stay consistent. onGround: true / false / null (keep the current one). Engine, electrics, flaps and
+ *    surfaces run from the normal inputs. Sim events are muted while the puppet is on (it is a demonstration).
+ *    Turning it off continues with normal integration from the same speed / path / attitude. applyPreset resets it.
+ *    Used by core.js to mirror exterior animations / poses in the cockpit.
+ *  - INPUT state.failures = { engine, engineRough, alternator, vacuum, oilPress, magLeft, magRight, door, pitotBlocked,
+ *    carbIce } (all false after applyPreset). Change them with Sim.actions.fail(state, name, on) → bool, which also
+ *    handles the side effects of the moment (an engine failure stops the engine now, a blocked pitot traps the current
+ *    pitot pressure, a door failure pops the right door open, carb ice switches on carbIceEnabled). Effects:
+ *      engine       the engine quits and will not restart (starter or windmilling) until cleared; the propeller
+ *                   windmills in flight, oil pressure 0.
+ *      engineRough  RPM sags ≈ 100–200 and wobbles, roughness ≥ 0.45.
+ *      alternator   no charging: the ammeter shows the discharge, the battery drains (accelerated) and the bus
+ *                   voltage sags; events for the discharge and the low voltage (then the usual low-battery one).
+ *      vacuum       suction falls to 0, the gyros spin down (the attitude indicator leans and stops following,
+ *                   the heading indicator wanders, then freezes); turn coordinator and pitot-static keep working.
+ *      oilPress     oil pressure falls toward ≈ 5 psi and the oil temperature climbs toward the red line.
+ *      magLeft/Right that magneto is bad: ≈ 380 RPM drop and strong roughness when it runs alone (L / R),
+ *                   a slight drop and roughness on BOTH.
+ *      door         the right door is open (doorRightOpen): noise, extra drag; closing it (doorRightOpen = false)
+ *                   clears the failure with a short event. (Any open door in flight adds drag.)
+ *      pitotBlocked the ASI works like an altimeter: air.ias = speed from the trapped pitot pressure minus the
+ *                   current static pressure (climb → reads more, descend → reads less). 20 s of pitot heat melts it.
+ *                   The TRUE indicated airspeed is always in air.iasTrue (the simulation itself uses it).
+ *      carbIce      carbIceEnabled with fast accumulation (≈ 35 s to full ice) up to almost full throttle.
  */
 (function (C150) {
   'use strict';
@@ -121,6 +155,13 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   var BAT_CHARGE = 0.003125;    // % per ampere-second of charging current above the float current
   var STARTER_AMPS = 120;
   var BUS_POWERED_V = 8;        // below this the bus is considered dead
+
+  /* ------------------------------------------------------ puppet / failures */
+  var PUPPET_TAU = 0.35;        // s, attitude / speed / vs follow the puppet targets
+  var PUPPET_RANGE = 6000;      // m, the puppet never wanders farther than this from where it started
+  var DOOR_CDA = 0.10;          // m², extra drag area of an open door in flight
+  var FAILURE_NAMES = ['engine', 'engineRough', 'alternator', 'vacuum', 'oilPress', 'magLeft', 'magRight', 'door',
+    'pitotBlocked', 'carbIce'];
 
   var IGNITIONS = { OFF: 1, R: 1, L: 1, BOTH: 1, START: 1 };
   var FLAP_SWITCH = { UP: 1, OFF: 1, DOWN: 1 };
@@ -215,6 +256,19 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     return 1 / (f * f);
   }
 
+  var NO_FAILURES = Object.freeze({});
+  /** state.failures, or an empty object (states built by hand / older saves). */
+  function fails(s) { var f = s.failures; return (f && typeof f === 'object') ? f : NO_FAILURES; }
+
+  /** ISA static pressure in Pa at a pressure altitude in feet (blocked-pitot ASI). */
+  function staticPa(altFt) { return 101325 * Math.pow(Math.max(0.05, 1 - 6.8756e-6 * altFt), 5.2559); }
+
+  /** Wind-tunnel mode in effect (the puppet, used for demonstrations, wins over the tunnel). */
+  function inTunnel(s) { return !!(s.tunnel && s.tunnel.on) && !(s.puppet && s.puppet.on); }
+
+  /** True indicated airspeed (kt) from the integrator: what the ASI shows when the pitot works. */
+  function trueIas(s, sim) { return sim.V / KT * Math.sqrt(sigmaAt(s.air.altitude)); }
+
   /** Deterministic pseudo-random 0..1 (engine roughness), no allocation. */
   function rnd(sim) {
     sim.seed = (Math.imul(sim.seed, 1664525) + 1013904223) >>> 0;
@@ -222,6 +276,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   }
 
   function pushEvent(s, text, kind) {
+    if (s.puppet && s.puppet.on) return;          // demonstrations (puppet mode) are silent
     if (!Array.isArray(s.events)) s.events = [];
     var ev = s.events;
     if (ev.length >= MAX_EVENTS) ev.shift();
@@ -251,9 +306,10 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     // Carburetor ice blocks the venturi; melting ice goes through the engine as water.
     rpm -= 300 * s.engine.carbIce + 250 * s._sim.meltWater;
     // Running on one magneto: only one plug per cylinder fires (POH max drop 150, max difference 75).
-    var magScale = clamp(rpm / 1700, 0.4, 1.5);
-    if (s.ignition === 'L') rpm -= 90 * magScale;
-    else if (s.ignition === 'R') rpm -= 70 * magScale;
+    var magScale = clamp(rpm / 1700, 0.4, 1.5), F = fails(s);
+    if (s.ignition === 'L') rpm -= (F.magLeft ? 380 : 90) * magScale;
+    else if (s.ignition === 'R') rpm -= (F.magRight ? 380 : 70) * magScale;
+    else if (s.ignition === 'BOTH' && (F.magLeft || F.magRight)) rpm -= 25 * magScale;   // a bad mag shows on BOTH too
     // Fuel starvation: the carburetor bowl is running dry.
     if (s._sim.starveTimer > 11) rpm *= 0.8;
     return rpm < 300 ? 300 : rpm;
@@ -478,7 +534,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       return;
     }
     var loads = electricLoads(s, sim);
-    var altCap = s.masterAlt ? 60 * clamp((e.rpm - 650) / 250, 0, 1) : 0;   // gear-driven 60 A alternator
+    var altFailed = !!fails(s).alternator;
+    var altCap = (s.masterAlt && !altFailed) ? 60 * clamp((e.rpm - 650) / 250, 0, 1) : 0;   // gear-driven 60 A alternator
     var deficit = 100 - pct;
     // Charge current the battery accepts: ≈ +15 A right after a start, back to ≈ +2 A within a minute.
     var demand = Math.min(30, 1.5 + 16 * deficit);
@@ -502,9 +559,23 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         sim.batLowWarned = true;
         pushEvent(s, 'Batería baja: el alternador no está cargando. Revisá el master ALT y el amperímetro.', 'warn');
       } else if (pct > 35) sim.batLowWarned = false;
+      // Alternator failure (situations): the discharge shows on the ammeter, then the voltage sags.
+      if (altFailed && s.masterAlt && e.running && batAmps < -1) {
+        sim.altFailTimer += h;
+        if (sim.altFailTimer > 3 && !sim.altFailWarned) {
+          sim.altFailWarned = true;
+          pushEvent(s, 'El amperímetro marca descarga: el alternador no carga. Apagá el ALT del master y lo que no necesites, y aterrizá apenas puedas.', 'warn');
+        }
+      } else if (!altFailed) { sim.altFailTimer = 0; sim.altFailWarned = false; }
     }
     el.busVolts = Math.max(0, volts);
     el.ammeterAmps = batAmps;
+    if (h > 0) {
+      if (altFailed && el.busVolts < 11.6 && el.busVolts > 1 && !sim.lowVoltWarned) {
+        sim.lowVoltWarned = true;
+        pushEvent(s, 'Voltaje bajo (' + el.busVolts.toFixed(1) + ' V): la batería se agota. Pronto se apagan la radio, los flaps y el coordinador de giro.', 'warn');
+      } else if (el.busVolts > 12.2) sim.lowVoltWarned = false;
+    }
     el.highVoltageLight = !s.masterAlt && el.busVolts > BUS_POWERED_V;   // POH light test: ALT off, BAT on
     s.gyro.tcPowered = el.busVolts > BUS_POWERED_V;
   }
@@ -528,6 +599,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     if (cause === 'mixture') pushEvent(s, 'Motor detenido: mezcla en corte (IDLE CUT-OFF).', ground ? 'info' : 'warn');
     else if (cause === 'mags') pushEvent(s, 'Motor detenido: llave de magnetos en OFF.', ground ? 'info' : 'warn');
     else if (cause === 'valve') pushEvent(s, 'Motor detenido: sin combustible (válvula de corte en OFF).', 'warn');
+    else if (cause === 'failure') pushEvent(s, '¡El motor se paró! Volá el avión primero: 60 nudos de planeo y buscá dónde aterrizar.', 'warn');
     else pushEvent(s, 'Motor detenido: sin combustible (tanques vacíos).', 'warn');
   }
 
@@ -567,7 +639,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     var e = s.engine, air = s.air;
     var ign = IGNITIONS[s.ignition] ? s.ignition : 'OFF';
     var onGround = air.onGround;
-    var ias = air.ias, altFt = air.altitude;
+    var ias = trueIas(s, sim), altFt = air.altitude;
+    var F = fails(s);
     var fuelInTanks = s.fuel.leftGal > UNUSABLE_GAL + 0.005 || s.fuel.rightGal > UNUSABLE_GAL + 0.005;
     var fuelFlowOK = !!s.fuelValve && fuelInTanks;
     var magsOn = ign !== 'OFF';
@@ -593,7 +666,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
           pushEvent(s, 'Motor despejado. Ahora mezcla rica, acelerador apenas abierto y arrancá sin cebar.', 'info');
         }
       }
-      var ok = !e.flooded && fuelFlowOK && sim.starveTimer < 15 && s.mixture > 0.6 &&
+      var ok = !e.flooded && !F.engine && fuelFlowOK && sim.starveTimer < 15 && s.mixture > 0.6 &&
         s.throttle >= 0.03 && s.throttle <= 0.35 && (!cold || e.primeCharges >= 2);
       var fastEnough = sim.rpmS > CRANK_RPM * 0.6;           // a weak battery turns the engine too slowly
       if (ok && fastEnough) {
@@ -606,7 +679,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
           pushEvent(s, ok ? 'El arranque gira lento: la batería está débil.' : startHint(s, fuelInTanks, cold), 'warn');
         }
       }
-    } else if (!e.running && !onGround && magsOn && fuelFlowOK && sim.starveTimer < 15 &&
+    } else if (!e.running && !onGround && magsOn && fuelFlowOK && !F.engine && sim.starveTimer < 15 &&
                s.mixture > 0.6 && !e.flooded && sim.rpmS > 300) {
       // In flight a windmilling propeller restarts the engine once fuel and spark are back.
       sim.catchTimer += h;
@@ -637,6 +710,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         if (sim.cutTimer >= 2 && !cause) cause = 'mixture';
       } else sim.cutTimer = 0;
       if (!cause && sim.starveTimer >= 15) cause = s.fuelValve ? 'empty' : 'valve';
+      if (F.engine) cause = 'failure';
       if (cause) stopEngine(s, sim, cause);
     }
 
@@ -654,8 +728,9 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         }
       }
     }
-    if (s.carbIceEnabled && e.running && heat < 0.5 && s.throttle < 0.85) {
-      e.carbIce = Math.min(1, e.carbIce + h / 90);
+    var iceFast = !!F.carbIce;
+    if (s.carbIceEnabled && e.running && heat < 0.5 && s.throttle < (iceFast ? 0.97 : 0.85)) {
+      e.carbIce = Math.min(1, e.carbIce + h / (iceFast ? 35 : 90));
       if (e.carbIce > 0.35 && !sim.iceWarned) {
         sim.iceWarned = true;
         pushEvent(s, 'Las RPM bajan solas y el motor tiembla: ¿hielo en el carburador? Probá CARB HEAT.', 'warn');
@@ -666,7 +741,14 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
 
     // RPM (engine and propeller are one: direct drive)
     var target, tau;
-    if (e.running) { target = engineTargetRpm(s, ias, altFt); tau = 0.4; }
+    if (e.running) {
+      target = engineTargetRpm(s, ias, altFt); tau = 0.4;
+      if (F.engineRough) {
+        // a sick engine (fouled plug, bad valve…): the RPM sags and surges irregularly
+        sim.roughWob += ((rnd(sim) - 0.5) * 2 - sim.roughWob) * Math.min(1, h / 0.15);
+        target -= 150 + 75 * (0.55 * Math.sin(2.3 * s.time) + 0.3 * Math.sin(5.9 * s.time + 1.3)) + 40 * sim.roughWob;
+      }
+    }
     else if (e.cranking) { target = CRANK_RPM * clamp((s.elec.batteryPct - 12) / 20, 0.3, 1); tau = 0.3; }
     else { target = onGround ? 0 : 8 * Math.max(0, ias); tau = 0.7; }   // windmilling in flight
     sim.rpmS += (target - sim.rpmS) * Math.min(1, h / tau);
@@ -678,6 +760,9 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       rough += 0.6 * e.carbIce + 1.5 * sim.meltWater;
       if (!s.primerLocked) rough += 0.1;
       if (sim.starveTimer > 11) rough += 0.5;
+      if (F.engineRough) rough += 0.45;
+      if ((F.magLeft && ign === 'L') || (F.magRight && ign === 'R')) rough += 0.7;
+      else if ((F.magLeft || F.magRight) && ign === 'BOTH') rough += 0.12;
       if (!s.primerLocked && !sim.primerWarned) {
         sim.primerWarned = true;
         pushEvent(s, 'El cebador quedó destrabado: empujalo y trabalo (si no, enriquece la mezcla y el motor anda mal).', 'warn');
@@ -699,6 +784,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     if (e.running) {
       tgtT = ambientF + 30 + 95 * Math.pow(sim.rpmS / 2400, 1.5) - 0.15 * Math.max(0, ias);
       tauT = 60;
+      if (F.oilPress) { tgtT = Math.max(tgtT, 175) + 90; tauT = 45; }   // losing oil: the temperature climbs
     }
     e.oilTempF += (tgtT - e.oilTempF) * h / tauT;
 
@@ -707,7 +793,13 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     if (e.running) { tgtP = oilPressTarget(e, sim.rpmS); tauP = 1.5; }
     else if (e.cranking) { tgtP = 4; tauP = 1.5; }
     else if (sim.rpmS > 300) { tgtP = 8 * sim.rpmS / 1000; }
+    if (F.oilPress && tgtP > 5) { tgtP = 5; tauP = 12; }                // the pressure bleeds away in ≈ 30 s
+    if (F.engine) { tgtP = 0; tauP = 1.5; }
     e.oilPressPsi += (tgtP - e.oilPressPsi) * Math.min(1, h / tauP);
+    if (F.oilPress && e.running && e.oilPressPsi < 25 && !sim.oilWarned) {
+      sim.oilWarned = true;
+      pushEvent(s, 'La presión de aceite baja y la temperatura sube: el motor puede fallar. Reducí la potencia y buscá dónde aterrizar.', 'warn');
+    } else if (!F.oilPress) sim.oilWarned = false;
 
     // Fuel burn ≈ 5.5 gal/h at full power, ≈ 0.9 gal/h at idle; both tanks feed together.
     if (e.running) {
@@ -726,8 +818,15 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   /* -------------------------------------------------------- vacuum & gyros */
 
   function stepVacuum(s, sim, h) {
-    var v = s.vacuum, g = s.gyro;
-    v.suctionInHg += (suctionFor(s.engine.rpm) - v.suctionInHg) * Math.min(1, h / 0.5);
+    var v = s.vacuum, g = s.gyro, vacFailed = !!fails(s).vacuum;
+    v.suctionInHg += ((vacFailed ? 0 : suctionFor(s.engine.rpm)) - v.suctionInHg) * Math.min(1, h / (vacFailed ? 1.2 : 0.5));
+    if (vacFailed && s.engine.running && v.suctionInHg < 3) {
+      sim.vacTimer += h;
+      if (sim.vacTimer > 4 && !sim.vacWarned) {
+        sim.vacWarned = true;
+        pushEvent(s, 'La succión cayó a cero: el horizonte y el direccional van a empezar a mentir. Usá el coordinador de giro, la brújula y mirá afuera.', 'warn');
+      }
+    } else if (!vacFailed) { sim.vacTimer = 0; sim.vacWarned = false; }
     var tgt = Math.min(1, v.suctionInHg / 4.6);
     // Spin-up τ ≈ 12 s and spin-down τ ≈ 40 s (accelerated: real gyros take minutes).
     g.aiSpin += (tgt - g.aiSpin) * Math.min(1, h / (tgt > g.aiSpin ? 12 : 40));
@@ -737,8 +836,9 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   function updateHeadingIndicator(s, sim, h) {
     var air = s.air, corr = num(s.hiCorrection, 0);
     if (s.gyro.hiSpin >= 0.7) {
-      // Gyro drift ≈ 1°/min (accelerated from ≈ 3° per 15 min so the student can see it).
-      sim.hiDrift = wrap180(sim.hiDrift + h / 60);
+      // Gyro drift ≈ 1°/min (accelerated from ≈ 3° per 15 min so the student can see it); a gyro that is
+      // losing speed (vacuum failure) wanders much faster before the card stops.
+      sim.hiDrift = wrap180(sim.hiDrift + h / 60 + h * 10 * Math.max(0, 0.97 - s.gyro.hiSpin));
       air.hiHeading = wrap360(air.heading + corr + sim.hiDrift);
     } else {
       // Not spun up: the card stays put and only the knob turns it.
@@ -851,7 +951,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       }
       CL = sim.stalled ? STALL_LIFT * (CLA * aStall + dCLf) : CLA * sim.alpha + dCLf;
       L = q * S_WING * CL;
-      D = q * S_WING * (CD0 + FLAP_DCD * fr + K_IND * CL * CL + (sim.stalled ? STALL_DRAG : 0)) + Dwm;
+      D = q * S_WING * (CD0 + FLAP_DCD * fr + K_IND * CL * CL + (sim.stalled ? STALL_DRAG : 0)) + Dwm +
+        q * DOOR_CDA * ((s.doorLeftOpen ? 1 : 0) + (s.doorRightOpen ? 1 : 0));   // a door open in flight: noise and drag
       var bankR = air.bank * DEG;
       var Vs = Math.max(V, 8);
       var sinG = Math.sin(sim.gamma), cosG = Math.cos(sim.gamma);
@@ -919,7 +1020,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     writeAirOutputs(s, sim);
 
     // Stall horn (pneumatic: works without electricity), on transitions only
-    var horn = !air.onGround && air.ias > 20 && sim.alpha > aStall - HORN_MARGIN;
+    var horn = !air.onGround && air.iasTrue > 20 && sim.alpha > aStall - HORN_MARGIN;
     if (horn && !air.stallWarning && sim.cdHorn <= 0 && !sim.stalled) {
       pushEvent(s, 'Bocina de pérdida: estás cerca de la pérdida. Bajá un poco la nariz.', 'warn');
       sim.cdHorn = 4;
@@ -934,6 +1035,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     var sig = sigmaAt(air.altitude);
     air.tas = sim.V / KT;
     air.ias = air.tas * Math.sqrt(sig);
+    air.iasTrue = air.ias;
     air.vs = air.onGround ? 0 : sim.V * Math.sin(sim.gamma) * FPM;
     air.groundSpeed = sim.V * Math.cos(sim.gamma) / KT;
     air.aoa = sim.alpha;
@@ -941,9 +1043,136 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     air.indicatedAlt = air.altitude + (num(s.altimeterSetting, 29.92) - 29.92) * 1000;
     air.oatC = 20 - 2 * Math.max(0, air.altitude) / 1000;
     if (!air.onGround) air.pitch = sim.gamma * RAD + sim.alpha - INCIDENCE;
-    if (s.tunnel && s.tunnel.on) {
+    if (inTunnel(s)) {
       // Held still in the wind: no motion over the ground; the wind is horizontal so pitch = aoa.
       air.vs = 0; air.groundSpeed = 0; air.rollRate = 0; air.pitch = sim.alpha;
+    } else if (fails(s).pitotBlocked && sim.pitotPs > 0) {
+      // Blocked pitot (ram hole and drain): the trapped pressure stays, the static pressure changes with altitude,
+      // so the ASI reads like an altimeter (more when climbing, less when descending).
+      var qInd = sim.pitotQ + (sim.pitotPs - staticPa(air.altitude));
+      air.ias = qInd > 0 ? Math.min(200, Math.sqrt(2 * qInd / RHO0) / KT) : 0;
+    }
+  }
+
+  /* ----------------------------------------------------------- puppet mode */
+
+  /**
+   * Puppet mode (state.puppet.on): the attitude, speed and vertical speed follow the puppet targets; heading, altitude
+   * and position are integrated from them so every instrument and the world outside agree (see the header).
+   */
+  function stepPuppet(s, sim, h) {
+    var pp = s.puppet, air = s.air, e = s.engine;
+    var k = Math.min(1, h / clamp(num(pp.tau, PUPPET_TAU), 0.02, 3));
+    var field = s.fieldElevation;
+    if (!sim.puppetActive) {
+      sim.puppetActive = true;
+      sim.pHdg = air.heading; sim.pYaw = 0; sim.pVs = num(air.vs, 0); sim.pPitch = num(air.pitch, 0);
+      sim.pAx = s.pos.x; sim.pAz = s.pos.z;
+    }
+    var ground = (pp.onGround === true || pp.onGround === false) ? pp.onGround : air.onGround;
+    var bankT = clamp(num(pp.bank, 0), -85, 85), pitchT = clamp(num(pp.pitch, 0), -45, 45);
+    var iasT = clamp(num(pp.ias, 0), 0, 200), vsT = clamp(num(pp.vs, 0), -4000, 4000);
+    var yawT = clamp(num(pp.yaw, 0), -90, 90);
+    if (ground) { bankT = 0; vsT = 0; }
+
+    // attitude and roll rate
+    var bank0 = air.bank;
+    air.bank += (bankT - air.bank) * k;
+    sim.p = (air.bank - bank0) / h;
+    sim.pPitch += (pitchT - sim.pPitch) * k;
+    air.pitch = sim.pPitch;
+
+    // speed, vertical speed, altitude
+    var sig = sigmaAt(air.altitude), sq = Math.sqrt(sig);
+    sim.V += (iasT * KT / sq - sim.V) * k;
+    if (!(sim.V >= 0)) sim.V = 0;
+    sim.pVs += (vsT - sim.pVs) * k;
+    var alt = air.altitude;
+    if (ground) {
+      air.onGround = true; alt = field; sim.pVs = 0; sim.gamma = 0;
+      sim.thetaG = air.pitch; sim.alpha = air.pitch + INCIDENCE; sim.stalled = false;
+    } else {
+      air.onGround = false;
+      alt += sim.pVs / 60 * h;
+      if (alt < field + 50) alt = field + 50;                    // demonstrations never touch the ground
+      sim.gamma = sim.V > 1 ? Math.asin(clamp(sim.pVs / FPM / sim.V, -0.9, 0.9)) : 0;
+      var aoaT = (pp.aoa !== null && pp.aoa !== undefined && isFinite(pp.aoa)) ? clamp(pp.aoa, -15, 30)
+        : clamp(air.pitch - sim.gamma * RAD + INCIDENCE, -15, 30);
+      sim.alpha += (aoaT - sim.alpha) * k;
+      var aS = alphaStall(s.flaps), iasKt = sim.V / KT * sq;
+      sim.stalled = iasKt > 15 && sim.alpha > aS;
+    }
+    air.altitude = alt;
+
+    // heading: turn rate (given, or coordinated from the bank) + yaw offset (guiñada)
+    var yaw0 = sim.pYaw;
+    sim.pYaw += wrap180(yawT - sim.pYaw) * k;
+    var yawRate = (sim.pYaw - yaw0) / h;
+    var psiDot = 0, Vs = Math.max(sim.V, 8);
+    if (pp.turnRate !== null && pp.turnRate !== undefined && isFinite(pp.turnRate)) psiDot = clamp(pp.turnRate, -30, 30);
+    else if (!ground) psiDot = G * Math.tan(clamp(air.bank, -80, 80) * DEG) / Vs * RAD;
+    sim.pHdg = wrap360(sim.pHdg + psiDot * h);
+    air.heading = wrap360(sim.pHdg + sim.pYaw);
+
+    // the ball and the turn coordinator
+    var rud = clamp(num(s.rudder, 0), -1, 1);
+    var thrEff = e.running ? clamp(num(s.throttle, 0), 0, 1) : 0, iasNow = sim.V / KT * sq;
+    var pFactor = 0.3 * clamp((thrEff - 0.6) / 0.4, 0, 1) * clamp((85 - iasNow) / 35, 0, 1);
+    var slipT;
+    if (pp.slip !== null && pp.slip !== undefined && isFinite(pp.slip)) slipT = clamp(pp.slip, -1, 1);
+    else if (ground) slipT = clamp(-sim.V * psiDot * DEG / G * 3, -1, 1);
+    else slipT = clamp(0.35 * (sim.p / MAX_ROLL_RATE) + pFactor - rud, -1, 1);
+    air.slip += (slipT - air.slip) * Math.min(1, h / 0.3);
+    air.turnRate = psiDot + yawRate;
+    s.noseWheelAngle = 8.5 * rud;
+    air.gLoad = ground ? 1 : clamp(1 / Math.max(0.25, Math.cos(air.bank * DEG)), 1, 4);
+
+    // position: along the heading at the ground speed, never far from where the puppet started
+    var vh = sim.V * Math.cos(sim.gamma), hr = air.heading * DEG;
+    var px = s.pos.x + vh * Math.sin(hr) * h, pz = s.pos.z - vh * Math.cos(hr) * h;
+    var dx = px - sim.pAx, dz = pz - sim.pAz, d = Math.sqrt(dx * dx + dz * dz);
+    if (d > PUPPET_RANGE) { px = sim.pAx + dx * PUPPET_RANGE / d; pz = sim.pAz + dz * PUPPET_RANGE / d; }
+    s.pos.x = px; s.pos.z = pz;
+
+    writeAirOutputs(s, sim);
+    if (ground) air.pitch = sim.thetaG;
+    else { air.vs = sim.pVs; air.pitch = sim.pPitch; }
+    var aSt = alphaStall(s.flaps);
+    air.stallWarning = !ground && air.iasTrue > 20 && sim.alpha > aSt - HORN_MARGIN;
+    air.stalled = sim.stalled;
+  }
+
+  /** Leaving puppet mode: hand the attitude over to the normal integrator without a jump. */
+  function leavePuppet(s, sim) {
+    sim.puppetActive = false;
+    var air = s.air;
+    sim.p = 0;
+    if (air.onGround) { sim.thetaG = clamp(air.pitch, 0, 12); sim.gamma = 0; }
+  }
+
+  /* ------------------------------------------------------------- failures */
+
+  /** Failures that end or report over time (pitot heat melts a blocked pitot, closing the door). */
+  function stepFailures(s, sim, h) {
+    var F = s.failures;
+    if (!F || typeof F !== 'object') return;
+    if (F.pitotBlocked) {
+      var dev = Math.abs(num(s.air.ias, 0) - num(s.air.iasTrue, 0));
+      if (dev > 12 && !sim.pitotWarned) {
+        sim.pitotWarned = true;
+        pushEvent(s, 'El velocímetro hace cosas raras: si subís marca más y si bajás marca menos, como un altímetro. ¿Pitot tapado? Prendé el calefactor del pitot y volá con actitud y potencia.', 'warn');
+      }
+      if (s.pitotHeat && s.elec.busVolts > BUS_POWERED_V) {
+        sim.pitotHeatTimer += h;
+        if (sim.pitotHeatTimer >= 20) {
+          F.pitotBlocked = false; sim.pitotHeatTimer = 0; sim.pitotWarned = false;
+          pushEvent(s, 'El calefactor del pitot derritió el hielo: el velocímetro vuelve a marcar bien.', 'good');
+        }
+      }
+    } else { sim.pitotHeatTimer = 0; sim.pitotWarned = false; }
+    if (F.door && !s.doorRightOpen) {
+      F.door = false;
+      pushEvent(s, 'Puerta cerrada y trabada. Bien: el avión siguió volando todo el tiempo.', 'good');
     }
   }
 
@@ -976,7 +1205,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     var thrEff = e.running ? clamp(num(s.throttle, 0), 0, 1) : 0;
     var flaps = s.flaps, aS = alphaStall(flaps);
     var p, blendTarget;
-    if (s.tunnel && s.tunnel.on) {
+    if (inTunnel(s)) {
       p = tunnelParams(air.ias, sim.alpha, clamp(num(s.tunnel.beta, 0), -30, 30), flaps, air.altitude);
       blendTarget = p.ias > 15 ? stallBlendOf(sim.alpha, flaps) : 0;
     } else {
@@ -1030,16 +1259,17 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     if (sim.cdLock > 0) sim.cdLock -= h;
     if (sim.cdG > 0) sim.cdG -= h;
 
-    if (air.ias > lim.vne && !sim.vneOn) {
+    var iasT = num(air.iasTrue, air.ias);
+    if (iasT > lim.vne && !sim.vneOn) {
       sim.vneOn = true;
       pushEvent(s, '¡Superaste la VNE (' + lim.vne + ' nudos)! Reducí potencia y levantá la nariz con suavidad.', 'warn');
-    } else if (air.ias < lim.vne - 5) sim.vneOn = false;
+    } else if (iasT < lim.vne - 5) sim.vneOn = false;
 
-    var flapOver = s.flaps > 1 && air.ias > lim.vfe;
+    var flapOver = s.flaps > 1 && iasT > lim.vfe;
     if (flapOver && !sim.flapsOver) {
       sim.flapsOver = true;
       pushEvent(s, '¡Flaps abajo a más de ' + lim.vfe + ' nudos! Reducí la velocidad o subí los flaps.', 'warn');
-    } else if (!flapOver && (s.flaps <= 1 || air.ias < lim.vfe - 3)) sim.flapsOver = false;
+    } else if (!flapOver && (s.flaps <= 1 || iasT < lim.vfe - 3)) sim.flapsOver = false;
 
     var gMax = s.flaps > 1 ? lim.gMaxFlaps : lim.gMax;
     if (!air.onGround && (air.gLoad > gMax || air.gLoad < lim.gMin) && sim.cdG <= 0) {
@@ -1075,10 +1305,14 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     stepElectrical(s, sim, h);
     stepVacuum(s, sim, h);
     stepFlaps(s, sim, h);
-    if (s.tunnel && s.tunnel.on) stepTunnel(s, sim, h);
+    var puppet = !!(s.puppet && s.puppet.on);
+    if (!puppet && sim.puppetActive) leavePuppet(s, sim);
+    if (puppet) stepPuppet(s, sim, h);
+    else if (inTunnel(s)) stepTunnel(s, sim, h);
     else stepFlight(s, sim, h);
     updateHeadingIndicator(s, sim, h);
     stepWarnings(s, sim, h);
+    stepFailures(s, sim, h);
     s.time += h;
     // Never let a bad input poison the state.
     if (!(isFinite(sim.V) && isFinite(sim.gamma) && isFinite(sim.alpha) && isFinite(s.air.altitude) &&
@@ -1134,6 +1368,61 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       if (FLAP_SWITCH[pos]) s.flapSwitch = pos;
       return s.flapSwitch;
     },
+    /**
+     * Turn a failure on/off (situations): name ∈ state.failures keys (see the header). Returns the new value, or
+     * null for an unknown name. Applies the side effects of the moment.
+     */
+    fail: function (s, name, on) {
+      if (FAILURE_NAMES.indexOf(name) < 0) return null;
+      on = !!on;
+      if (!s.failures || typeof s.failures !== 'object') s.failures = {};
+      var F = s.failures, was = !!F[name];
+      if (!s._sim) s._sim = makeInternal();
+      var sim = s._sim;
+      F[name] = on;
+      if (on === was) return on;
+      if (name === 'engine' && on && s.engine.running) stopEngine(s, sim, 'failure');
+      else if (name === 'engineRough' && on && s.engine.running) {
+        pushEvent(s, 'El motor empezó a andar áspero: tiembla y las RPM bajan. Revisá mezcla, calefacción al carburador y magnetos.', 'warn');
+      } else if (name === 'pitotBlocked' && on) {
+        // the pitot pressure trapped now (indicated dynamic pressure + static pressure at this altitude)
+        var ias = num(s.air.iasTrue, num(s.air.ias, 0)) * KT;
+        sim.pitotQ = 0.5 * RHO0 * ias * ias;
+        sim.pitotPs = staticPa(s.air.altitude);
+        sim.pitotHeatTimer = 0; sim.pitotWarned = false;
+      } else if (name === 'door') {
+        s.doorRightOpen = on;
+        if (on && !s.air.onGround) pushEvent(s, '¡Se abrió la puerta! Hace mucho ruido y viento, pero no es una emergencia: volá el avión, bajá a unos 65 nudos y cerrala.', 'warn');
+      } else if (name === 'carbIce') {
+        s.carbIceEnabled = on;
+      }
+      return on;
+    },
+    /**
+     * Safe engine switch for demonstrations (core mirror): on → mixture rich, fuel ON, primer locked, magnetos BOTH and
+     * the engine running at once (no start sequence, no events); off → mixture to idle cut-off, magnetos OFF, engine
+     * stopped (it spools down). Returns engine.running.
+     */
+    setEngine: function (s, on) {
+      var e = s.engine;
+      if (!s._sim) s._sim = makeInternal();
+      var sim = s._sim;
+      if (on) {
+        if (fails(s).engine) return e.running;
+        s.mixture = 1; s.fuelValve = true; s.primerLocked = true;
+        s.ignition = 'BOTH'; sim.prevIgnition = 'BOTH';
+        e.flooded = false;
+        if (!e.running) {
+          e.running = true; e.cranking = false; e.primeCharges = 0;
+          sim.catchTimer = 0; sim.cutTimer = 0; sim.starveTimer = 0;
+          if (sim.rpmS < 300) sim.rpmS = 300;
+        }
+      } else {
+        s.mixture = 0; s.ignition = 'OFF'; sim.prevIgnition = 'OFF';
+        if (e.running) { e.running = false; e.cranking = false; sim.catchTimer = 0; sim.cutTimer = 0; }
+      }
+      return e.running;
+    },
     /** Split master: ALT on also pushes BAT on; BAT off also takes ALT off. */
     setMaster: function (s, which, on) {
       on = !!on;
@@ -1162,6 +1451,11 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       cdStall: 0, cdStallRec: 0, cdHorn: 0, cdAir: 0, cdLock: 0, cdG: 0,
       vneOn: false, flapsOver: false, revOn: false,
       stallBlend: 0,
+      // failures (situations)
+      roughWob: 0, altFailTimer: 0, altFailWarned: false, lowVoltWarned: false, oilWarned: false,
+      vacTimer: 0, vacWarned: false, pitotQ: 0, pitotPs: 0, pitotHeatTimer: 0, pitotWarned: false,
+      // puppet mode
+      puppetActive: false, pHdg: 0, pYaw: 0, pVs: 0, pPitch: 0, pAx: 0, pAz: 0,
       seed: 20260614
     };
   }
@@ -1185,6 +1479,12 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     s.carbIceEnabled = false;          // scenario switch: missions set it AFTER applyPreset
     if (!s.tunnel || typeof s.tunnel !== 'object') s.tunnel = { on: false, ias: 80, aoa: 4, beta: 0 };
     s.tunnel.on = false; s.tunnel.ias = 80; s.tunnel.aoa = 4; s.tunnel.beta = 0;
+    if (!s.puppet || typeof s.puppet !== 'object') s.puppet = {};
+    var pp = s.puppet;
+    pp.on = false; pp.bank = 0; pp.pitch = 0; pp.yaw = 0; pp.ias = 0; pp.vs = 0;
+    pp.turnRate = null; pp.slip = null; pp.onGround = null; pp.aoa = null; pp.tau = PUPPET_TAU;
+    if (!s.failures || typeof s.failures !== 'object') s.failures = {};
+    for (var i = 0; i < FAILURE_NAMES.length; i++) s.failures[FAILURE_NAMES[i]] = false;
   }
 
   function resetOutputs(s) {
@@ -1201,7 +1501,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     a.ias = 0; a.tas = 0; a.altitude = s.fieldElevation; a.indicatedAlt = s.fieldElevation; a.vs = 0;
     a.pitch = 0; a.bank = 0; a.heading = 0; a.hiHeading = 0; a.turnRate = 0; a.slip = 0;
     a.aoa = INCIDENCE; a.gLoad = 1; a.onGround = true; a.stallWarning = false; a.stalled = false;
-    a.groundSpeed = 0; a.rollRate = 0; a.oatC = 20;
+    a.groundSpeed = 0; a.rollRate = 0; a.oatC = 20; a.iasTrue = 0;
     s.pos.x = 0; s.pos.z = 0;
     s.propRpm = 0; s.noseWheelAngle = 0;
     if (Array.isArray(s.events)) s.events.length = 0; else s.events = [];
@@ -1403,6 +1703,10 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       doorLeftOpen: false, doorRightOpen: false, windowLeftOpen: false,
       paused: false, carbIceEnabled: false,
       tunnel: { on: false, ias: 80, aoa: 4, beta: 0 },
+      puppet: { on: false, bank: 0, pitch: 0, yaw: 0, ias: 0, vs: 0, turnRate: null, slip: null, onGround: null, aoa: null,
+                tau: PUPPET_TAU },
+      failures: { engine: false, engineRough: false, alternator: false, vacuum: false, oilPress: false,
+                  magLeft: false, magRight: false, door: false, pitotBlocked: false, carbIce: false },
       engine: { running: false, cranking: false, rpm: 0, oilTempF: 68, oilPressPsi: 0, primeCharges: 0,
                 flooded: false, carbIce: 0, startAttemptTime: 0, roughness: 0 },
       elec: { busVolts: 0, ammeterAmps: 0, batteryPct: 100, highVoltageLight: false },
@@ -1412,7 +1716,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       flaps: 0,
       air: { ias: 0, tas: 0, altitude: 100, indicatedAlt: 100, vs: 0, pitch: 0, bank: 0, heading: 0,
              hiHeading: 0, turnRate: 0, slip: 0, aoa: INCIDENCE, gLoad: 1, onGround: true,
-             stallWarning: false, stalled: false, groundSpeed: 0, rollRate: 0, oatC: 20 },
+             stallWarning: false, stalled: false, groundSpeed: 0, rollRate: 0, oatC: 20, iasTrue: 0 },
       pos: { x: 0, z: 0 },
       surfaces: { aileronL: 0, aileronR: 0, elevator: 0, rudder: 0, trimTab: 0, flaps: 0 },
       propRpm: 0, noseWheelAngle: 0,

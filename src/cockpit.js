@@ -11,7 +11,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
  *                            dome/pitot/nav/strobe/beacon/taxi/landing, doors 'left'/'right'/'window', pedals 'left'/'right')
  *   ck.anchors[id]           Object3D at the centre of each control (follows moving parts such as doors)
  *   ck.views[id]             { position, target } close-up camera (0.30–0.60 m away, from the pilot's side)
- *   ck.presets[name]         { position, target, label } — pilot, flight, panel, left, center, right, floor, overhead,
+ *   ck.presets[name]         { position, target, label } — pilot, flight, inside, panel, left, center, right, floor, overhead,
  *                            copilot, door
  *   ck.dragAxes[id]          { axis, length, out } for throttle, mixture, carb-heat, cabin-heat, cabin-air, primer, trim-wheel
  *   ck.update(state, dt)     animates every moving part, redraws gauge textures whose C150.Gauges.signature changed
@@ -1839,6 +1839,9 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     var presets = {
       pilot: { position: EYE.clone(), target: V(-0.10, 0.50, 0.0), label: 'Asiento del piloto' },
       flight: { position: EYE.clone(), target: V(-0.235, 0.74, -1.0), label: 'En vuelo: mirar afuera' },
+      // "así se ve desde adentro" (lessons mirroring an exterior movement): the horizon through the windshield, the
+      // six flight instruments and the yoke in one picture, also in a tall half of 'Las dos'
+      inside: { position: EYE.clone(), target: V(-0.22, 0.655, -0.2), label: 'Desde adentro: horizonte, tablero y volante' },
       // panel/left/center/right are framed so the control wheels do not hide what each view is about (ray-cast
       // checked: every instrument ≥ 78 % visible in 'panel', 100 % in 'left'; 'center'/'right' show their knobs)
       panel: { position: V(0, 0.84, 0.70), target: V(0, 0.47, 0), label: 'Tablero completo' },
@@ -1902,7 +1905,14 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     group.add(probe);
 
     /* ================================================================== UPDATE */
-    var gaugeCursor = 0, gaugeBudget = gauges.length, lastState = null, GAUGE_RATE = 30, GAUGE_BURST = 6;
+    var gaugeCursor = 0, gaugeBudget = gauges.length, lastState = null, GAUGE_RATE = 90, GAUGE_BURST = 8;
+    // Flight instruments first: during a manoeuvre (or a mirrored demonstration) several of them change every frame and
+    // must move smoothly; the rest (clock, fuel, radios…) share what is left of the budget round-robin.
+    var GAUGE_RATES = { alta: 90, media: 60, baja: 36 };
+    var PRIORITY_IDS = ['attitude', 'turn-coordinator', 'heading-indicator', 'asi', 'vsi', 'altimeter', 'tachometer', 'flap-indicator'];
+    var priorityGauges = [], prioCursor = 0;
+    gauges.forEach(function (g) { if (PRIORITY_IDS.indexOf(g.gid) >= 0) priorityGauges.push(g); });
+    priorityGauges.sort(function (a, b) { return PRIORITY_IDS.indexOf(a.gid) - PRIORITY_IDS.indexOf(b.gid); });
     var BASE_EMISSIVE = 0.33;
     var api = null, lastMotionSig = NaN;
     function rockerAngle(on) { return on ? -0.22 : 0.22; }
@@ -1961,7 +1971,9 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       // doors (open outward on the front hinge) and the left window (top hinge)
       var rate = reducedMotion ? 30 : 5;
       A.doorAngle.left = easeTo(A.doorAngle.left, s.doorLeftOpen ? 1 : 0, dt, rate);
-      A.doorAngle.right = easeTo(A.doorAngle.right, s.doorRightOpen ? 1 : 0, dt, rate);
+      // a door that popped open in flight (failure 'door') only trails a few centimetres ajar in the slipstream
+      var ajar = !!(s.failures && s.failures.door && s.air && s.air.onGround === false);
+      A.doorAngle.right = easeTo(A.doorAngle.right, s.doorRightOpen ? (ajar ? 0.14 : 1) : 0, dt, rate);
       A.doorAngle.window = easeTo(A.doorAngle.window, s.windowLeftOpen ? 1 : 0, dt, rate);
       A.doorL.rotation.y = -A.doorAngle.left * 55 * DEG;
       A.doorR.rotation.y = A.doorAngle.right * 55 * DEG;
@@ -2002,7 +2014,14 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
 
       // gauges: redraw only when the displayed values change, at most ~30 redraws per second in total
       gaugeBudget = Math.min(gaugeBudget + dt * GAUGE_RATE, Math.max(GAUGE_BURST, gaugeBudget));
-      var checked = 0, n = gauges.length;
+      var checked = 0, n = gauges.length, np = priorityGauges.length;
+      // the attitude indicator and the turn coordinator always get the first redraws (rotating start for the others)
+      for (var pi = 0; pi < np && gaugeBudget >= 1; pi++) {
+        var pg = priorityGauges[pi < 2 ? pi : 2 + (prioCursor + pi - 2) % Math.max(1, np - 2)];
+        var psig = (Gauges && Gauges.signature) ? Gauges.signature(pg.gid, s) : 'static';
+        if (pg.dirty || psig !== pg.sig) { pg.sig = psig; pg.dirty = false; drawGauge(pg, s); gaugeBudget -= 1; }
+      }
+      prioCursor = (prioCursor + 1) % Math.max(1, np - 2);
       while (checked < n && gaugeBudget >= 1) {
         var g = gauges[gaugeCursor];
         gaugeCursor = (gaugeCursor + 1) % n; checked++;
@@ -2105,6 +2124,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       o.castShadow = !hidden && !seeThrough && !o.userData.noCast;
     });
     function setQuality(level) {
+      GAUGE_RATE = GAUGE_RATES[level] || GAUGE_RATE;
       var on = level !== 'baja';
       if (on === detailOn) return;
       detailOn = on;

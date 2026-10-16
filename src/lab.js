@@ -1299,7 +1299,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     airflowOff();
     if (L.el.stage) L.el.stage.hidden = true;
     var p = L.prev || {};
-    setBackdrop(p.backdrop || 'estudio');
+    setBackdrop(p.backdrop || 'cielo');
     A.applyPreset(p.preset || 'parked');
     A.cc('setMainView', p.view === 'exterior' ? 'exterior' : 'cockpit');
     A.syncMainView();

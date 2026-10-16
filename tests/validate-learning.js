@@ -35,6 +35,22 @@ var ANIMS = [
   'carb-ice', 'pitot-static'
 ];
 var PRESETS = ['parked', 'runup', 'runway', 'cruise', 'approach'];
+// Poses del avión de afuera (contrato v3: ext.POSES / Core.poseExterior) para los botones de acción de las lecciones.
+var POSES = [
+  'nivelado', 'alabeo-izq', 'alabeo-der', 'cabeceo-arriba', 'cabeceo-abajo', 'guinada-izq', 'guinada-der',
+  'motor-on', 'motor-off', 'potencia-max', 'potencia-ralenti', 'flaps-0', 'flaps-10', 'flaps-20', 'flaps-40',
+  'viraje-izq', 'viraje-der', 'ascenso', 'descenso', 'perdida', 'carreteo-izq', 'carreteo-der',
+  'compensador-arriba', 'compensador-abajo'
+];
+// Cruce con exterior.js (si ya trae ext.POSES): sólo quedan las poses que el avión de afuera sabe hacer.
+(function () {
+  var extPath = path.join(SRC, 'exterior.js');
+  if (!fs.existsSync(extPath)) return;
+  var m = fs.readFileSync(extPath, 'utf8').match(/POSE_LIST\s*=\s*\[[\s\S]*?\n\s*\];/);
+  if (!m) return;
+  var ext = (m[0].match(/id:\s*'([a-z0-9-]+)'/g) || []).map(function (s) { return s.replace(/id:\s*'|'/g, ''); });
+  if (ext.length) POSES = POSES.filter(function (p) { return ext.indexOf(p) >= 0; });
+})();
 
 var fallas = 0, pruebas = 0;
 function ok(cond, msg) {
@@ -130,6 +146,27 @@ var idsLecciones = {};
     ok(p.vista === 'exterior' || p.vista === 'cockpit', m + ': vista válida');
     ok(!(p.vista === 'cockpit' && p.foco === null), m + ': vista cockpit con foco');
     ok(!(p.vista === 'exterior' && p.anim === null), m + ': vista exterior con animación');
+    // contrato v3: cada paso con un movimiento del avión trae botones de acción (poses que se mantienen)
+    if (p.anim) ok(Array.isArray(p.acciones) && p.acciones.length >= 2, m + ': paso con animación sin acciones (botones)');
+    // integración v3: "el aire" en las lecciones del aire (flujo, fuerzas, giros y una región de airflow.js)
+    if (p.aire !== undefined) {
+      var AIRE_FOCOS = ['flaps', 'ailerons', 'elevator', 'rudder', 'prop', 'wingtips', 'stall', 'tail', 'wing'];
+      ok(p.aire && typeof p.aire === 'object', m + ': aire es un objeto');
+      ok(p.aire && (p.aire.flujo || p.aire.fuerzas || p.aire.giros), m + ': aire muestra algo (flujo, fuerzas o giros)');
+      ok(!p.aire || p.aire.foco === undefined || AIRE_FOCOS.indexOf(p.aire.foco) >= 0, m + ': aire.foco válido (' + (p.aire && p.aire.foco) + ')');
+      ok(!p.aire || Object.keys(p.aire).every(function (k) { return ['flujo', 'fuerzas', 'giros', 'foco'].indexOf(k) >= 0; }), m + ': aire sólo con flujo/fuerzas/giros/foco');
+      ok(p.anim !== null || (p.acciones && p.acciones.length), m + ': aire en un paso con movimiento');
+    }
+    if (p.acciones !== undefined) {
+      ok(Array.isArray(p.acciones) && p.acciones.length >= 1 && p.acciones.length <= 7, m + ': acciones 1–7');
+      var vistas = {};
+      (p.acciones || []).forEach(function (x, q) {
+        ok(x && texto(x.etiqueta) && x.etiqueta.length <= 30, m + ' acción ' + q + ': etiqueta corta');
+        ok(x && POSES.indexOf(x.pose) >= 0, m + ' acción ' + q + ': pose válida (' + (x && x.pose) + ')');
+        ok(x && !vistas[x.pose], m + ' acción ' + q + ': pose repetida');
+        if (x) vistas[x.pose] = true;
+      });
+    }
   });
 });
 

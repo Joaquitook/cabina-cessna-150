@@ -40,6 +40,9 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
  *    itself to fit any camera.far. world.fog (THREE.Fog) is kept for compatibility (colour = horizon haze, range ≈
  *    the haze) but is no longer put on the scene unless world.autoFog is set to true before the first render.
  *  - The windsock streams toward 240° (light breeze from 060°, straight down runway 06): the sim has no wind.
+ *  - world.createExteriorView() → {group, update(o), dispose()}: a second view of this scenery for exterior.js's 'cielo'
+ *    backdrop (shared geometry/textures, own haze uniforms, its own root transform; see the function). C150.World.current
+ *    = the last world created (exterior.js finds it there: core creates the world before the exterior).
  *  - Extra read-only fields: world.fog, world.sunDirection (world frame), world.getSunDirectionLocal(out)
  *    (sun direction in cockpit coordinates, handy for aiming the cockpit's directional light), world.airport.
  */
@@ -1796,6 +1799,105 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
 
     // unlit scenery: never tone mapped (RENDERING NOTES in core.js)
     group.traverse(function (o) { if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(function (m) { m.toneMapped = false; }); });
+
+    /* ============================================== a second view of this scenery (exterior 'cielo' backdrop) */
+    /**
+     * world.createExteriorView() → { group, update(o), dispose() }: the same sky, haze, countryside, airfield and clouds
+     * for ANOTHER scene (exterior.js), sharing every geometry and texture (no extra GPU memory except the copied scene
+     * graph and a few materials). Its materials get their own haze uniforms (that scene's frame: up = +Y, sun turned
+     * by the heading); the airplane's own ground-shadow decals are left out (the exterior has a real shadow).
+     * update(o) once per frame AFTER world.update(): o = { x, z (world m), heading (°), agl (m: ground below the
+     * airplane's CG), groundY (scene y of the ground when agl = 0), eyeH (camera height above the ground, m),
+     * far (camera far) }. The view's root: scene = T(0, groundY − agl, 0) · R_y(heading) · T(−x, 0, −z) · world.
+     */
+    function createExteriorView() {
+      var hz = {
+        uHazeColor: hazeU.uHazeColor, uHazeSun: hazeU.uHazeSun, uHazeA: hazeU.uHazeA, uHazeB: hazeU.uHazeB,
+        uSunS: { value: SUN.clone() }, uUpS: { value: new THREE.Vector3(0, 1, 0) },
+        uEyeH: { value: 1.5 }, uHazeFar: { value: HAZE_FAR }
+      };
+      var FLAGS = ['side', 'transparent', 'depthWrite', 'depthTest', 'blending', 'blendSrc', 'blendDst', 'blendEquation', 'toneMapped',
+        'opacity', 'vertexColors', 'polygonOffset', 'polygonOffsetFactor', 'polygonOffsetUnits', 'premultipliedAlpha', 'alphaTest',
+        'colorWrite', 'visible'];
+      var mats = [], matMap = [];
+      function viewMat(m) {
+        for (var i = 0; i < matMap.length; i++) if (matMap[i][0] === m) return matMap[i][1];
+        var c;
+        if (m.isShaderMaterial) {
+          var u = {};
+          for (var key in m.uniforms) u[key] = hz[key] || m.uniforms[key];   // textures and the rest: shared objects
+          c = new THREE.ShaderMaterial({ uniforms: u, vertexShader: m.vertexShader, fragmentShader: m.fragmentShader });
+          c.defines = Object.assign({}, m.defines);
+          c.fog = false;
+          FLAGS.forEach(function (f) { c[f] = m[f]; });
+        } else {
+          c = m.clone();   // keeps the texture references (no texture copies)
+          var inner = m.onBeforeCompile, innerKey = m.customProgramCacheKey();
+          c.onBeforeCompile = function (shader, renderer) {
+            inner.call(this, shader, renderer);
+            for (var key2 in hz) if (shader.uniforms[key2]) shader.uniforms[key2] = hz[key2];
+          };
+          c.customProgramCacheKey = function () { return 'c150-xview:' + innerKey; };
+        }
+        mats.push(c); matMap.push([m, c]);
+        return c;
+      }
+      var pairs = [];
+      function copyNode(o) {
+        if (o === planeShadow) return null;
+        var c;
+        if (o.isInstancedMesh) {
+          c = new THREE.InstancedMesh(o.geometry, viewMat(o.material), o.count);
+          c.instanceMatrix = o.instanceMatrix;          // shared attribute: one GPU buffer, updated by world.update
+          if (o.instanceColor) c.instanceColor = o.instanceColor;
+        } else if (o.isMesh) c = new THREE.Mesh(o.geometry, Array.isArray(o.material) ? o.material.map(viewMat) : viewMat(o.material));
+        else if (o.isLineSegments) c = new THREE.LineSegments(o.geometry, viewMat(o.material));
+        else if (o.isLine) c = new THREE.Line(o.geometry, viewMat(o.material));
+        else if (o.isPoints) c = new THREE.Points(o.geometry, viewMat(o.material));
+        else if (o.isSprite) c = new THREE.Sprite(viewMat(o.material));
+        else c = new THREE.Group();
+        c.name = o.name; c.renderOrder = o.renderOrder; c.frustumCulled = o.frustumCulled;
+        c.matrixAutoUpdate = o.matrixAutoUpdate;
+        c.position.copy(o.position); c.quaternion.copy(o.quaternion); c.scale.copy(o.scale); c.visible = o.visible;
+        if (!o.matrixAutoUpdate) c.matrix.copy(o.matrix);
+        pairs.push([o, c]);
+        for (var i = 0; i < o.children.length; i++) { var cc = copyNode(o.children[i]); if (cc) c.add(cc); }
+        return c;
+      }
+      var vg = new THREE.Group();
+      vg.name = 'world-view';
+      vg.matrixAutoUpdate = false;
+      for (var i = 0; i < group.children.length; i++) { var cn = copyNode(group.children[i]); if (cn) vg.add(cn); }
+      var mR = new THREE.Matrix4(), mT = new THREE.Matrix4(), UPV = new THREE.Vector3(0, 1, 0);
+      function updateView(o) {
+        o = o || {};
+        // follow the moving parts of the original (sky / ground re-centred on the airplane, windsock, clouds, LOD)
+        for (var p = 0; p < pairs.length; p++) {
+          var a = pairs[p][0], b = pairs[p][1];
+          b.visible = a.visible;
+          if (a.matrixAutoUpdate) { b.position.copy(a.position); b.quaternion.copy(a.quaternion); b.scale.copy(a.scale); }
+          if (a.isInstancedMesh) b.count = a.count;
+        }
+        var h = (isFinite(o.heading) ? o.heading : 0) * DEG, agl = isFinite(o.agl) ? Math.max(0, o.agl) : 0;
+        var gy = isFinite(o.groundY) ? o.groundY : 0;
+        mT.makeTranslation(-(o.x || 0), 0, -(o.z || 0));
+        mR.makeRotationY(h);
+        mR.setPosition(0, gy - agl, 0);
+        vg.matrix.multiplyMatrices(mR, mT);
+        vg.matrixWorldNeedsUpdate = true;
+        hz.uSunS.value.copy(SUN).applyAxisAngle(UPV, h);
+        hz.uUpS.value.set(0, 1, 0);
+        hz.uEyeH.value = Math.max(0.5, isFinite(o.eyeH) ? o.eyeH : agl + 1.5);
+        hz.uHazeFar.value = Math.min(HAZE_FAR, (o.far || 60000) * 0.9);
+      }
+      function dispose() {
+        if (vg.parent) vg.parent.remove(vg);
+        mats.forEach(function (m) { m.dispose(); });
+      }
+      return { group: vg, update: updateView, dispose: dispose, haze: hz };
+    }
+
+    api.createExteriorView = createExteriorView;
     api.group = group;
     api.update = update;
     api.setQuality = setQuality;
@@ -1806,6 +1908,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     api.quality = 2;
     api.cloudCount = function () { return cloudVisible; };
     void rnd;
+    C150.World.current = api;   // the last world created (exterior.js reuses its scenery for the 'cielo' backdrop)
     return api;
   }
 
