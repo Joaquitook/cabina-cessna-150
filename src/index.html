@@ -44,10 +44,11 @@
     <section id="viewport" class="viewport" aria-label="Cabina en 3D. Arrastrá para mirar, tocá un control para conocerlo.">
       <div class="vp-top">
         <div id="vp-status" class="vp-status" aria-label="Estado del avión"></div>
-        <label class="vp-scenario">
-          <span class="vp-scenario-label">Escenario</span>
+        <div class="vp-scenario">
+          <label class="vp-scenario-label" for="vp-scenario-select">Escenario</label>
           <select id="vp-scenario-select" aria-label="Escenario: dónde y cómo está el avión"></select>
-        </label>
+          <button type="button" id="vp-scenario-back" class="vp-scenario-back" aria-label="Volver al escenario" hidden><span class="vsb-long">Volver al escenario</span><span class="vsb-short">Volver</span></button>
+        </div>
       </div>
 
       <div id="vp-stall" class="vp-stall" hidden role="status">

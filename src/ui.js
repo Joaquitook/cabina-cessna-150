@@ -42,6 +42,12 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
  *    in localStorage 'c150.layout'. 3D callouts: label + leader line for the hovered control (any mode) or the
  *    selected one (Explorar, Recorrido, Checklists, Lo básico), anchored with Core.projectControl.
  *  - VOLAR has two sections: "Practicar" (as before) and "Situaciones" (C150.Situations, situations.js + data).
+ *    A "Mostrar el aire" switch (both sections; on by default on computers, off on phones, localStorage 'c150.volarAir')
+ *    turns on Core.setAirPeek('vuelo'): the flow is always drawn in the exterior view while flying and the caption shows
+ *    only the calm air explanations of deliberate inputs (no generic surfaces line).
+ *  - Demonstrations (a lesson / Explorar animation or a held pose mirrored into the cockpit): the "Escenario" selector
+ *    shows "Demostración en curso" with a "Volver al escenario" button, and a "Demostración" chip leads the status
+ *    chips (which then describe the demonstration airplane); picking a scenario ends the demonstration first.
  */
 (function (C150) {
   'use strict';
@@ -259,7 +265,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   function presetApplied(name) {
     currentPreset = name;
     var sel = $('vp-scenario-select');
-    if (sel && sel.value !== name) sel.value = name;
+    if (sel && sel.value !== name && !demoOn) sel.value = name;
     presetListeners.forEach(function (fn) { safe(function () { fn(name); }, 'preset listener'); });
     kick();
   }
@@ -442,7 +448,23 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   /** "El aire" in the whole app: where the student explores the cockpit, moving a flight control briefly shows the air
    *  around that part of the airplane in the exterior view (Core.setAirPeek; lessons and AIRE own the flow themselves). */
   var AIR_PEEK_MODES = { explorar: 1, recorrido: 1, checklists: 1 };
-  function syncAirPeek() { if (has('setAirPeek')) cc('setAirPeek', !!AIR_PEEK_MODES[mode]); }
+  /** VOLAR: "Mostrar el aire" → Core.setAirPeek('vuelo'): the flow is always drawn while flying and a calm caption
+   *  explains only deliberate inputs (core.js "el aire en VOLAR"). On by default on computers, off on phones; remembered. */
+  var volarAir = null;
+  function voAirOn() {
+    if (volarAir === null) {
+      var v = store.get('volarAir', null);
+      if (typeof v === 'boolean') volarAir = v;
+      else if (coreReady) volarAir = !cc('isMobile');
+      else return true;
+    }
+    return volarAir;
+  }
+  function syncAirPeek() {
+    if (!has('setAirPeek')) return;
+    if (mode === 'volar') cc('setAirPeek', voAirOn() ? 'vuelo' : false);
+    else cc('setAirPeek', !!AIR_PEEK_MODES[mode]);
+  }
 
   /* ================================================================== theme, sound, help, tabs */
 
@@ -687,7 +709,14 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       sel.appendChild(h('option', { value: sc[0], title: desc || null }, sc[1]));
     });
     sel.value = currentPreset;
-    sel.addEventListener('change', function () { applyPreset(sel.value); });
+    sel.addEventListener('change', function () {
+      if (sel.value === DEMO_VALUE) return;
+      var name = sel.value;
+      if (demoOn) endDemo();                    // another scenario during a demonstration: the demonstration ends first
+      applyPreset(name);
+    });
+    var back = $('vp-scenario-back');
+    if (back) back.addEventListener('click', function () { endDemo(); });
 
     // inset buttons
     $('inset-swap').addEventListener('click', function () {
@@ -728,6 +757,11 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
 
   function getCaption() {
     var c = Core();
+    // VOLAR with "Mostrar el aire": only the calm air explanations (the generic surfaces line would change all the time)
+    if (mode === 'volar' && coreReady && voAirOn() && c && isFn(c.getAirPeek)) {
+      var pk = safe(function () { return c.getAirPeek(); });
+      return pk && typeof pk.caption === 'string' ? pk.caption : '';
+    }
     if (c && isFn(c.getCaption)) { var t = safe(function () { return c.getCaption(); }); if (typeof t === 'string') return t; }
     var ext = c && (c.exterior || c.ext);
     if (ext && typeof ext.caption === 'string') return ext.caption;
@@ -938,10 +972,12 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     }
     // big exterior, or a small inset (phones, where a caption under it would be clipped): caption as a subtitle
     if (mainView === 'exterior' || !insetRect || insetRect.w < 240) {
-      // left+right+fit-content+auto margins: centred, and it may use the whole width (left:50% would halve it)
-      st.left = '12px'; st.right = '12px'; st.top = 'auto'; st.bottom = (flypadShown() ? VO.overlay.offsetHeight + 74 : 62) + 'px';
+      // left+right+fit-content+auto margins: centred, and it may use the whole width (left:50% would halve it);
+      // phones get 8 px gutters so a long lesson line needs fewer lines
+      var vpw = $('viewport') ? $('viewport').clientWidth : 0, gut = vpw && vpw < 560 ? 8 : 12;
+      st.left = gut + 'px'; st.right = gut + 'px'; st.top = 'auto'; st.bottom = (flypadShown() ? VO.overlay.offsetHeight + 74 : 62) + 'px';
       st.width = 'fit-content'; st.marginLeft = st.marginRight = 'auto';
-      st.maxWidth = 'min(560px, calc(100% - 24px))'; st.transform = 'none'; st.textAlign = 'center';
+      st.maxWidth = 'min(560px, calc(100% - ' + (2 * gut) + 'px))'; st.transform = 'none'; st.textAlign = 'center';
     } else {
       st.left = insetRect.x + 'px'; st.right = 'auto'; st.top = (insetRect.y + insetRect.h + 6) + 'px'; st.bottom = 'auto';
       st.marginLeft = st.marginRight = '0';
@@ -1052,6 +1088,62 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     tt.style.transform = 'translate(' + Math.round(x) + 'px,' + Math.round(y) + 'px)';
   }
 
+  /* ---------------------------------------------------------------- demonstrations vs the "Escenario" selector
+   * While an exterior animation or a held pose is mirrored into the cockpit (Core.isMirroring), the airplane is NOT in
+   * the selected scenario: the selector says "Demostración en curso" (a disabled option), a "Volver al escenario" button
+   * ends the demonstration (the core then gives the scenario's airplane back), the status chips show the demonstration
+   * airplane with a "Demostración" chip first. Picking another scenario ends the demonstration and applies it. */
+  var DEMO_VALUE = '__demo';
+  var demoOn = false;
+  function demoActive() {
+    if (!coreReady) return false;
+    if (has('isMirroring')) return !!cc('isMirroring');
+    var a = cc('getAnimState');
+    return !!(a && a.active);
+  }
+  function scenarioName(id) {
+    for (var i = 0; i < SCENARIOS.length; i++) if (SCENARIOS[i][0] === id) return SCENARIOS[i][1];
+    return id || '';
+  }
+  function demoLabel() {
+    var c = Core(), ext = c && (c.exterior || c.ext), id = ext && ext.posing;
+    if (id) {
+      var P = arr(cc('getPoses'));
+      for (var i = 0; i < P.length; i++) if (P[i] && P[i].id === id && P[i].etiqueta) return 'Demostración: ' + P[i].etiqueta;
+    }
+    return 'Demostración en curso';
+  }
+  function syncDemo() {
+    var on = demoActive();
+    var sel = $('vp-scenario-select'), back = $('vp-scenario-back'), box = doc.querySelector('.vp-scenario');
+    if (back) setAttr(back, 'title', 'Termina la demostración y vuelve al escenario: ' + scenarioName(currentPreset));
+    if (on === demoOn || !sel) return;
+    demoOn = on;
+    var opt = $('vp-scenario-demo');
+    if (on) {
+      if (!opt) { opt = h('option', { id: 'vp-scenario-demo', value: DEMO_VALUE, disabled: true }, 'Demostración en curso'); sel.insertBefore(opt, sel.firstChild); }
+      sel.value = DEMO_VALUE;
+    } else {
+      if (opt && opt.parentNode) opt.parentNode.removeChild(opt);
+      sel.value = currentPreset;
+    }
+    if (back) back.hidden = !on;
+    if (box) toggleClass(box, 'is-demo', on);
+    setAttr(sel, 'aria-label', on ? 'Escenario: ahora hay una demostración en curso; elegí uno para terminarla'
+      : 'Escenario: dónde y cómo está el avión');
+    positionPaneLabels();
+  }
+  /** Ends the demonstration (pose / animation) wherever it came from; a lesson step keeps its buttons in sync. */
+  function endDemo() {
+    var inLesson = mode === 'basico' && LB.idx >= 0;
+    if (inLesson) { LB.pose = null; LB.auto = false; LB.poseCaption = ''; }
+    clearExteriorPose();
+    cc('playExterior', null);
+    if (inLesson) { lbSyncActions(); var p = lbStep(); if (p) lbAir(p); }
+    syncMainView();
+    kick();
+  }
+
   function buildStatus() {
     var box = $('vp-status');
     function chip(key) {
@@ -1060,15 +1152,21 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       box.appendChild(el);
       status[key] = { el: el, t: t };
     }
-    chip('paused'); chip('engine'); chip('master'); chip('ground'); chip('ias'); chip('alt');
+    chip('demo'); chip('paused'); chip('engine'); chip('master'); chip('ground'); chip('ias'); chip('alt');
     status.paused.el.classList.add('is-paused');
     setText(status.paused.t, 'Pausa');
     status.paused.el.hidden = true;
+    status.demo.el.classList.add('is-demo');
+    status.demo.el.hidden = true;
   }
   function updateStatus(s) {
     if (!status.engine || !s) return;
     var e = s.engine || {}, a = s.air || {};
-    status.paused.el.hidden = !s.paused;
+    syncDemo();
+    // during a demonstration the chips show the airplane of the demonstration (the mirrored state), labelled as such
+    status.demo.el.hidden = !demoOn;
+    if (demoOn) setText(status.demo.t, demoLabel());
+    status.paused.el.hidden = !s.paused || demoOn;
     if (e.running) {
       setText(status.engine.t, 'Motor en marcha · ' + Math.round(num(e.rpm, 0) / 10) * 10 + ' RPM');
       status.engine.el.className = 'chip-st is-on';
@@ -3024,6 +3122,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     VO.live = [];
     clear(v);
     v.appendChild(voTabs());
+    var airRow = voAirToggle();
+    if (airRow) v.appendChild(airRow);
     if (VO.tab === 'situaciones' && VO.sitView) {      // "Situaciones prácticas" (situations.js keeps its own DOM)
       v.appendChild(VO.sitView);
       if (hadFocus) { var tb = v.querySelector('.vo-tab[aria-selected="true"]'); if (tb) safe(function () { tb.focus({ preventScroll: true }); }); }
@@ -3077,6 +3177,24 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     var s = S();
     if (s) runLive(VO.live, s);
     if (hadFocus) { var t = $('vo-mission-title') || v.querySelector('button'); if (t) safe(function () { t.focus({ preventScroll: true }); }); }
+  }
+
+  /** "Mostrar el aire" switch (both VOLAR sections). */
+  function voAirToggle() {
+    if (!coreReady || !has('setAirPeek')) return null;
+    var b = h('button', {
+      type: 'button', class: 'lb-loop vo-air', role: 'switch', 'aria-checked': voAirOn() ? 'true' : 'false',
+      title: 'Líneas de aire alrededor del avión en la vista de afuera y una explicación corta cuando movés un mando a propósito',
+      onclick: function () {
+        volarAir = !voAirOn();
+        store.set('volarAir', volarAir);
+        setAttr(b, 'aria-checked', volarAir ? 'true' : 'false');
+        syncAirPeek();
+        kick();
+      }
+    }, h('span', { class: 'lb-loop-track', 'aria-hidden': 'true' }), 'Mostrar el aire');
+    return h('div', { class: 'vo-air-row' }, b,
+      h('span', { class: 'vo-air-hint', text: 'Mientras volás, en la vista de afuera. Te explico cuando movés un mando a propósito.' }));
   }
 
   /* --- VOLAR sections: "Practicar" (free flight + missions) · "Situaciones" (situations.js, contract v3) --- */

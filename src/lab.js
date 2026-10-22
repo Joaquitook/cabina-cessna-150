@@ -28,6 +28,10 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
  *  - Flaps: los botones 0/10/20/30/40 usan el motor real (≈ 9 s de 0° a 40°, flapSwitch DOWN/UP) y al llegar
  *    dejan el valor exacto; sin tensión en la barra los ponen directo.
  *  - Vistas de región (acercar): Core.setExteriorView(región) si la acepta; si no, la vista con nombre del paso.
+ *  - Narración y pérdida: mientras el ala está en pérdida la franja de abajo del avión (y "Qué está pasando") muestra
+ *    siempre la explicación de la pérdida (la regla 'perdida' de data/lab.js aunque esté en su 'espera', o el paso del
+ *    experimento que la provoca); las otras líneas de ese momento van sólo al historial. La franja entra con un brillo
+ *    corto, nunca desde opacidad 0 (donde las animaciones CSS se congelan, el texto igual se ve).
  */
 (function (C150) {
   'use strict';
@@ -507,7 +511,12 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     applySet(st.set);
     (Array.isArray(st.luego) ? st.luego : []).forEach(function (l) { if (l && isFinite(l.tras) && l.set) L.timers.push({ t: l.tras, set: l.set }); });
     if (L.narrator) L.narrator.reset();
-    if (Array.isArray(st.cadena) && st.cadena.length >= 2) say({ id: 'exp', tono: 'info', tipo: 'evento', cadena: st.cadena, t: 0, exp: true });
+    if (Array.isArray(st.cadena) && st.cadena.length >= 2) {
+      // a step that takes the wing past the critical angle explains the stall itself: it stays on screen while stalled
+      var ta = st.set && st.set.tunnel ? num(st.set.tunnel.aoa, NaN) : NaN;
+      var tf = st.set && isFinite(st.set.flaps) ? st.set.flaps : num(S() && S().flaps, 0);
+      say({ id: 'exp', tono: 'info', tipo: 'evento', cadena: st.cadena, t: 0, exp: true, stall: isFinite(ta) && ta >= Lab.stallAoa(tf) });
+    }
     if (i === ex.pasos.length - 1) markDone(ex.id);
     renderRun();
     A.kick();
@@ -525,12 +534,36 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
 
   /* ------------------------------------------------------------------ narration */
 
-  function say(item) {
+  /** keep = true: the line goes to the log ("Antes") but the strip keeps showing the current one (while stalled). */
+  function say(item, keep) {
     if (!item) return;
-    L.current = item;
-    L.history.unshift(item);
+    if (keep && L.current) L.history.splice(1, 0, item);
+    else { L.current = item; L.history.unshift(item); }
     if (L.history.length > 6) L.history.length = 6;
     renderNarration();
+  }
+  /** A line that explains the stall itself (the 'perdida' rules, or an experiment step that stalls the wing). */
+  function isStallLine(it) {
+    return !!it && (!!it.stall || (it.tema === 'perdida' && it.id !== 'bocina' && it.id !== 'recuperacion'));
+  }
+  /** The stall narration from the 'perdida' rule of data/lab.js (it may be waiting for its 'espera': we still say it). */
+  function stallLine(c) {
+    var rules = (C150.DATA && C150.DATA.labNarration) || [], ch = null;
+    for (var i = 0; i < rules.length; i++) {
+      if (rules[i] && rules[i].id === 'perdida' && isFn(rules[i].cadena)) {
+        try { ch = validChain(rules[i].cadena(c, null, {})); } catch (e) { ch = null; }
+        break;
+      }
+    }
+    if (!ch) ch = ['Pasaste el ángulo crítico (' + f0(c.stallAoa) + '°)', 'el aire se despega de la parte de arriba del ala', '¡PÉRDIDA! Nariz abajo y potencia'];
+    return { id: 'perdida', tema: 'perdida', tono: 'warn', tipo: 'evento', prioridad: 5, cadena: ch, t: c.t };
+  }
+  /** Narration tick: what the rules said, but while the wing is stalled the strip keeps explaining the stall (other
+   *  lines only go to the log) and, if no stall line is showing yet, it says one right away. */
+  function narrate(c, said) {
+    var stalled = !!(c && c.stalled);
+    for (var j = said.length - 1; j >= 0; j--) say(said[j], stalled && !isStallLine(said[j]) && isStallLine(L.current));
+    if (stalled && !isStallLine(L.current)) say(stallLine(c));
   }
   function chainEl(cadena, tono, compact) {
     var wrap = h('div', { class: 'lab-chain' + (compact ? ' lab-chain--compact' : '') + ' is-' + (tono || 'info'), role: 'group' });
@@ -1348,8 +1381,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     if (L.el.afHint) L.el.afHint.hidden = L.mode !== 'tunel';
     if (t - L.narrT >= NARR_DT) {
       L.narrT = t;
-      var said = L.narrator ? L.narrator.update(c) : [];
-      for (var j = said.length - 1; j >= 0; j--) say(said[j]);
+      narrate(c, L.narrator ? L.narrator.update(c) : []);
     }
   };
   Lab.frame = function () { /* the lab runs its own smooth loop (tickLoop) */ };

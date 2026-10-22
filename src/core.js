@@ -50,13 +50,16 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
  *     state.puppet (sim.js) and every frame copies the animation's bank/pitch/yaw/ias/vs/turnRate/slip into the puppet
  *     and its yokeRoll/yokePitch/rudder/brakes/throttle/flaps/engineOn into the inputs (engine via Sim.actions.setEngine,
  *     flaps: the switch shows the direction of travel and the indicator follows exactly), with the master on, the
- *     gyros spun and, for a flight movement started on the ground, the airplane lifted to 2500 ft AGL. So the cockpit,
+ *     gyros spun and, for a flight movement started on the ground, the airplane lifted to 1500 ft AGL (a practice-area
+ *     height) under a clear sky (world.setHaze(0.45): a crisp horizon line through the windshield). So the cockpit,
  *     the world through the windshield and every instrument show the movement from inside. When it ends the snapshot is
  *     restored in place (events and time are not rolled back). The sim keeps stepping during a mirror even if paused.
  *     applyPreset during a mirror drops the snapshot (the new preset is the base of the next one).
- *   *setAirPeek(bool) · *getAirPeek() → {region, key, caption, virtual}|null · event *'airpeek'(info|null): moving a flight
- *     control in the cockpit briefly shows the air around that part in the exterior view with a caption (see "el aire
- *     en toda la app" below; getCaption() returns the peek caption while it runs and no animation or pose does).
+ *   *setAirPeek(bool | 'vuelo') · *getAirPeek() → {region, key, caption, virtual, mode}|null · event *'airpeek'(info|null):
+ *     true (Explorar, Recorrido, Checklists): moving a flight control in the cockpit briefly shows the air around that
+ *     part in the exterior view with a caption (see "el aire en toda la app" below). 'vuelo' (VOLAR): the flow is always
+ *     drawn while flying and a calm caption explains only deliberate inputs, with a cooldown per control (see "el aire
+ *     en VOLAR"). getCaption() returns the peek caption while it runs and no animation or pose does.
  *
  * Decisions where the contract leaves room (other agents: please read):
  *  - Colour pipeline: physically based (see RENDERING NOTES below). setToneMapping('none') is kept for debugging.
@@ -1450,7 +1453,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   }
   function applyPreset(name) {
     if (!state) return null;
-    if (mirror) { mirror = null; emit('mirror', false); }   // the next frame starts a fresh mirror if a pose still runs
+    if (mirror) { mirror = null; mirrorHaze(false); emit('mirror', false); }   // the next frame starts a fresh mirror if a pose still runs
+    if (peek.mode === 'vuelo') { endFlightCaption(); peek.trk = {}; }         // a new airplane: nothing the student did
     if (Sim && Sim.applyPreset) Sim.applyPreset(state, name);
     cancelMomentary();
     releaseAllKeys();
@@ -2053,15 +2057,25 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     { key: 'trim', eps: 0.06, region: 'tail' },
     { key: 'carbHeat', eps: 0.2, region: 'prop' }
   ];
-  var peek = { enabled: false, on: null, key: null, t: 0, ref: {}, cam: null, flowWas: null, caption: '', virtual: false,
-    vstate: null, vbase: null, vaero: null };
-  /** The UI turns the peek on in the modes where the student explores the cockpit (Explorar, Recorrido, Checklists). */
+  var peek = { enabled: false, mode: null, on: null, key: null, t: 0, ref: {}, cam: null, flowWas: null, caption: '', virtual: false,
+    vstate: null, vbase: null, vaero: null,
+    // 'vuelo' (VOLAR): live flow + calm captions
+    live: false, liveWas: null, trk: {}, shown: 0, idle: 0, v0: 0 };
+  /** The UI turns the peek on in the modes where the student explores the cockpit (Explorar, Recorrido, Checklists):
+   *  setAirPeek(true). VOLAR uses setAirPeek('vuelo') (see "El aire en VOLAR" below). false turns it off. */
   function setAirPeek(on) {
-    peek.enabled = !!on;
-    if (!peek.enabled) endAirPeek();
+    var m = on === 'vuelo' ? 'vuelo' : (on ? 'explorar' : null);
+    if (m !== peek.mode) {
+      if (peek.mode === 'vuelo') endFlightFlow(); else endAirPeek();
+      peek.ref = {}; peek.trk = {};
+    }
+    peek.mode = m;
+    peek.enabled = !!m;
     return peek.enabled;
   }
-  function getAirPeek() { return peek.on ? { region: peek.on, key: peek.key, caption: peek.caption, virtual: peek.virtual } : null; }
+  function getAirPeek() {
+    return peek.on ? { region: peek.on, key: peek.key, caption: peek.caption, virtual: peek.virtual, mode: peek.mode } : null;
+  }
   function peekCaption(key, s, dir) {
     var run = !!(s.engine && s.engine.running), v;
     switch (key) {
@@ -2153,6 +2167,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   function updateAirPeek(dt, extShown) {
     var s = state;
     if (!s) return;
+    if (peek.mode === 'vuelo') { updateFlightPeek(dt, extShown); return; }
     var blocked = !peek.enabled || !flow || !ext || !!mirror || !!(s.tunnel && s.tunnel.on) || !extShown ||
       ext.backdrop === 'tunel' || !!ext.playing || !!ext.posing;
     var student = isInteracting() || nowMs() - lastOperateAt < 2500;
@@ -2170,6 +2185,80 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     if (peek.virtual) peekVirtualState(s);
     if (isInteracting()) peek.t = Math.max(peek.t, 1.5);
     if ((peek.t -= dt) <= 0) endAirPeek();
+  }
+
+  /* ------------------------------------------------------------------ "el aire" en VOLAR (setAirPeek('vuelo'))
+   * In VOLAR the controls move all the time, so the explore-style peek (camera fly-to + caption on every change) would
+   * never stop. Instead: while flying (airborne, or rolling at ≥ 30 kt) and the exterior is on screen, the flow is ALWAYS
+   * drawn around the airplane (streamlines, slipstream, tip vortices; the camera is never moved). A caption only comes
+   * for a DELIBERATE input made by the student: a change of at least FLY_BIG[key] from where that control rested (small
+   * corrections never count; a yoke / pedal coming back to the centre is not explained). The flow then emphasises that
+   * region (flow.focus) and shows the moment arcs; the caption stays while the student keeps moving or holding that
+   * control and FLY_LINGER s more (at least FLY_SHOW_MIN s on screen, to be read), then FLY_COOL s must pass before the
+   * same control is explained again. Only one caption at a time; never during a mirror or in the tunnel. */
+  var FLY_SHOW_MIN = 3, FLY_LINGER = 1.5, FLY_COOL = 6;
+  var FLY_BIG = { yokeRoll: 0.3, yokePitch: 0.3, rudder: 0.35, throttle: 0.15, flaps: 4, trim: 0.2, carbHeat: 0.5 };
+  var FLY_CENTERED = { yokeRoll: 0.12, yokePitch: 0.12, rudder: 0.12 };   // back near the centre: nothing to explain
+  function startFlightFlow() {
+    var cur = null;
+    try { cur = flow.get ? flow.get() : null; } catch (e) { cur = null; }
+    if (cur && cur.enabled) return false;                  // a lesson / the AIRE lab owns the flow
+    peek.liveWas = cur ? { enabled: !!cur.enabled, streamlines: cur.streamlines, propwash: cur.propwash, vortices: cur.vortices,
+      pressure: cur.pressure, forces: cur.forces, moments: cur.moments, trails: cur.trails } : { enabled: false };
+    setAirflow({ enabled: true, streamlines: true, propwash: true, vortices: true, pressure: false, forces: false, moments: false, trails: false });
+    peek.live = true;
+    return true;
+  }
+  function endFlightCaption() {
+    if (!peek.on) return;
+    var tr = peek.trk[peek.key];
+    if (tr) { tr.ref = num(state && state[peek.key], tr.ref); tr.cool = FLY_COOL; }
+    peek.on = null; peek.key = null; peek.caption = '';
+    try { if (flow && flow.focus) flow.focus(null); } catch (e) { reportOnce('airflow.focus', e); }
+    if (peek.live) setAirflow({ moments: false });
+    emit('airpeek', null);
+  }
+  function endFlightFlow() {
+    endFlightCaption();
+    if (!peek.live) return;
+    peek.live = false;
+    if (peek.liveWas) setAirflow(peek.liveWas);
+    peek.liveWas = null;
+  }
+  function updateFlightPeek(dt, extShown) {
+    var s = state, air = s.air || {};
+    var blocked = !peek.enabled || !flow || !ext || !!mirror || !!(s.tunnel && s.tunnel.on) || !extShown ||
+      ext.backdrop === 'tunel' || !!ext.playing || !!ext.posing;
+    var flying = !air.onGround || num(air.ias, 0) >= (peek.live ? 20 : 30);
+    if (!blocked && flying && !peek.live) startFlightFlow();
+    else if ((blocked || !flying) && peek.live) endFlightFlow();
+    var student = isInteracting() || nowMs() - lastOperateAt < 2500;
+    for (var i = 0; i < PEEK_INPUTS.length; i++) {
+      var it = PEEK_INPUTS[i], v = num(s[it.key], 0), tr = peek.trk[it.key];
+      if (!tr) { peek.trk[it.key] = { ref: v, anchor: v, still: 0, cool: 0 }; continue; }
+      tr.cool = Math.max(0, tr.cool - dt);
+      if (Math.abs(v - tr.anchor) > it.eps * 0.5) { tr.anchor = v; tr.still = 0; } else tr.still += dt;
+      if (peek.on && peek.key === it.key) continue;        // the one being explained (below)
+      if (!peek.live) { tr.ref = v; continue; }
+      if (Math.abs(v - tr.ref) < FLY_BIG[it.key]) continue;
+      var centred = FLY_CENTERED[it.key] !== undefined && Math.abs(v) < FLY_CENTERED[it.key];
+      // a change nobody will hear about: not the student's, back to the centre, another caption on, or cooling down
+      if (!student || centred || peek.on || tr.cool > 0) { if (tr.still > 0.3 || !student) tr.ref = v; continue; }
+      peek.on = it.region; peek.key = it.key; peek.virtual = false; peek.shown = 0; peek.idle = 0; peek.v0 = tr.ref;
+      try { if (flow.focus) flow.focus(it.region); } catch (e) { reportOnce('airflow.focus', e); }
+      setAirflow({ moments: true });
+    }
+    if (!peek.on) return;
+    var k = peek.key, cur = num(s[k], 0), t = peek.trk[k];
+    peek.shown += dt;
+    var holding = FLY_CENTERED[k] !== undefined && Math.abs(cur) >= FLY_CENTERED[k] && isInteracting();
+    if ((t && t.still === 0) || holding) peek.idle = 0; else peek.idle += dt;
+    // back near the centre (yoke / pedals released): the explanation of what was done stays while it lingers
+    if (!(FLY_CENTERED[k] !== undefined && Math.abs(cur) < FLY_CENTERED[k] && peek.caption)) {
+      var cap = peekCaption(k, s, cur - peek.v0);
+      if (cap !== peek.caption) { peek.caption = cap; emit('airpeek', getAirPeek()); }
+    }
+    if (peek.shown >= FLY_SHOW_MIN && peek.idle >= FLY_LINGER) endFlightCaption();
   }
 
   /* ------------------------------------------------------------------ air lab hooks (airflow.js, exterior backdrops) */
@@ -2228,6 +2317,13 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     if (a.ground === false || a.onGround === false) return true;
     return num(a.ias, 0) > 30 || Math.abs(num(a.bank, 0)) > 2 || Math.abs(num(a.vs, 0)) > 50 || Math.abs(num(a.pitch, 0)) > 4;
   }
+  var DEMO_AGL = 1500;     // ft above the field for a flight demonstration started on the ground (practice-area height)
+  var DEMO_HAZE = 0.45;    // aerial-haze density during a demonstration (world.setHaze: 1 = the usual hazy afternoon)
+  /** A clear, crisp day for a demonstration: the far fields keep their colour, so the horizon is a sharp line through
+   *  the windshield and the bank / pitch read at a glance (world.setHaze, eased); the usual haze comes back after. */
+  function mirrorHaze(on) {
+    if (world && world.setHaze) { try { world.setHaze(on ? DEMO_HAZE : 1); } catch (e) { reportOnce('world.setHaze', e); } }
+  }
   function startMirror(a) {
     var air = state.air;
     mirror = { snap: snapCopy(state, true), simRef: state._sim, airborne: null, thr: null };
@@ -2241,6 +2337,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     if (state.vacuum) state.vacuum.suctionInHg = Math.max(num(state.vacuum.suctionInHg, 0), 5);
     if (state.elec && num(state.elec.batteryPct, 100) < 60) state.elec.batteryPct = 80;
     if (air) air.hiHeading = air.heading;
+    mirrorHaze(true);
     emit('mirror', true);
   }
   function endMirror() {
@@ -2250,6 +2347,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     snapRestore(state, m.snap);
     if (state.puppet) state.puppet.on = false;
     cancelMomentary();
+    mirrorHaze(false);
     emit('mirror', false);
     emit('frame', state, 0);
   }
@@ -2257,9 +2355,10 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     var pp = state.puppet, air = state.air, act = actions();
     var airborne = animAirborne(a);
     if (airborne && mirror.airborne !== true) {
-      // seen from inside a flight demonstration needs air under the wings: start well above the field
+      // seen from inside a flight demonstration needs air under the wings: a practice-area height (DEMO_AGL ft), low
+      // enough that the fields, the roads and the horizon line stay crisp through the windshield
       if (air.onGround || num(air.altitude, 0) < num(state.fieldElevation, 0) + 300) {
-        air.altitude = num(state.fieldElevation, 0) + 2500;
+        air.altitude = num(state.fieldElevation, 0) + DEMO_AGL;
         air.onGround = false;
       }
     }
@@ -2314,7 +2413,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     if (!state || !Sim || !Sim.step) return;
     var a = getAnimState();
     var active = !!(a && a.active) && !!state.puppet;
-    if (mirror && mirror.simRef !== state._sim) mirror = null;   // a preset was applied behind our back: start over
+    if (mirror && mirror.simRef !== state._sim) { mirror = null; if (!active) mirrorHaze(false); }   // a preset was applied behind our back: start over
     if (active && !mirror) startMirror(a);
     else if (!active && mirror) endMirror();
     if (mirror) { try { applyMirror(a, dt); } catch (e) { reportOnce('mirror', e); } }

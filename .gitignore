@@ -6,3 +6,6 @@ dist/
 .claude/
 node_modules/
 *.log
+
+# Material del curso (no se publica)
+_teorico/

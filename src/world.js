@@ -45,6 +45,9 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
  *    = the last world created (exterior.js finds it there: core creates the world before the exterior).
  *  - Extra read-only fields: world.fog, world.sunDirection (world frame), world.getSunDirectionLocal(out)
  *    (sun direction in cockpit coordinates, handy for aiming the cockpit's directional light), world.airport.
+ *  - world.setHaze(scale, instant?) → scale (0.2…2, eased ≈ 0.5 s) · world.getHaze(): density of the aerial haze. core.js
+ *    asks for 0.45 (a clear, crisp day: the far fields keep their colour, so the horizon is a sharp line) while a lesson
+ *    demonstration is mirrored into the cockpit, and gives 1 back afterwards. The exterior 'cielo' view shares it.
  */
 (function (C150) {
   'use strict';
@@ -1688,6 +1691,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     var mAir = new THREE.Matrix4();
     var euler = new THREE.Euler(0, 0, 0, 'YXZ');
     var time = 0;
+    var hazeScale = 1, hazeTarget = 1;   // setHaze(): 1 = the usual hazy afternoon, < 1 = clearer air (eased)
     var mCloud = new THREE.Matrix4(), qCloud = new THREE.Quaternion(), vS = new THREE.Vector3(), vP = new THREE.Vector3();
     var cloudOrder = cloudData.map(function (c, i) { return i; });
     var cloudDist = new Float32Array(cloudData.length);
@@ -1769,6 +1773,11 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       hazeU.uSunS.value.copy(SUN).transformDirection(group.matrix);
       hazeU.uUpS.value.set(0, 1, 0).transformDirection(group.matrix);
       hazeU.uEyeH.value = agl + 1.5;
+      if (hazeScale !== hazeTarget) {
+        hazeScale += (hazeTarget - hazeScale) * Math.min(1, dt / 0.45);
+        if (Math.abs(hazeTarget - hazeScale) < 0.004) hazeScale = hazeTarget;
+        hazeU.uHazeA.value = HAZE_A * hazeScale;
+      }
       fog.near = 3000 + agl * 3;
       fog.far = Math.min(HAZE_FAR, 30000 + agl * 12);
 
@@ -1780,6 +1789,14 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       // windsock: gentle flapping around 240°
       sockPivot.rotation.set(0, sockYaw + Math.sin(time * 0.9) * 0.08 + Math.sin(time * 2.3) * 0.03,
         -0.12 + Math.sin(time * 1.7) * 0.04);
+    }
+
+    /** Visibility of the day: scale of the aerial-haze density (1 = default; 0.45 = a clear, crisp winter day with the
+     *  horizon sharp against the sky). Eased over ≈ 0.5 s in update(); the exterior 'cielo' view shares it. */
+    function setHaze(scale, instant) {
+      hazeTarget = Math.min(2, Math.max(0.2, isFinite(scale) ? +scale : 1));
+      if (instant) { hazeScale = hazeTarget; hazeU.uHazeA.value = HAZE_A * hazeScale; }
+      return hazeTarget;
     }
 
     function setQuality(level) {
@@ -1901,6 +1918,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     api.group = group;
     api.update = update;
     api.setQuality = setQuality;
+    api.setHaze = setHaze;
+    api.getHaze = function () { return hazeTarget; };
     api.fog = fog;
     api.sunDirection = SUN;
     api.getSunDirectionLocal = getSunDirectionLocal;

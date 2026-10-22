@@ -177,6 +177,23 @@ kbd {
   color-scheme: dark;
 }
 .vp-scenario select option { background: #151D24; color: #E4EAEE; }
+/* a demonstration is running: the selector says so and offers the way back (ui.js syncDemo) */
+.vp-scenario.is-demo { box-shadow: inset 0 0 0 1px #F08A3C; }
+.vp-scenario.is-demo select { color: #F5A869; font-weight: 700; }
+.vp-scenario-back {
+  pointer-events: auto; min-height: 30px; padding: 0 10px; margin-left: 2px; border: 0; border-radius: 4px; background: #F08A3C;
+  color: #111; font-family: var(--font-display); font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+  font-size: 13px; white-space: nowrap; cursor: pointer;
+}
+.vp-scenario-back:hover { filter: brightness(1.08); }
+.vp-scenario-back[hidden] { display: none; }
+.vp-scenario-back .vsb-short { display: none; }
+.chip-st.is-demo { background: #F08A3C; color: #111; font-weight: 700; }
+.chip-st.is-demo .dot { background: currentColor; animation: stall-pulse .8s ease-in-out infinite alternate; }
+@media (prefers-reduced-motion: reduce) { .chip-st.is-demo .dot { animation: none; } }
+/* VOLAR: "Mostrar el aire" */
+.vo-air-row { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 10px; margin: -6px 0 12px; }
+.vo-air-hint { color: var(--fg-soft); font-size: 14px; line-height: 1.35; flex: 1 1 200px; }
 
 .vp-stall {
   position: absolute; z-index: 4; left: 50%; bottom: 62px; transform: translateX(-50%);
@@ -829,7 +846,9 @@ details.fold[open] > summary::after { content: '−'; }
   .detail-title { font-size: 27px; }
   .lead { font-size: 16px; margin: 6px 0 10px; }
   .inset-caption { font-size: 12px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-  .inset-caption.is-big { font-size: 17px; padding: 6px 10px; -webkit-line-clamp: 2; }
+  /* phones: the lesson / demonstration subtitle wraps (2–3 lines, 4 for the longest at 360 px) instead of "…"; the
+     clamp is only a safety net. 16 px with a calm line height stays readable over the 3D view. */
+  .inset-caption.is-big { font-size: 16px; line-height: 1.36; padding: 7px 10px; -webkit-line-clamp: 4; text-wrap: pretty; }
   .step-card h2 { font-size: 27px; }
   .step-card .step-text { font-size: 18px; }
   .lb-act-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -837,6 +856,11 @@ details.fold[open] > summary::after { content: '−'; }
   #panel-volar .mode-sub { display: none; }
   .chip-st { font-size: 11px; padding: 2px 5px; gap: 4px; }
   .vp-scenario select { font-size: 13px; }
+  .vp-scenario.is-demo .vp-scenario-label { display: none; }
+  .vp-scenario.is-demo select { max-width: 40vw; }
+  .vp-scenario-back { min-height: 34px; padding: 0 9px; }
+  .vp-scenario-back .vsb-long { display: none; }
+  .vp-scenario-back .vsb-short { display: inline; }
 }
 /* phones: the six tabs fit in one row (no hidden VOLAR / QUIZ off-screen); narrower than ~340 px they scroll */
 @media (max-width: 520px) {
@@ -1213,8 +1237,14 @@ details.fold[open] > summary::after { content: '−'; }
 .lab-stage-narr .lab-chain-effect { border-color: rgba(255, 255, 255, .7); }
 .lab-stage-narr .lab-chain.is-warn .lab-chain-cause { background: var(--arc-red); color: #fff; }
 .lab-stage-narr .lab-chain-arrow { color: var(--ov-soft); }
-.lab-stage-narr.is-new { animation: lab-narr-in .45s ease-out; }
-@keyframes lab-narr-in { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
+/* a new line slides in with a short glow, never from opacity 0: where CSS animations stall (throttled embeds) the text
+   must still be there */
+.lab-stage-narr.is-new { animation: lab-narr-in .5s ease-out; }
+@keyframes lab-narr-in {
+  from { transform: translate(-50%, 6px); box-shadow: 0 0 0 2px rgba(240, 138, 60, .7), 0 10px 30px rgba(0, 0, 0, .3); }
+  to { transform: translate(-50%, 0); box-shadow: 0 0 0 0 rgba(240, 138, 60, 0), 0 10px 30px rgba(0, 0, 0, .3); }
+}
+@media (prefers-reduced-motion: reduce) { .lab-stage-narr.is-new { animation: none; } }
 
 .lab-toolbar { position: absolute; left: 12px; right: 12px; bottom: 12px; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; pointer-events: none; }
 .lab-bar-grp {
