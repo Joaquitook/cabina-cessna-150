@@ -15,22 +15,32 @@
 <style>
   html, body { height: auto; }
   body { overflow: auto; font-size: 17px; line-height: 1.55; }
-  .sg { max-width: 1040px; margin: 0 auto; padding: 24px 20px 96px; }
+  .sg-root { max-width: 1040px; margin: 0 auto; padding: 24px 20px 96px; }
   .sg-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--fg); margin-bottom: 8px; }
   .sg-demo { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 18px; border: 1px dashed var(--line); border-radius: var(--radius-m); background: var(--bg); }
   .sg-demo + .sg-demo { margin-top: 12px; }
   .sg-label { font-family: var(--font-data); font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--fg-soft); margin: 18px 0 6px; }
   .sg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
-  .sg-ico { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 6px; border: 1px solid var(--line); border-radius: var(--radius-s); background: var(--surface); font-family: var(--font-data); font-size: 11.5px; color: var(--fg-soft); text-align: center; }
-  .sg-ico .icon { width: 28px; height: 28px; color: var(--fg); }
+  .sg-icn { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 6px; border: 1px solid var(--line); border-radius: var(--radius-s); background: var(--surface); font-family: var(--font-data); font-size: 11.5px; color: var(--fg-soft); text-align: center; }
+  .sg-icn .icon { width: 28px; height: 28px; color: var(--fg); }
   .sg-sw { display: flex; flex-direction: column; justify-content: flex-end; min-height: 74px; padding: 8px 10px; border-radius: var(--radius-s); font-family: var(--font-data); font-size: 12px; border: 1px solid var(--line); }
   .sg-wide { flex: 1 1 100%; }
   .sg-stage { width: 100%; padding: 22px; border-radius: var(--radius-m); background: #0E151B; color: var(--ov-fg); }
   .sg-stage .glass { display: inline-flex; gap: 12px; padding: 10px 14px; border-radius: 10px; background: var(--ov-bg); border: 1px solid var(--ov-line); backdrop-filter: blur(8px); font-family: var(--font-data); font-size: 14px; }
+  /* v5: escenario de ejemplo para el HUD, el dock y la cadena (el mismo CSS que usa la app sobre el 3D) */
+  .sg-3d { position: relative; width: 100%; height: 440px; border-radius: var(--radius-m); overflow: hidden; container-type: inline-size; container-name: vp; --inset-w: 200px;
+    background: radial-gradient(ellipse at 50% 35%, #2A3A4A 0%, #121B24 60%, #0B1117 100%); }
+  .sg-3d--phone { max-width: 390px; height: 520px; --inset-w: 130px; }
+  .sg-3d .sg-inset { position: absolute; z-index: 2; right: 12px; top: 12px; width: 200px; height: 140px; background: linear-gradient(160deg, #4B7BA8, #2A4560); box-shadow: inset 0 0 0 1px rgba(255,255,255,.24); }
+  .sg-3d--phone .sg-inset { right: 8px; top: 8px; width: 130px; height: 96px; }
+  .sg-3d .sg-inset .inset-label { position: absolute; left: 6px; top: 6px; }
+  .sg-paper { padding: 20px; border: 1px solid var(--line); border-radius: var(--radius-m); max-width: 440px; width: 100%; }
+  .sg-pair { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; width: 100%; }
+  .sg-callout-mock { position: absolute; z-index: 3; }
 </style>
 </head>
 <body>
-<div class="sg" id="sg"></div>
+<div class="sg-root" id="sg"></div>
 
 <script src="../src/icons.js"></script>
 <script src="../src/kit.js"></script>
@@ -160,10 +170,77 @@
   sec('Vidrio sobre el 3D', 'cinematográfico');
   demo(h('div', { 'class': 'sg-stage' }, h('span', { 'class': 'glass' }, h('span', { text: 'IAS 085 kt' }), h('span', { text: 'ALT 2 450 ft' }), h('span', { text: 'RPM 2 300' }))));
 
+  /* ---- AIRE · el lenguaje compartido (contrato v5): los mismos componentes que usa cada pestaña */
+  sec('AIRE · el lenguaje compartido', 'panel de papel · HUD · dock · cadena');
+  label('Cabecera, modos, secciones numeradas, tarjetas con código, deslizadores y barras (sobre papel cuadriculado)');
+  var paper = h('div', { 'class': 'sg-paper paper' });
+  paper.appendChild(K.pageHeader({ kicker: '04 · Aire · Laboratorio del aire', title: 'Cómo el aire hace volar al avión', sub: 'Mové los mandos y mirá en vivo cómo se mueve el aire, qué fuerzas aparecen y cómo reacciona el avión.',
+    children: K.modes({ label: 'Modo', value: 'tunel', items: [{ value: 'tunel', label: 'Túnel de viento', sub: 'el avión quieto' }, { value: 'vuelo', label: 'En vuelo', sub: 'el avión reacciona' }] }) }));
+  paper.appendChild(K.section({ num: 'EX', title: 'Experimentos', meta: '8 guiados', body: K.cardCarousel({ label: 'Experimentos', items: [
+    { code: 'E1', title: 'Las cuatro fuerzas', sum: 'Sustentación, peso, empuje y resistencia: cuándo se equilibran y cuándo no.', meta: '4 pasos · en vuelo', current: true, tag: 'Empezá acá', onClick: function () {} },
+    { code: 'E2', title: 'Los flaps', sum: 'Qué cambia en las fuerzas cuando bajás 10°, 20° o 40° de flaps.', meta: '5 pasos · túnel', onClick: function () {} },
+    { code: 'E3', title: 'La pérdida', sum: 'Qué pasa con el aire cuando el ala se pone muy inclinada.', meta: '4 pasos · túnel', onClick: function () {} }] }) }));
+  var rng = K.slider({ label: 'Velocidad del viento', min: 0, max: 140, step: 1, value: 80, big: true, format: function (v) { return Math.round(v) + ' nudos'; },
+    zones: [{ from: 0, to: 47, color: '#D9A400' }, { from: 47, to: 100, color: '#2E9A4E' }, { from: 100, to: 140, color: '#C7362B' }],
+    ticks: [{ v: 0, t: '0' }, { v: 47, t: '47' }, { v: 100, t: '100' }, { v: 140, t: '140', cls: 'is-red' }], quick: [{ v: 50, t: 'DESPEGUE' }, { v: 100, t: 'CRUCERO' }], sub: 'Verde: velocidades normales. Rojo: nunca excederla.' });
+  var flp = K.slider({ label: 'Flaps', min: 0, max: 40, step: 1, value: 20, format: function (v) { return Math.round(v) + '°'; }, detents: [{ v: 0, t: '0°' }, { v: 10, t: '10°' }, { v: 20, t: '20°' }, { v: 30, t: '30°' }, { v: 40, t: '40°' }] });
+  paper.appendChild(K.section({ num: 1, title: 'Mandos', meta: '2 deslizadores', body: h('div', { 'class': 'ctl-grp' }, rng, flp) }));
+  var br = K.bars({ rows: [{ key: 'lift', label: 'Sustentación', color: 'var(--lab-lift)', caption: 'Arriba y abajo' }, { key: 'weight', label: 'Peso', color: 'var(--lab-weight)' }, { key: 'thrust', label: 'Empuje', color: 'var(--lab-thrust)', caption: 'Adelante y atrás' }, { key: 'drag', label: 'Resistencia', color: 'var(--lab-drag)' }] });
+  paper.appendChild(K.section({ num: 2, title: 'Fuerzas', meta: 'en vivo', open: false, body: br }));
+  paper.appendChild(K.section({ num: 3, title: 'Cómo se usa', open: false, body: h('p', { text: 'Esta sección empieza cerrada: tocá el título para abrirla.' }) }));
+  var pap3 = K.modes({ label: 'Tres opciones', value: 'chk', items: [{ value: 'chk', label: 'Checklists', sub: '5 listas' }, { value: 'mis', label: 'Misiones y situaciones', sub: '8 + 6' }, { value: 'qz', label: 'Quiz', sub: '24 preguntas' }] });
+  paper.appendChild(h('div', { style: { 'margin-top': '14px' } }, pap3));
+  paper.appendChild(K.cardCarousel({ list: true, label: 'Lista de tarjetas', items: [{ code: 'L1', title: 'Cómo vuela un avión', sum: 'Las 4 fuerzas, paso a paso.', meta: '5 pasos · 9 min', onClick: function () {} }, { code: 'L2', title: 'Los 3 ejes', sum: 'Alabeo, cabeceo y guiñada.', meta: '5 pasos · 8 min', onClick: function () {} }] }));
+  var sgPair = h('div', { 'class': 'sg-pair' }, paper);
+  root.appendChild(sgPair);
+  var fb = 0; setInterval(function () { fb += 0.05; br.set('lift', 0.5 + 0.1 * Math.sin(fb), Math.round(500 + 60 * Math.sin(fb)) + ' kg'); br.set('weight', 0.5, '500 kg'); br.set('thrust', 0.4 + 0.1 * Math.cos(fb), '31 kg'); br.set('drag', 0.4 + 0.1 * Math.cos(fb), '31 kg'); }, 200);
+
+  /* ---- sobre el 3D */
+  function stage3d(phone) {
+    var wrap = h('div', { 'class': 'sg-3d' + (phone ? ' sg-3d--phone' : '') });
+    var stage = h('div', { 'class': 'vp-stage' });
+    var hd = K.hud({ label: 'Estado del avión', kicker: 'Cabina · Estacionado', bigs: [{ label: 'Motor', unit: 'rpm' }, { label: 'Velocidad', unit: 'nudos' }, { label: 'Altura', unit: 'pies' }] });
+    var t0 = 0;
+    function tick() {
+      t0 += 0.08;
+      hd.set({ kicker: 'Lecciones · En vuelo', live: true, bigs: [{ v: 2300 + Math.round(Math.sin(t0) * 40), u: 'rpm', l: 'Motor' }, { v: 95 + Math.round(Math.sin(t0 * 1.3) * 3), u: 'nudos', l: 'Velocidad' }, { v: 3000 + Math.round(Math.sin(t0 * 0.7) * 30), u: 'pies', l: 'Altura' }],
+        row: [{ text: 'Corriente (master) encendida', onClick: function () {} }, { text: 'Flaps 0°' }, { text: 'En vuelo', onClick: function () {} }],
+        pill: { text: 'En vuelo', tone: 'is-air' },
+        extra: { k: 'Lección 2 · paso 3 de 5', t: '', nums: [{ v: Math.abs(Math.round(Math.sin(t0) * 20)), u: '° der.', l: 'Alabeo' }, { v: 3, u: '° arriba', l: 'Cabeceo' }] } });
+    }
+    tick(); setInterval(tick, 200);
+    stage.appendChild(hd);
+    var bottom = h('div', { 'class': 'vp-bottom' });
+    var bar = K.chainBar();
+    bar.set(['Acelerador', 'Empujás para dar más potencia', 'La hélice gira más rápido'], { key: 'demo' });
+    var vista = K.dockGroup({ label: 'Vista', value: 'pilot', items: ['Piloto', 'Horizonte', 'Tablero', 'Izq.', 'Centro', 'Der.', 'Piso', 'Techo'].map(function (t, i) { return { value: ['pilot', 'flight', 'panel', 'left', 'center', 'right', 'floor', 'overhead'][i], label: t }; }) });
+    var dis = K.dockGroup({ label: 'Diseño', value: 'cabina', items: [{ value: 'cabina', label: 'Cabina' }, { value: 'dos', label: 'Las dos' }, { value: 'afuera', label: 'Afuera' }] });
+    var scn = h('div', { 'class': 'dock-group dock-group--scn' }, h('span', { 'class': 'dock-label', text: 'Escenario' }), h('button', { type: 'button', 'class': 'seg-btn scn-btn' }, h('span', { 'class': 'scn-btn-v', text: 'En vuelo' }), K.icon('chevron-down')));
+    var capas = K.dockGroup({ label: 'Capas', kind: 'chips', items: [{ value: 'flow', label: 'Flujo' }, { value: 'prop', label: 'Hélice' }] }); capas.setPressed('flow', true);
+    bottom.appendChild(bar);
+    bottom.appendChild(K.dock(phone ? [vista, dis, scn] : [vista, dis, scn, capas]));
+    stage.appendChild(bottom);
+    wrap.appendChild(stage);
+    var ins = h('div', { 'class': 'sg-inset' }, h('span', { 'class': 'inset-label', text: 'Así se ve desde afuera' }));
+    wrap.appendChild(ins);
+    return wrap;
+  }
+  label('HUD de vidrio, cadena causa → efecto y dock (vista ancha, 760 px o más)');
+  var w1 = stage3d(false); w1.style.height = '480px'; w1.style.maxWidth = '900px';
+  root.appendChild(h('div', { 'class': 'sg-demo' }, w1));
+  label('Lo mismo en un teléfono (390 px): HUD compacto, cadena de dos eslabones y el dock en una sola fila que se desliza');
+  root.appendChild(h('div', { 'class': 'sg-demo' }, stage3d(true)));
+  label('Cartel sobre el 3D (.callout3d) con guía');
+  var co3 = h('div', { 'class': 'sg-3d', style: { height: '170px', 'max-width': '520px' } });
+  var svgHold = document.createElement('div'); svgHold.innerHTML = '<svg class="callout3d-svg" viewBox="0 0 520 170" aria-hidden="true"><line x1="120" y1="120" x2="190" y2="70"/><circle cx="120" cy="120" r="5"/></svg>';
+  co3.appendChild(svgHold.firstChild);
+  co3.appendChild(h('div', { 'class': 'callout3d is-hover', style: { left: '190px', top: '34px', position: 'absolute' } }, h('span', { 'class': 'callout3d-name', style: { '--cat': '#C4428E' }, text: 'Acelerador' }), h('span', { 'class': 'callout3d-en', text: 'Throttle' }), h('span', { 'class': 'callout3d-sum', text: 'Empujás para más potencia y tirás para menos.' }), h('span', { 'class': 'callout3d-hint', text: 'Tocá para conocerlo' })));
+  root.appendChild(h('div', { 'class': 'sg-demo' }, co3));
+
   /* ---- 14 íconos */
   sec('Íconos', C150.Icons.names.length + ' · sprite inline');
   var ig = h('div', { 'class': 'sg-grid' });
-  C150.Icons.names.forEach(function (nm) { ig.appendChild(h('div', { 'class': 'sg-ico' }, K.icon(nm), nm)); });
+  C150.Icons.names.forEach(function (nm) { ig.appendChild(h('div', { 'class': 'sg-icn' }, K.icon(nm), nm)); });
   root.appendChild(ig);
 })();
 </script>

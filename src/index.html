@@ -63,22 +63,13 @@
 
   <main class="main">
     <section id="viewport" class="viewport" aria-label="Cabina en 3D. Arrastrá para mirar, tocá un control para conocerlo.">
-      <div class="vp-top">
-        <div id="vp-status" class="vp-status" role="group" aria-label="Estado del avión: tocá cada dato para saber qué significa"></div>
-        <div class="vp-tools" id="vp-tools">
-          <div id="vp-scenario" class="vp-scenario">
-            <button type="button" id="vp-scenario-btn" class="vp-scn-btn" aria-haspopup="dialog" aria-label="Escenario: dónde y cómo está el avión. Tocá para cambiarlo">
-              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-map"/></svg>
-              <span class="vp-scn-text"><span class="vp-scn-k">Escenario</span><span class="vp-scn-v" id="vp-scenario-v">Estacionado</span></span>
-              <svg class="vp-scn-chev" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-chevron-down"/></svg>
-            </button>
-            <button type="button" id="vp-scenario-back" class="vp-scenario-back" aria-label="Volver al escenario" hidden><span class="vsb-long">Volver al escenario</span><span class="vsb-short">Volver</span></button>
+      <div id="vp-stage" class="vp-stage" role="group" aria-label="Datos del avión y controles de la vista 3D">
+        <div id="vp-bottom" class="vp-bottom">
+          <div id="toasts" class="toasts" role="status" aria-live="polite" aria-relevant="additions"></div>
+          <div id="vp-stall" class="vp-stall" hidden role="status">
+            <span class="vp-stall-dot" aria-hidden="true"></span>Bocina de pérdida
           </div>
         </div>
-      </div>
-
-      <div id="vp-stall" class="vp-stall" hidden role="status">
-        <span class="vp-stall-dot" aria-hidden="true"></span>Bocina de pérdida
       </div>
 
       <div id="inset-frame" class="inset-frame" hidden>
@@ -91,20 +82,6 @@
         </div>
       </div>
       <p id="inset-caption" class="inset-caption" hidden aria-live="off"></p>
-
-      <div id="vp-tooltip" class="vp-tooltip" hidden aria-hidden="true">
-        <strong class="vp-tooltip-name"></strong>
-        <span class="vp-tooltip-en"></span>
-      </div>
-
-      <div id="vp-cams" class="vp-cams">
-        <button type="button" id="vp-cams-toggle" class="vp-cams-toggle" aria-haspopup="dialog" title="Vistas: mirá la cabina desde otro lugar (teclas 1 a 8)">
-          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-camera"/></svg>
-          <span>Vistas</span>
-        </button>
-      </div>
-
-      <div id="toasts" class="toasts" role="status" aria-live="polite" aria-relevant="additions"></div>
 
       <div id="vp-overlay" class="vp-overlay" role="status">
         <div class="vp-overlay-card">
@@ -184,7 +161,7 @@
           <li><strong>Arrastrá</strong> con el mouse o el dedo para girar la mirada.</li>
           <li><strong>Rueda del mouse</strong> o <strong>pellizco</strong> con dos dedos para acercarte o alejarte.</li>
           <li><strong>Clic derecho y arrastrar</strong> (o dos dedos) para desplazarte de costado.</li>
-          <li>Los botones de <strong>Vistas</strong>, abajo a la izquierda, te llevan a cada zona: tablero, piso, techo…</li>
+          <li>Abajo, el grupo <strong>Vista</strong> te lleva a cada zona: tablero, piso, techo… (también con las teclas 1 a 8). <strong>Diseño</strong> elige qué ver en grande y <strong>Escenario</strong> cambia dónde está el avión.</li>
           <li>El cuadrito de arriba a la derecha muestra el avión <strong>desde afuera</strong>. Tocá las flechas para agrandarlo.</li>
         </ul>
         <h3 class="placard placard--small">Tocar los controles</h3>

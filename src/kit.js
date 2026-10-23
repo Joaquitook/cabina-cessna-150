@@ -31,6 +31,24 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
  *   Kit.kbd(text)
  *   Kit.toast(text, kind)                          → puente a C150.UI.toast (kind: info|warn|good)
  *   Kit.reducedMotion()
+ *
+ * v5 · lenguaje de AIRE (contrato v5): los mismos componentes en TODAS las pestañas (mismo DOM que lab.js; las clases .lab-* y las compartidas valen igual):
+ *   Kit.pageHeader({kicker, title, sub, children})                  → <header class="pg-head">: kicker mono "NN · SECCIÓN · SUB", título enorme, párrafo
+ *   Kit.hud({label, kicker, bigs:[{label, unit, title, onClick}]})  → .hud de vidrio · .set({kicker, live, bigs:[{v,u,l,warn}], row:[{text,onClick}]|texto,
+ *                                                                      pill:{text, tone:"is-ok|is-air|is-warn|is-demo|is-pause|is-stall"},
+ *                                                                      extra:{k, t, v, bar:0..1, nums:[{v,u,l}]}|null})
+ *   Kit.dockGroup({label, aria, kind:"seg"|"chips", items:[{value,label,title,aria,data}], value, onChange|onToggle}) → .dock-group · .setValue(v) · .btn(v) · .setPressed(v,on)
+ *   Kit.dock([grupos], {label})                                     → .dock: fila de cristal con grupos; en vistas angostas se desliza de costado
+ *   Kit.tchip({label, pressed, onClick, title})                     → ficha con punto que se prende (.seg-btn.tchip)
+ *   Kit.chain(items, {tone:"info|warn|good", compact})              → .chain: [causa naranja] → [paso] → [efecto con borde]; items: texto o {text, onClick, keep} (keep: se queda en la versión compacta)
+ *   Kit.chainBar()                                                  → .chain-bar: barra de vidrio sobre el 3D (vacía = oculta) · .set(items, {tone, key, dismiss, dismissLabel}) · .clear()
+ *   Kit.modes({items:[{value,label,sub}], value, onChange, label})  → .modes de 2 o 3 opciones (.mode-btn con .mode-t y .mode-s) · .setValue(v)
+ *                                                                      (el botón es .mode-btn y no .mode porque .mode ya es el <section> de cada panel)
+ *   Kit.section({num, title, meta, open, body, id, onToggle})       → <section class="sec sec--num"> plegable "01 TÍTULO … meta ⌄" · .setOpen(b) · .setMeta(t) · .body
+ *   Kit.cardCarousel({items:[{code,title,sum,meta,current,tag,onClick}], label, list})
+ *                                                                   → <ul class="cards-h"> de .card-h con código (E1, L2…), título, 2 líneas y meta mono; list:true = en columna
+ *   Kit.slider({label,min,max,step,value,format,big,center,zones:[{from,to,color}],ticks:[{v,t,cls}],ends,detents,quick:[{v,t}],sub,onInput}) → .ctl · .set(v) · .setSub(t)
+ *   Kit.bars({rows:[{key,label,color,caption}]})                    → .bars de .bar-row con valor mono · .set(key, 0..1, texto)
  */
 (function (C150) {
   'use strict';
@@ -525,6 +543,339 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     if (live) { var d = h('div', { 'class': 'toast toast--' + (kind || 'info') }, h('span', { text: text })); live.appendChild(d); setTimeout(function () { if (d.parentNode) d.parentNode.removeChild(d); }, 4000); }
   }
 
+  /* ------------------------------------------------------------------ v5 · lenguaje de AIRE (contrato v5 §2)
+   * HUD de vidrio, dock inferior, cadena causa → efecto, interruptor de modos, secciones numeradas, tarjetas con código,
+   * deslizadores con marcas y barras vivas. Mismo DOM que arma lab.js (clases .lab-*): los estilos valen para los dos nombres. */
+  var tick_ = function (node, text) { if (node && node.textContent !== text) node.textContent = text; };
+  function fmtCode(n) { return typeof n === 'number' ? (n < 10 ? '0' + n : String(n)) : n; }
+
+  /** Cabecera de página: kicker mono con punto, título enorme y un párrafo. */
+  function pageHeader(o) {
+    o = o || {};
+    var el = h('header', { 'class': 'pg-head' },
+      o.kicker ? h('p', { 'class': 'pg-kicker' }, h('span', { 'class': 'pg-kicker-dot', 'aria-hidden': 'true' }), h('span', { text: o.kicker })) : null,
+      o.title ? h('h2', { 'class': 'pg-title', text: o.title }) : null,
+      o.sub ? h('p', { 'class': 'pg-sub', text: o.sub }) : null);
+    add(el, o.children);
+    return el;
+  }
+
+  /** HUD de vidrio sobre el 3D. o = {label, kicker, bigs:[{label, unit, title, onClick}]}.
+   *  el.set({kicker, live:bool, bigs:[{v, u, l, warn}], row:[{text, onClick, title}] | string, pill:{text, tone}, extra:{k, t, v, bar:0..1, nums:[{v,u,l}]} | null}) */
+  function hud(o) {
+    o = o || {};
+    var kick = h('span', { 'class': 'hud-mode', text: o.kicker || '' });
+    var dot = h('span', { 'class': 'live-dot', 'aria-hidden': 'true' });
+    var bigWrap = h('div', { 'class': 'hud-big' });
+    var cells = [];
+    (o.bigs || []).forEach(function (b) {
+      var v = h('span', { 'class': 'big-v' }), u = h('span', { 'class': 'big-u', text: b.unit || '' }), l = h('span', { 'class': 'big-l', text: b.label || '' });
+      var kids = [h('span', { 'class': 'big-num' }, v, u), l];
+      var el = isFn(b.onClick)
+        ? h('button', { type: 'button', 'class': 'big big--btn', title: b.title, 'aria-haspopup': 'dialog', onclick: b.onClick }, kids)
+        : h('div', { 'class': 'big', title: b.title }, kids);
+      bigWrap.appendChild(el);
+      cells.push({ el: el, v: v, u: u, l: l });
+    });
+    var row = h('p', { 'class': 'hud-row' });
+    var pill = h('p', { 'class': 'hud-pill' });
+    var exK = h('span', { 'class': 'hud-ex-k' }), exT = h('span', { 'class': 'hud-ex-t' }), exV = h('span', { 'class': 'hud-ex-v' });
+    var exBar = h('span', { 'class': 'hud-ex-bar', hidden: true }, h('span')), exNums = h('div', { 'class': 'hud-ex-nums', hidden: true });
+    var extra = h('div', { 'class': 'hud-extra', hidden: true }, exK, exT, exV, exBar, exNums);
+    var el = h('div', { 'class': 'hud', role: 'group', 'aria-label': o.label }, h('p', { 'class': 'hud-kicker' }, dot, kick), bigWrap, row, pill, extra);
+    var rowSig = '', exSig = '';
+    el.set = function (d) {
+      d = d || {};
+      if (d.kicker !== undefined) tick_(kick, d.kicker);
+      if (d.live !== undefined) dot.classList.toggle('is-off', !d.live);
+      (d.bigs || []).forEach(function (b, i) {
+        var c = cells[i];
+        if (!c) return;
+        tick_(c.v, b.v === undefined ? '' : String(b.v));
+        if (b.u !== undefined) tick_(c.u, b.u);
+        if (b.l !== undefined) tick_(c.l, b.l);
+        c.el.classList.toggle('is-warn', !!b.warn);
+        c.el.classList.toggle('is-dim', !!b.dim);
+      });
+      if (d.row !== undefined) {
+        var segs = typeof d.row === 'string' ? [{ text: d.row }] : (d.row || []);
+        var sig = segs.map(function (s) { return s.text; }).join('·');
+        if (sig !== rowSig) {
+          rowSig = sig;
+          while (row.firstChild) row.removeChild(row.firstChild);
+          segs.forEach(function (s, i) {
+            if (i) row.appendChild(doc.createTextNode(' · '));
+            row.appendChild(isFn(s.onClick) ? h('button', { type: 'button', 'class': 'hud-link', title: s.title, onclick: s.onClick, text: s.text }) : h('span', { text: s.text }));
+          });
+        }
+        row.hidden = !segs.length;
+      }
+      if (d.pill !== undefined) {
+        var cn = 'hud-pill' + (d.pill && d.pill.tone ? ' ' + d.pill.tone : '');
+        if (pill.className !== cn) pill.className = cn;
+        tick_(pill, d.pill ? d.pill.text : '');
+        pill.hidden = !d.pill;
+      }
+      if (d.extra !== undefined) {
+        var x = d.extra;
+        var xs = x ? [x.k, x.t, x.v, x.bar, (x.nums || []).map(function (n) { return n.v + n.u + n.l; }).join('|')].join('~') : '';
+        if (xs !== exSig) {
+          exSig = xs;
+          extra.hidden = !x;
+          if (x) {
+            tick_(exK, x.k || ''); tick_(exT, x.t || ''); tick_(exV, x.v || '');
+            exT.hidden = !x.t; exV.hidden = !x.v; exK.hidden = !x.k;
+            exBar.hidden = x.bar === undefined || x.bar === null;
+            if (!exBar.hidden) exBar.firstChild.style.width = (clamp(+x.bar || 0, 0, 1) * 100).toFixed(1) + '%';
+            var nn = x.nums || [];
+            exNums.hidden = !nn.length;
+            while (exNums.firstChild) exNums.removeChild(exNums.firstChild);
+            nn.forEach(function (n) {
+              exNums.appendChild(h('div', { 'class': 'big big--sm' }, h('span', { 'class': 'big-num' }, h('span', { 'class': 'big-v', text: n.v }), h('span', { 'class': 'big-u', text: n.u || '' })), h('span', { 'class': 'big-l', text: n.l || '' })));
+            });
+          }
+        }
+      }
+    };
+    el.cells = cells; el.pill = pill;
+    return el;
+  }
+
+  /** Grupo del dock: rótulo mono en versalitas + botones segmentados (kind 'seg') o fichas con punto que se prenden (kind 'chips').
+   *  o = {label, aria, kind, items:[{value, label, title, aria, data:{x:1}}], value, onChange(value) | onToggle(value, on)} → .setValue(v) · .btn(v) · .setPressed(v, on) */
+  function dockGroup(o) {
+    o = o || {};
+    var chips = o.kind === 'chips';
+    var g = h('div', { 'class': 'dock-group', role: 'group', 'aria-label': o.aria || o.label }, o.label ? h('span', { 'class': 'dock-label', text: o.label }) : null);
+    var btns = {};
+    (o.items || []).forEach(function (it) {
+      var b = h('button', {
+        type: 'button', 'class': 'seg-btn' + (chips ? ' tchip' : ''), 'aria-pressed': 'false', title: it.title, 'aria-label': it.aria,
+        onclick: function () {
+          if (chips) { var on = b.getAttribute('aria-pressed') !== 'true'; b.setAttribute('aria-pressed', on ? 'true' : 'false'); if (isFn(o.onToggle)) o.onToggle(it.value, on); }
+          else g.setValue(it.value, true);
+        }
+      }, chips ? h('span', { 'class': 'tchip-dot', 'aria-hidden': 'true' }) : null, it.label);
+      if (it.data) for (var k in it.data) b.setAttribute('data-' + k, it.data[k]);
+      btns[it.value] = b;
+      g.appendChild(b);
+    });
+    g.value = o.value;
+    g.setValue = function (v, fire) {
+      g.value = v;
+      for (var k in btns) btns[k].setAttribute('aria-pressed', String(k) === String(v) ? 'true' : 'false');
+      if (fire && isFn(o.onChange)) o.onChange(v);
+    };
+    g.setPressed = function (v, on) { if (btns[v]) btns[v].setAttribute('aria-pressed', on ? 'true' : 'false'); };
+    g.btn = function (v) { return btns[v] || null; };
+    if (!chips && o.value !== undefined) g.setValue(o.value, false);
+    return g;
+  }
+
+  /** El dock inferior: una fila de grupos de cristal. Cuando no entra, se desliza de costado y muestra una sombra en el borde que corta. */
+  function dock(groups, o) {
+    o = o || {};
+    var el = h('div', { 'class': 'dock', role: 'toolbar', 'aria-label': o.label || 'Controles de la vista 3D' });
+    add(el, groups);
+    function more() {
+      var max = el.scrollWidth - el.clientWidth;
+      el.classList.toggle('has-more-r', max > 3 && el.scrollLeft < max - 3);
+      el.classList.toggle('has-more-l', max > 3 && el.scrollLeft > 3);
+    }
+    el.addEventListener('scroll', more, { passive: true });
+    if (root.ResizeObserver) new ResizeObserver(more).observe(el); else root.addEventListener('resize', more);
+    el.refresh = more;
+    return el;
+  }
+  function tchip(o) {
+    o = o || {};
+    return h('button', { type: 'button', 'class': 'seg-btn tchip', 'aria-pressed': o.pressed ? 'true' : 'false', title: o.title, onclick: o.onClick },
+      h('span', { 'class': 'tchip-dot', 'aria-hidden': 'true' }), o.label);
+  }
+
+  /** Cadena causa → efecto. items: textos o {text, onClick} (un botón). tone: 'info' | 'warn' | 'good'. compact: sólo el primero y el último. */
+  function chain(items, o) {
+    o = o || {};
+    var list = (items || []).filter(Boolean);
+    var shown = o.compact && list.length > 2 ? list.filter(function (it, i) { return i === 0 || i === list.length - 1 || (typeof it === 'object' && it.keep); }) : list;
+    var el = h('div', { 'class': 'chain' + (o.compact ? ' chain--compact' : '') + ' is-' + (o.tone || 'info'), role: 'group' });
+    function txt(it) { return typeof it === 'string' ? it : it.text; }
+    el.setAttribute('aria-label', list.map(txt).join(', entonces '));
+    shown.forEach(function (it, i) {
+      if (i > 0) el.appendChild(h('span', { 'class': 'chain-arrow', 'aria-hidden': 'true' }));
+      var cl = 'chain-item ' + (i === 0 ? 'chain-cause' : (i === shown.length - 1 ? 'chain-effect' : 'chain-step'));
+      if (typeof it === 'object' && isFn(it.onClick)) el.appendChild(h('button', { type: 'button', 'class': cl + ' chain-act', onclick: it.onClick, text: it.text }));
+      else el.appendChild(h('span', { 'class': cl, text: txt(it) }));
+    });
+    return el;
+  }
+  /** La barra de vidrio que lleva la cadena sobre el 3D (vacía = oculta). .set(items, {tone, key}) · .clear() */
+  function chainBar() {
+    var el = h('div', { 'class': 'chain-bar', hidden: true });
+    var sig = '';
+    el.set = function (items, o) {
+      o = o || {};
+      var list = (items || []).filter(Boolean);
+      if (!list.length) { el.clear(); return; }
+      var s = (o.tone || '') + (o.dismiss ? 'x' : '') + '|' + list.map(function (i) { return typeof i === 'string' ? i : i.text; }).join('→');
+      if (s === sig && !el.hidden) return;
+      var fresh = o.key === undefined || o.key !== el._key;
+      sig = s; el._key = o.key;
+      while (el.firstChild) el.removeChild(el.firstChild);
+      el.appendChild(chain(list, { tone: o.tone }));
+      el.appendChild(chain(list, { tone: o.tone, compact: true }));
+      if (isFn(o.dismiss)) el.appendChild(h('button', { type: 'button', 'class': 'chain-x', 'aria-label': o.dismissLabel || 'Cerrar', title: o.dismissLabel || 'Cerrar', onclick: o.dismiss }, icon('close')));
+      el.hidden = false;
+      if (fresh && !reducedMotion()) { el.classList.remove('is-new'); void el.offsetWidth; el.classList.add('is-new'); }
+    };
+    el.clear = function () { if (sig || !el.hidden) { sig = ''; el._key = undefined; while (el.firstChild) el.removeChild(el.firstChild); el.hidden = true; } };
+    return el;
+  }
+
+  /** Interruptor de 2 o 3 modos con rótulo grande y sub-rótulo mono. o = {items:[{value,label,sub}], value, onChange, label} → .setValue(v) */
+  function modes(o) {
+    o = o || {};
+    var items = o.items || [];
+    var el = h('div', { 'class': 'modes' + (items.length > 2 ? ' modes--' + items.length : ''), role: 'group', 'aria-label': o.label, style: { 'grid-template-columns': 'repeat(' + items.length + ', minmax(0, 1fr))' } });
+    var btns = {};
+    items.forEach(function (it) {
+      var b = h('button', { type: 'button', 'class': 'mode-btn', 'aria-pressed': 'false', 'data-value': it.value, onclick: function () { el.setValue(it.value, true); } },
+        h('span', { 'class': 'mode-t', text: it.label }), it.sub ? h('span', { 'class': 'mode-s', text: it.sub }) : null);
+      btns[it.value] = b; el.appendChild(b);
+    });
+    el.value = o.value;
+    el.setValue = function (v, fire) {
+      var changed = v !== el.value;
+      el.value = v;
+      for (var k in btns) btns[k].setAttribute('aria-pressed', String(k) === String(v) ? 'true' : 'false');
+      if (fire && changed && isFn(o.onChange)) o.onChange(v);
+    };
+    el.setValue(o.value, false);
+    return el;
+  }
+
+  /** Sección numerada que se pliega ("01 MANDOS ... meta ⌄"). o = {num, title, meta, open, body, id, onToggle} → .setOpen(b) · .setMeta(text) · .body */
+  function section(o) {
+    o = o || {};
+    var id = o.id || nid('sec');
+    var open = o.open !== false;
+    var meta = h('span', { 'class': 'sec-meta', text: o.meta || '' });
+    var body = h('div', { 'class': 'sec-body', id: id + '-body' });
+    add(body, o.body);
+    body.hidden = !open;
+    var head = h('button', { type: 'button', 'class': 'sec-head', 'aria-expanded': open ? 'true' : 'false', 'aria-controls': id + '-body' },
+      (o.num !== undefined && o.num !== null && o.num !== '') ? h('span', { 'class': 'sec-num', text: fmtCode(o.num) }) : null,
+      h('span', { 'class': 'sec-title', text: o.title }), meta, h('span', { 'class': 'sec-chev', 'aria-hidden': 'true' }));
+    var el = h('section', { 'class': 'sec sec--num', 'data-sec': o.key || null }, head, body);
+    el.setOpen = function (v) {
+      v = v === undefined ? head.getAttribute('aria-expanded') !== 'true' : !!v;
+      head.setAttribute('aria-expanded', v ? 'true' : 'false'); body.hidden = !v;
+      if (isFn(o.onToggle)) o.onToggle(v);
+    };
+    head.addEventListener('click', function () { el.setOpen(); });
+    el.setMeta = function (t) { tick_(meta, t || ''); };
+    el.body = body; el.head = head;
+    return el;
+  }
+
+  /** Carrusel horizontal de tarjetas con código (E1, L2, C3…), título en versalitas, dos líneas y meta mono.
+   *  o = {items:[{code, title, sum, meta, current, tag, onClick}], label, list:true (en columna)} */
+  function cardCarousel(o) {
+    o = o || {};
+    var ul = h('ul', { 'class': 'cards-h' + (o.list ? ' cards-h--list' : ''), 'aria-label': o.label });
+    (o.items || []).forEach(function (it) {
+      var act = isFn(it.onClick);
+      var b = h(act ? 'button' : 'div', { type: act ? 'button' : null, 'class': 'card-h' + (it.current ? ' is-current' : ''), 'aria-current': it.current ? 'true' : null, onclick: act ? it.onClick : null },
+        h('span', { 'class': 'card-h-top' }, it.code ? h('span', { 'class': 'card-h-code', text: it.code }) : null, it.tag ? h('span', { 'class': 'card-h-tag', text: it.tag }) : null),
+        h('span', { 'class': 'card-h-title', text: it.title }),
+        it.sum ? h('span', { 'class': 'card-h-sum', text: it.sum }) : null,
+        it.meta ? h('span', { 'class': 'card-h-meta', text: it.meta }) : null);
+      ul.appendChild(h('li', null, b));
+    });
+    return ul;
+  }
+
+  /** Deslizador con lectura grande, marcas, zonas de color, detents y valores rápidos.
+   *  o = {label, min, max, step, value, format(v), big, center, zones:[{from,to,color}], ticks:[{v,t,cls}], ends:[a,b], detents:[v…] | [{v,t}], quick:[{v,t}], sub, onInput(v), id}
+   *  → .set(v) · .value · .input · .setSub(text) */
+  function slider(o) {
+    o = o || {};
+    var id = o.id || nid('rng');
+    var fmt = isFn(o.format) ? o.format : function (v) { return String(v); };
+    var inp = h('input', { type: 'range', 'class': 'range', min: o.min, max: o.max, step: o.step || 1, 'aria-label': o.label, id: id });
+    var val = h('output', { 'class': 'ctl-val', 'for': id });
+    var sub = o.sub !== undefined ? h('p', { 'class': 'ctl-sub', text: o.sub }) : null;
+    var span = (+o.max) - (+o.min) || 1;
+    var track = h('div', { 'class': 'ctl-track' }, inp);
+    if (o.zones && o.zones.length) {
+      track.style.setProperty('--trk', 'linear-gradient(90deg,' + o.zones.map(function (z) {
+        return z.color + ' ' + ((z.from - o.min) / span * 100).toFixed(1) + '% ' + ((z.to - o.min) / span * 100).toFixed(1) + '%';
+      }).join(',') + ')');
+    }
+    if (o.center) track.appendChild(h('span', { 'class': 'ctl-center', 'aria-hidden': 'true' }));
+    var ticks = null;
+    if (o.ticks) {
+      ticks = h('div', { 'class': 'ticks', 'aria-hidden': 'true' });
+      o.ticks.forEach(function (tk, i) {
+        var sp = h('span', { 'class': 'tick' + (i % 2 ? ' is-alt' : '') + (tk.cls ? ' ' + tk.cls : ''), text: tk.t });
+        sp.style.left = ((tk.v - o.min) / span * 100) + '%';
+        ticks.appendChild(sp);
+      });
+    }
+    var ends = o.ends ? h('div', { 'class': 'ctl-ends', 'aria-hidden': 'true' }, h('span', { text: o.ends[0] }), h('span', { text: o.ends[1] })) : null;
+    var api = null, detents = null, dBtns = [];
+    if (o.detents) {
+      detents = h('div', { 'class': 'detents', role: 'group', 'aria-label': o.label + ': posiciones', style: { 'grid-template-columns': 'repeat(' + o.detents.length + ', 1fr)' } });
+      o.detents.forEach(function (d) {
+        var dv = typeof d === 'object' ? d.v : d, dt = typeof d === 'object' && d.t ? d.t : fmt(dv);
+        var b = h('button', { type: 'button', 'class': 'detent', 'aria-pressed': 'false', onclick: function () { api.set(dv); if (isFn(o.onInput)) o.onInput(dv); } }, h('span', { 'class': 'detent-n', text: dt }));
+        b._v = dv; dBtns.push(b); detents.appendChild(b);
+      });
+    }
+    var quick = null;
+    if (o.quick) {
+      quick = h('div', { 'class': 'quick', role: 'group', 'aria-label': o.label + ': valores rápidos' });
+      o.quick.forEach(function (q) { quick.appendChild(h('button', { type: 'button', 'class': 'qbtn', onclick: function () { api.set(q.v); if (isFn(o.onInput)) o.onInput(q.v); }, text: q.t })); });
+    }
+    api = h('div', { 'class': 'ctl' + (o.big ? ' ctl--big' : '') },
+      h('div', { 'class': 'ctl-top' }, h('label', { 'class': 'ctl-lbl', 'for': id, text: o.label }), val), track, ticks, ends, detents, sub, quick);
+    api.input = inp;
+    api.set = function (v) {
+      v = clamp(+v, +o.min, +o.max);
+      if (+inp.value !== v) inp.value = v;
+      var t = fmt(v);
+      tick_(val, t);
+      inp.setAttribute('aria-valuetext', t);
+      dBtns.forEach(function (b) { b.setAttribute('aria-pressed', Math.abs(b._v - v) < (+o.step || 1) / 2 ? 'true' : 'false'); });
+      api.value = v;
+    };
+    api.setSub = function (t) { if (sub) tick_(sub, t); };
+    inp.addEventListener('input', function () { var v = parseFloat(inp.value); api.set(v); if (isFn(o.onInput)) o.onInput(v); });
+    api.set(o.value !== undefined ? o.value : o.min);
+    return api;
+  }
+
+  /** Barras vivas con valor mono. o = {rows:[{key, label, color, caption}]} → .set(key, frac 0..1, text) */
+  function bars(o) {
+    o = o || {};
+    var el = h('div', { 'class': 'bars' });
+    var rows = {};
+    (o.rows || []).forEach(function (r) {
+      if (r.caption) el.appendChild(h('p', { 'class': 'bars-cap', text: r.caption }));
+      var fill = h('span', { 'class': 'bar-fill' }), v = h('span', { 'class': 'bar-val' });
+      var row = h('div', { 'class': 'bar-row', style: r.color ? { '--c': r.color } : null }, h('span', { 'class': 'bar-name', text: r.label }), h('span', { 'class': 'bar-track', 'aria-hidden': 'true' }, fill), v);
+      rows[r.key] = { fill: fill, v: v };
+      el.appendChild(row);
+    });
+    el.set = function (key, frac, text) {
+      var r = rows[key];
+      if (!r) return;
+      r.fill.style.transform = 'scaleX(' + clamp(+frac || 0, 0, 1).toFixed(3) + ')';
+      if (text !== undefined) tick_(r.v, text);
+    };
+    return el;
+  }
+
   /* ------------------------------------------------------------------ API pública */
   Kit.el = h; Kit.add = add; Kit.cls = cls;
   Kit.icon = icon; Kit.button = button; Kit.iconButton = iconButton; Kit.chip = chip; Kit.badge = badge;
@@ -534,4 +885,6 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   Kit.tooltip = tooltip; Kit.popover = popover; Kit.closePopover = function () { closePopover(true); };
   Kit.dialog = dialog; Kit.emptyState = emptyState; Kit.skeleton = skeleton; Kit.kbd = kbd; Kit.toast = toast;
   Kit.reducedMotion = reducedMotion; Kit.place = place;
+  Kit.pageHeader = pageHeader; Kit.hud = hud; Kit.dockGroup = dockGroup; Kit.dock = dock; Kit.tchip = tchip; Kit.chain = chain; Kit.chainBar = chainBar;
+  Kit.modes = modes; Kit.section = section; Kit.cardCarousel = cardCarousel; Kit.slider = slider; Kit.bars = bars;
 })(root.C150);

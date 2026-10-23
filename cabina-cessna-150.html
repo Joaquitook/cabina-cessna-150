@@ -15,6 +15,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=B612+Mono:wght@400;700&family=Barlow+Condensed:wght@500;600;700&display=swap">
 <style>
+/*@v1-aliased*/
 /* styles.css — "Cabina Cessna 150": cabina 3D a la izquierda, ficha de instrucción a la derecha.
    Tokens del contrato §8 (claro / oscuro / [data-theme]). Los colores de arco (verde, amarillo,
    rojo, blanco) son SEMÁNTICOS: sólo se usan para rangos y estados, nunca como decoración.
@@ -197,48 +198,6 @@ kbd {
 }
 .viewport canvas { display: block; touch-action: none; }
 .viewport > canvas { position: absolute; left: 0; top: 0; z-index: 0; }
-
-.vp-top {
-  position: absolute; z-index: 3; top: 10px; left: 10px; right: calc(var(--inset-w) + 24px);
-  display: flex; flex-direction: column; align-items: flex-start; gap: 6px; pointer-events: none;
-}
-.vp-status { display: flex; flex-wrap: wrap; gap: 4px; pointer-events: auto; }
-.chip-st {
-  display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 4px;
-  background: var(--ov-bg); color: var(--ov-fg); font-family: var(--font-data); font-size: 12px; line-height: 18px;
-  font-variant-numeric: tabular-nums; white-space: nowrap; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-}
-.chip-st { max-width: 100%; }
-.chip-st-text { min-width: 0; white-space: normal; }   /* a long chip wraps instead of sliding under the inset */
-.chip-st .dot { width: 8px; height: 8px; border-radius: 50%; background: #6B7782; }
-.chip-st.is-on .dot { background: var(--arc-green); box-shadow: 0 0 6px var(--arc-green); }
-.chip-st.is-warn .dot { background: var(--arc-yellow); }
-.chip-st.is-air .dot { background: #6FA8DC; }
-.chip-st.is-paused { background: var(--arc-yellow); color: #111; }
-.vp-scenario {
-  pointer-events: auto; display: inline-flex; align-items: center; gap: 6px; padding: 2px 4px 2px 8px;
-  background: var(--ov-bg); color: var(--ov-soft); border-radius: 4px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-}
-.vp-scenario-label { font-family: var(--font-display); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; font-size: 13px; }
-.vp-scenario select {
-  background: transparent; color: var(--ov-fg); border: 0; font-size: 14px; min-height: 30px; max-width: 46vw; padding: 0 4px;
-  color-scheme: dark;
-}
-.vp-scenario select option { background: #151D24; color: #E4EAEE; }
-/* a demonstration is running: the selector says so and offers the way back (ui.js syncDemo) */
-.vp-scenario.is-demo { box-shadow: inset 0 0 0 1px #F08A3C; }
-.vp-scenario.is-demo select { color: #F5A869; font-weight: 700; }
-.vp-scenario-back {
-  pointer-events: auto; min-height: 30px; padding: 0 10px; margin-left: 2px; border: 0; border-radius: 4px; background: #F08A3C;
-  color: #111; font-family: var(--font-display); font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
-  font-size: 13px; white-space: nowrap; cursor: pointer;
-}
-.vp-scenario-back:hover { filter: brightness(1.08); }
-.vp-scenario-back[hidden] { display: none; }
-.vp-scenario-back .vsb-short { display: none; }
-.chip-st.is-demo { background: #F08A3C; color: #111; font-weight: 700; }
-.chip-st.is-demo .dot { background: currentColor; animation: stall-pulse .8s ease-in-out infinite alternate; }
-@media (prefers-reduced-motion: reduce) { .chip-st.is-demo .dot { animation: none; } }
 /* VOLAR: "Mostrar el aire" */
 .vo-air-row { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 10px; margin: -6px 0 12px; }
 .vo-air-hint { color: var(--fg-soft); font-size: 14px; line-height: 1.35; flex: 1 1 200px; }
@@ -276,24 +235,7 @@ kbd {
   backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
 }
 /* lessons / big exterior / 'Las dos': the caption is a real subtitle (≥ 17 px, contract v3) */
-.inset-caption.is-big { font-size: 17px; line-height: 1.4; padding: 8px 12px; border-radius: 6px; }
-
-/* layout switch "Cabina · Las dos · Afuera" (contract v3) */
-.vp-layout {
-  pointer-events: auto; display: inline-flex; padding: 2px; gap: 2px; border-radius: 6px;
-  background: var(--ov-bg); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-}
-.vp-layout-btn {
-  min-height: 30px; padding: 0 10px; border: 0; border-radius: 4px; background: transparent; color: var(--ov-soft);
-  font-family: var(--font-display); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; font-size: 14px; white-space: nowrap;
-}
-.vp-layout-btn:hover { color: var(--ov-fg); background: rgba(255, 255, 255, .08); }
-.vp-layout-btn[aria-pressed="true"] { background: var(--accent-ink); color: var(--accent-fg); }
-.vp-layout-btn[hidden] { display: none; }
-/* 'Las dos': the toolbar stays over the cockpit half; each half gets a label */
-.app.is-dos-side .vp-top { right: calc(50% + 10px); flex-direction: row; flex-wrap: wrap; align-items: center; }
-.app.is-dos-side .vp-top .vp-status { flex-basis: 100%; }
-.app.is-dos-side .vp-cams { right: calc(50% + 10px); }   /* the camera presets belong to the cockpit half */
+.inset-caption.is-big { font-size: 17px; line-height: 1.4; padding: 8px 12px; border-radius: 6px; }   /* the camera presets belong to the cockpit half */
 .pane-label {
   position: absolute; z-index: 2; display: flex; align-items: center; gap: 6px; pointer-events: none;
 }
@@ -307,37 +249,10 @@ kbd {
 .pane-label .inset-btn { pointer-events: auto; }
 .app.is-dos .vp-flypad ~ .pane-label--exterior .inset-btn { display: none; }
 
-.vp-tooltip {
-  position: absolute; z-index: 6; left: 0; top: 0; pointer-events: none; max-width: 260px;
-  padding: 6px 10px; border-radius: 6px; background: var(--ov-bg-strong); color: var(--ov-fg);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, .35); display: flex; flex-direction: column; line-height: 1.25;
-}
-.vp-tooltip-name { font-size: 15px; }
-.vp-tooltip-en { font-size: 12px; color: var(--ov-soft); }
-
-.vp-cams { position: absolute; z-index: 3; left: 10px; bottom: 10px; right: 10px; display: flex; align-items: flex-end; gap: 6px; pointer-events: none; }
-.vp-cams-toggle {
-  display: none; pointer-events: auto; align-items: center; gap: 6px; min-height: 44px; padding: 0 12px;
-  border-radius: 8px; border: 1px solid var(--ov-line); background: var(--ov-bg); color: var(--ov-fg);
-  font-family: var(--font-display); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; font-size: 15px;
-}
-.vp-cams-toggle svg, .cam-btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; }
-.vp-cams-list { display: flex; flex-wrap: wrap; gap: 4px; pointer-events: auto; max-width: 100%; }
-.cam-btn {
-  min-height: 34px; padding: 0 10px; border-radius: 6px; border: 1px solid var(--ov-line);
-  background: var(--ov-bg); color: var(--ov-fg); font-family: var(--font-display); font-weight: 600;
-  text-transform: uppercase; letter-spacing: .05em; font-size: 14px; white-space: nowrap;
-  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-}
-.cam-btn:hover { background: var(--ov-bg-strong); border-color: rgba(255, 255, 255, .4); }
-.cam-btn[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 -3px 0 var(--accent); }
-.cam-btn--swap { display: inline-flex; align-items: center; gap: 6px; }
-
 .toasts {
   position: absolute; z-index: 5; right: 10px; bottom: 54px; width: min(360px, calc(100% - 20px));
   display: flex; flex-direction: column; justify-content: flex-end; gap: 6px; pointer-events: none;
-}
-.vp-stall:not([hidden]) ~ .toasts { bottom: 104px; }   /* the stall banner stays readable */
+}   /* the stall banner stays readable */
 .toast {
   display: flex; gap: 8px; align-items: flex-start; padding: 8px 12px 8px 10px; border-radius: 6px;
   background: var(--ov-bg-strong); color: var(--ov-fg); font-size: 14px; line-height: 1.35;
@@ -372,16 +287,8 @@ kbd {
 
 /* Vista 3D angosta: los botones de cámara se pliegan detrás de "Vistas". */
 @container vp (max-width: 760px) {
-  .vp-cams-toggle { display: inline-flex; }
-  .vp-cams-list {
-    display: none; position: absolute; left: 0; bottom: 52px; width: min(380px, calc(100cqw - 20px));
-    grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; padding: 6px; border-radius: 8px; background: var(--ov-bg-strong);
-  }
-  .vp-cams.is-open .vp-cams-list { display: grid; }
-  .cam-btn { min-height: 44px; padding: 0 6px; white-space: normal; line-height: 1.1; }
   .vp-stall { bottom: 64px; font-size: 15px; }
   .toasts { left: 10px; right: auto; width: calc(100% - 20px); bottom: 62px; }
-  .vp-stall:not([hidden]) ~ .toasts { bottom: 106px; }
 }
 
 /* ------------------------------------------------------------------ panel (ficha) */
@@ -738,7 +645,7 @@ details.fold[open] > summary::after { content: '−'; }
 .done-card h3 { color: var(--ok-ink); font-size: 22px; margin-bottom: 6px; }
 
 /* ------------------------------------------------------------------ Volar */
-.hud {
+.hud-panel {
   display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; border-radius: 10px; overflow: hidden;
   background: var(--line); border: 1px solid var(--line);
 }
@@ -836,7 +743,7 @@ details.fold[open] > summary::after { content: '−'; }
 
 /* ------------------------------------------------------------------ teléfonos y tablets angostas */
 @media (pointer: coarse) {
-  .cam-btn, .inset-btn { min-height: 44px; }
+   .inset-btn { min-height: 44px; }
   .inset-btn--icon { width: 44px; }
   .chip { min-height: 44px; }
   .dots button { width: 44px; height: 44px; }
@@ -875,15 +782,7 @@ details.fold[open] > summary::after { content: '−'; }
   .step-card h2 { font-size: 27px; }
   .step-card .step-text { font-size: 18px; }
   .lb-act-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .vp-layout-btn { min-height: 36px; padding: 0 8px; font-size: 13px; }
   #panel-volar .mode-sub { display: none; }
-  .chip-st { font-size: 11px; padding: 2px 5px; gap: 4px; }
-  .vp-scenario select { font-size: 13px; }
-  .vp-scenario.is-demo .vp-scenario-label { display: none; }
-  .vp-scenario.is-demo select { max-width: 40vw; }
-  .vp-scenario-back { min-height: 34px; padding: 0 9px; }
-  .vp-scenario-back .vsb-long { display: none; }
-  .vp-scenario-back .vsb-short { display: inline; }
 }
 @media (max-width: 380px) {
   .flypad-btns { grid-template-columns: repeat(3, 1fr); }
@@ -919,10 +818,7 @@ details.fold[open] > summary::after { content: '−'; }
   .vp-flypad .vsl-track { width: 48px; height: 92px; background: rgba(255, 255, 255, .06); border-color: var(--ov-line); }
   .vp-flypad .vsl-track::before { background: var(--ov-line); }
   .vp-flypad .vsl-val { min-height: 0; font-size: 11px; color: var(--ov-soft); }
-  .app.has-flypad .vp-cams { bottom: calc(var(--flypad-h, 150px) + 16px); }
-  .app.has-flypad .vp-cams .vp-scenario { display: none; }
-  .app.has-flypad .toasts, .app.has-flypad .vp-stall { bottom: calc(var(--flypad-h, 150px) + 72px); }
-  .app.has-flypad .vp-stall:not([hidden]) ~ .toasts { bottom: calc(var(--flypad-h, 150px) + 114px); }
+   .app.has-flypad .vp-stall { bottom: calc(var(--flypad-h, 150px) + 72px); }
   .app.has-flypad .flypad > .pad-wrap { display: none; }
   .app.has-flypad .flypad-ovnote { display: block; }
   .app.has-flypad .flypad { grid-template-columns: 1fr; }
@@ -974,105 +870,105 @@ details.fold[open] > summary::after { content: '−'; }
   background-size: 22px 22px; background-attachment: local;
 }
 .lab { padding-bottom: 36px; }
-.lab-head { padding-bottom: 14px; }
-.lab-kicker {
+.lab-head , .pg-head { padding-bottom: 14px; }
+.lab-kicker , .pg-kicker {
   display: flex; align-items: center; gap: 8px; margin: 0 0 6px; font-family: var(--font-data); font-size: 12px;
   text-transform: uppercase; letter-spacing: .14em; color: var(--accent-ink);
 }
-.lab-kicker-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px var(--accent-tint); }
-.lab-title {
+.lab-kicker-dot , .pg-kicker-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px var(--accent-tint); }
+.lab-title , .pg-title {
   margin: 0; font-family: var(--font-display); font-weight: 700; font-size: 36px; line-height: .98;
   text-transform: uppercase; letter-spacing: .005em; text-wrap: balance;
 }
-.lab-sub { margin: 8px 0 12px; color: var(--fg-soft); font-size: 15px; line-height: 1.45; }
-.lab-modes { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 1px solid var(--fg); border-radius: 10px; overflow: hidden; background: var(--surface); }
-.lab-mode {
+.lab-sub , .pg-sub { margin: 8px 0 12px; color: var(--fg-soft); font-size: 15px; line-height: 1.45; }
+.lab-modes , .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 1px solid var(--fg); border-radius: 10px; overflow: hidden; background: var(--surface); }
+.lab-mode , .mode-btn {
   display: flex; flex-direction: column; align-items: flex-start; gap: 1px; min-height: 58px; padding: 8px 12px;
   border: 0; background: none; color: var(--fg); text-align: left;
 }
-.lab-mode + .lab-mode { border-left: 1px solid var(--fg); }
-.lab-mode:hover { background: var(--hover); }
-.lab-mode-t { font-family: var(--font-display); font-weight: 700; font-size: 19px; text-transform: uppercase; letter-spacing: .03em; line-height: 1.05; }
-.lab-mode-s { font-family: var(--font-data); font-size: 11px; color: var(--fg-soft); text-transform: uppercase; letter-spacing: .06em; }
-.lab-mode[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
-.lab-mode[aria-pressed="true"] .lab-mode-s { color: color-mix(in srgb, var(--bg) 75%, transparent); }
-.lab-mode-note { margin: 2px 0 6px; font-size: 14px; color: var(--fg-soft); line-height: 1.4; }
+.lab-mode + .lab-mode , .mode-btn + .mode-btn { border-left: 1px solid var(--fg); }
+.lab-mode:hover , .mode-btn:hover { background: var(--hover); }
+.lab-mode-t , .mode-t { font-family: var(--font-display); font-weight: 700; font-size: 19px; text-transform: uppercase; letter-spacing: .03em; line-height: 1.05; }
+.lab-mode-s , .mode-s { font-family: var(--font-data); font-size: 11px; color: var(--fg-soft); text-transform: uppercase; letter-spacing: .06em; }
+.lab-mode[aria-pressed="true"] , .mode-btn[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
+.lab-mode[aria-pressed="true"] .lab-mode-s , .mode-btn[aria-pressed="true"] .mode-s { color: color-mix(in srgb, var(--bg) 75%, transparent); }
+.lab-mode-note , .mode-note { margin: 2px 0 6px; font-size: 14px; color: var(--fg-soft); line-height: 1.4; }
 
-.lab-sec { border-top: 1px solid var(--fg); }
-.lab-sec + .lab-sec { border-top-color: var(--line); }
-.lab-sec-head {
+.lab-sec , .sec--num { border-top: 1px solid var(--fg); }
+.lab-sec + .lab-sec , .sec--num + .sec--num { border-top-color: var(--line); }
+.lab-sec-head , .sec-head {
   display: flex; align-items: center; gap: 10px; width: 100%; min-height: 52px; padding: 8px 0; border: 0; background: none;
   color: var(--fg); text-align: left;
 }
-.lab-sec-head:hover .lab-sec-title { color: var(--accent-ink); }
-.lab-num {
+.lab-sec-head:hover .lab-sec-title , .sec-head:hover .sec-title { color: var(--accent-ink); }
+.lab-num , .sec-num {
   flex: none; min-width: 30px; padding: 2px 5px; border: 1px solid currentColor; border-radius: 3px; color: var(--accent-ink);
   font-family: var(--font-data); font-size: 12px; line-height: 1.2; text-align: center; letter-spacing: .04em;
 }
-.lab-sec-title { flex: 1; min-width: 0; font-family: var(--font-display); font-weight: 700; font-size: 23px; text-transform: uppercase; letter-spacing: .03em; line-height: 1.05; }
-.lab-sec-meta { flex: none; font-family: var(--font-data); font-size: 11.5px; color: var(--fg-soft); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.lab-chev { flex: none; width: 10px; height: 10px; border-right: 2px solid var(--fg-soft); border-bottom: 2px solid var(--fg-soft); transform: rotate(45deg) translate(-2px, -2px); transition: transform .2s; }
-.lab-sec-head[aria-expanded="false"] .lab-chev { transform: rotate(-45deg); }
-.lab-sec-body { padding: 2px 0 18px; }
+.lab-sec-title , .sec-title { flex: 1; min-width: 0; font-family: var(--font-display); font-weight: 700; font-size: 23px; text-transform: uppercase; letter-spacing: .03em; line-height: 1.05; }
+.lab-sec-meta , .sec-meta { flex: none; font-family: var(--font-data); font-size: 11.5px; color: var(--fg-soft); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.lab-chev , .sec-chev { flex: none; width: 10px; height: 10px; border-right: 2px solid var(--fg-soft); border-bottom: 2px solid var(--fg-soft); transform: rotate(45deg) translate(-2px, -2px); transition: transform .2s; }
+.lab-sec-head[aria-expanded="false"] .lab-chev , .sec-head[aria-expanded="false"] .sec-chev { transform: rotate(-45deg); }
+.lab-sec-body , .sec-body { padding: 2px 0 18px; }
 .lab-aviso { margin-top: 18px; }
 
 /* ---------- experiments */
-.lab-exps {
+.lab-exps , .cards-h {
   list-style: none; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(180px, 44%); gap: 8px;
   overflow-x: auto; scroll-snap-type: x mandatory; overscroll-behavior-x: contain;
   margin: 0 calc(-1 * var(--gutter)); padding: 2px var(--gutter) 8px; scroll-padding-left: var(--gutter); scrollbar-width: thin;
 }
-.lab-exps > li { scroll-snap-align: start; }
-.lab-exp {
+.lab-exps > li , .cards-h > li { scroll-snap-align: start; }
+.lab-exp , .card-h {
   display: flex; flex-direction: column; align-items: flex-start; gap: 3px; width: 100%; height: 100%; padding: 10px 12px 11px;
   border: 1px solid var(--line); border-radius: 10px; background: color-mix(in srgb, var(--surface) 88%, transparent); color: var(--fg); text-align: left;
   transition: border-color .15s, transform .15s;
 }
-.lab-exp:hover { border-color: var(--accent); transform: translateY(-1px); }
-.lab-exp.is-current { border: 2px solid var(--accent); padding: 9px 11px 10px; background: var(--surface); }
-.lab-exp-n { font-family: var(--font-data); font-size: 11px; color: var(--accent-ink); letter-spacing: .08em; }
-.lab-exp-title { font-family: var(--font-display); font-weight: 700; font-size: 19px; line-height: 1.05; text-transform: uppercase; letter-spacing: .02em; }
-.lab-exp-sum { font-size: 13.5px; line-height: 1.35; color: var(--fg-soft); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-.lab-exp-meta { margin-top: auto; padding-top: 4px; font-family: var(--font-data); font-size: 10.5px; color: var(--fg-soft); text-transform: uppercase; letter-spacing: .05em; }
+.lab-exp:hover , .card-h:hover { border-color: var(--accent); transform: translateY(-1px); }
+.lab-exp.is-current , .card-h.is-current { border: 2px solid var(--accent); padding: 9px 11px 10px; background: var(--surface); }
+.lab-exp-n , .card-h-code { font-family: var(--font-data); font-size: 11px; color: var(--accent-ink); letter-spacing: .08em; }
+.lab-exp-title , .card-h-title { font-family: var(--font-display); font-weight: 700; font-size: 19px; line-height: 1.05; text-transform: uppercase; letter-spacing: .02em; }
+.lab-exp-sum , .card-h-sum { font-size: 13.5px; line-height: 1.35; color: var(--fg-soft); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.lab-exp-meta , .card-h-meta { margin-top: auto; padding-top: 4px; font-family: var(--font-data); font-size: 10.5px; color: var(--fg-soft); text-transform: uppercase; letter-spacing: .05em; }
 
-.lab-run {
+.lab-run , .runner {
   margin: 4px 0 14px; padding: 14px 14px 10px; border-radius: 12px; border: 2px solid var(--accent); background: var(--surface);
   box-shadow: 0 10px 28px rgba(10, 20, 40, .12);
 }
-.lab-run-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
-.lab-run-kicker { display: flex; flex-wrap: wrap; gap: 4px 10px; margin: 2px 0 0; font-family: var(--font-data); font-size: 11.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--accent-ink); }
-.lab-run-count { color: var(--fg-soft); }
-.lab-run-close { margin: -6px -6px 0 0; }
-.lab-run-prog { height: 4px; border-radius: 2px; background: var(--surface-2); margin: 8px 0 10px; overflow: hidden; }
-.lab-run-prog span { display: block; height: 100%; background: var(--accent); transition: width .3s; }
-.lab-run-title { margin: 0 0 6px; font-family: var(--font-display); font-weight: 700; font-size: 27px; line-height: 1.02; text-transform: uppercase; letter-spacing: .01em; }
-.lab-run-title:focus { outline: none; }
-.lab-run-text { font-size: 16px; line-height: 1.5; margin: 0 0 10px; }
-.lab-run-mira { display: flex; gap: 8px; align-items: flex-start; margin: 0 0 10px; padding: 9px 11px; border-radius: 8px; background: var(--sky-tint); border-left: 4px solid var(--sky); font-size: 15px; line-height: 1.4; }
-.lab-run-mira svg { width: 20px; height: 20px; margin-top: 1px; fill: none; stroke: var(--sky); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.lab-run-hint { margin: 8px 0 0; font-size: 13px; color: var(--fg-soft); }
-.lab-run-nav { display: grid; grid-template-columns: 1fr auto 1.3fr; gap: 6px; margin-top: 12px; }
-.lab-run-nav .btn { padding: 0 10px; }
-.lab-run-dots { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px; margin-top: 6px; }
-.lab-run-dot { width: 30px; height: 30px; padding: 0; border: 0; background: none; display: grid; place-items: center; }
-.lab-run-dot::before { content: ''; width: 9px; height: 9px; border-radius: 50%; background: var(--line); }
-.lab-run-dot.is-seen::before { background: var(--fg-soft); }
-.lab-run-dot[aria-current="step"]::before { width: 22px; border-radius: 5px; background: var(--accent); }
+.lab-run-top , .runner-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.lab-run-kicker , .runner-kicker { display: flex; flex-wrap: wrap; gap: 4px 10px; margin: 2px 0 0; font-family: var(--font-data); font-size: 11.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--accent-ink); }
+.lab-run-count , .runner-count { color: var(--fg-soft); }
+.lab-run-close , .runner-close { margin: -6px -6px 0 0; }
+.lab-run-prog , .runner-prog { height: 4px; border-radius: 2px; background: var(--surface-2); margin: 8px 0 10px; overflow: hidden; }
+.lab-run-prog span , .runner-prog span { display: block; height: 100%; background: var(--accent); transition: width .3s; }
+.lab-run-title , .runner-title { margin: 0 0 6px; font-family: var(--font-display); font-weight: 700; font-size: 27px; line-height: 1.02; text-transform: uppercase; letter-spacing: .01em; }
+.lab-run-title:focus , .runner-title:focus { outline: none; }
+.lab-run-text , .runner-text { font-size: 16px; line-height: 1.5; margin: 0 0 10px; }
+.lab-run-mira , .runner-mira { display: flex; gap: 8px; align-items: flex-start; margin: 0 0 10px; padding: 9px 11px; border-radius: 8px; background: var(--sky-tint); border-left: 4px solid var(--sky); font-size: 15px; line-height: 1.4; }
+.lab-run-mira svg , .runner-mira svg { width: 20px; height: 20px; margin-top: 1px; fill: none; stroke: var(--sky); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.lab-run-hint , .runner-hint { margin: 8px 0 0; font-size: 13px; color: var(--fg-soft); }
+.lab-run-nav , .runner-nav { display: grid; grid-template-columns: 1fr auto 1.3fr; gap: 6px; margin-top: 12px; }
+.lab-run-nav .btn , .runner-nav .btn { padding: 0 10px; }
+.lab-run-dots , .runner-dots { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px; margin-top: 6px; }
+.lab-run-dot , .runner-dot { width: 30px; height: 30px; padding: 0; border: 0; background: none; display: grid; place-items: center; }
+.lab-run-dot::before , .runner-dot::before { content: ''; width: 9px; height: 9px; border-radius: 50%; background: var(--line); }
+.lab-run-dot.is-seen::before , .runner-dot.is-seen::before { background: var(--fg-soft); }
+.lab-run-dot[aria-current="step"]::before , .runner-dot[aria-current="step"]::before { width: 22px; border-radius: 5px; background: var(--accent); }
 
 /* ---------- cause → effect chains */
-.lab-chain { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 2px; }
-.lab-chain-item {
+.lab-chain , .chain { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 2px; }
+.lab-chain-item , .chain-item {
   padding: 5px 9px; border-radius: 6px; background: var(--surface); border: 1px solid var(--line); color: var(--fg);
   font-size: 14.5px; line-height: 1.3;
 }
-.lab-chain-cause { background: var(--accent-ink); border-color: transparent; color: var(--accent-fg); font-weight: 700; }
-.lab-chain-effect { font-weight: 700; border-color: var(--fg); }
-.lab-chain-arrow { flex: none; width: 18px; text-align: center; color: var(--fg-soft); font-family: var(--font-data); font-size: 15px; }
-.lab-chain-arrow::before { content: '→'; }
-.lab-chain.is-warn .lab-chain-cause { background: var(--arc-red); color: #fff; }
-.lab-chain.is-warn .lab-chain-effect { border-color: var(--arc-red); }
-.lab-chain.is-good .lab-chain-effect { border-color: var(--arc-green); box-shadow: inset 0 0 0 1px var(--arc-green); }
-.lab-chain--compact { display: none; }
+.lab-chain-cause , .chain-cause { background: var(--accent-ink); border-color: transparent; color: var(--accent-fg); font-weight: 700; }
+.lab-chain-effect , .chain-effect { font-weight: 700; border-color: var(--fg); }
+.lab-chain-arrow , .chain-arrow { flex: none; width: 18px; text-align: center; color: var(--fg-soft); font-family: var(--font-data); font-size: 15px; }
+.lab-chain-arrow::before , .chain-arrow::before { content: '→'; }
+.lab-chain.is-warn .lab-chain-cause , .chain.is-warn .chain-cause { background: var(--arc-red); color: #fff; }
+.lab-chain.is-warn .lab-chain-effect , .chain.is-warn .chain-effect { border-color: var(--arc-red); }
+.lab-chain.is-good .lab-chain-effect , .chain.is-good .chain-effect { border-color: var(--arc-green); box-shadow: inset 0 0 0 1px var(--arc-green); }
+.lab-chain--compact , .chain--compact { display: none; }
 
 .lab-narr-now { min-height: 64px; padding: 12px; border-radius: 10px; background: color-mix(in srgb, var(--surface) 92%, transparent); border: 1px solid var(--line); }
 .lab-narr-tag { margin: 0 0 8px; font-family: var(--font-data); font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: var(--fg-soft); }
@@ -1097,60 +993,60 @@ details.fold[open] > summary::after { content: '−'; }
 .lab-legend--chart .lab-sw--stall { height: 10px; border-radius: 2px; background: color-mix(in srgb, var(--arc-red) 30%, transparent); }
 
 /* ---------- 01 mandos */
-.lab-ctl-group {
+.lab-ctl-group , .ctl-grp {
   margin-top: 10px; padding: 2px 14px; border-radius: 12px; border: 1px solid var(--line);
   background: color-mix(in srgb, var(--surface) 90%, transparent);
 }
-.lab-ctl { padding: 12px 0 12px; }
-.lab-ctl + .lab-ctl { border-top: 1px solid var(--line); }
-.lab-ctl-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
-.lab-ctl-label { font-family: var(--font-display); font-weight: 600; font-size: 16px; text-transform: uppercase; letter-spacing: .05em; }
-.lab-ctl-val { font-family: var(--font-data); font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.lab-ctl--big .lab-ctl-val { font-size: 22px; color: var(--accent-ink); }
-.lab-ctl-sub { margin: 4px 0 0; font-size: 13px; line-height: 1.35; color: var(--fg-soft); }
-.lab-track { position: relative; }
-.lab-center { position: absolute; left: 50%; top: 11px; bottom: 11px; width: 2px; margin-left: -1px; background: var(--fg-soft); opacity: .55; pointer-events: none; }
-.lab-range {
+.lab-ctl , .ctl { padding: 12px 0 12px; }
+.lab-ctl + .lab-ctl , .ctl + .ctl { border-top: 1px solid var(--line); }
+.lab-ctl-head , .ctl-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.lab-ctl-label , .ctl-lbl { font-family: var(--font-display); font-weight: 600; font-size: 16px; text-transform: uppercase; letter-spacing: .05em; }
+.lab-ctl-val , .ctl-val { font-family: var(--font-data); font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.lab-ctl--big .lab-ctl-val , .ctl--big .ctl-val { font-size: 22px; color: var(--accent-ink); }
+.lab-ctl-sub , .ctl-sub { margin: 4px 0 0; font-size: 13px; line-height: 1.35; color: var(--fg-soft); }
+.lab-track , .ctl-track { position: relative; }
+.lab-center , .ctl-center { position: absolute; left: 50%; top: 11px; bottom: 11px; width: 2px; margin-left: -1px; background: var(--fg-soft); opacity: .55; pointer-events: none; }
+.lab-range , .range {
   -webkit-appearance: none; appearance: none; display: block; width: 100%; height: 44px; margin: 0; padding: 0;
   background: transparent; cursor: pointer; touch-action: pan-y; position: relative;
 }
-.lab-range:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: 8px; }
-.lab-range::-webkit-slider-runnable-track { height: 12px; border-radius: 6px; background: var(--trk, var(--lab-track)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fg) 14%, transparent); }
-.lab-range::-moz-range-track { height: 12px; border-radius: 6px; background: var(--trk, var(--lab-track)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fg) 14%, transparent); }
-.lab-range::-webkit-slider-thumb {
+.lab-range:focus-visible , .range:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: 8px; }
+.lab-range::-webkit-slider-runnable-track , .range::-webkit-slider-runnable-track { height: 12px; border-radius: 6px; background: var(--trk, var(--lab-track)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fg) 14%, transparent); }
+.lab-range::-moz-range-track , .range::-moz-range-track { height: 12px; border-radius: 6px; background: var(--trk, var(--lab-track)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fg) 14%, transparent); }
+.lab-range::-webkit-slider-thumb , .range::-webkit-slider-thumb {
   -webkit-appearance: none; appearance: none; width: 30px; height: 30px; margin-top: -9px; border-radius: 50%;
   background: var(--surface); border: 3px solid var(--accent); box-shadow: 0 2px 8px rgba(0, 0, 0, .3);
 }
-.lab-range::-moz-range-thumb { width: 24px; height: 24px; border-radius: 50%; background: var(--surface); border: 3px solid var(--accent); box-shadow: 0 2px 8px rgba(0, 0, 0, .3); }
-.lab-range:disabled { cursor: default; }
-.lab-range:disabled::-webkit-slider-thumb { border-color: var(--fg-soft); background: var(--surface-2); }
-.lab-range:disabled::-moz-range-thumb { border-color: var(--fg-soft); background: var(--surface-2); }
-.lab-ticks { position: relative; height: 15px; margin-top: -6px; font-family: var(--font-data); font-size: 10.5px; color: var(--fg-soft); }
-.lab-ticks:has(.is-alt) { height: 28px; }
-.lab-tick { position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap; line-height: 1.2; padding-top: 3px; }
-.lab-tick::before { content: ''; position: absolute; left: 50%; top: -2px; width: 1px; height: 5px; background: currentColor; }
-.lab-tick.is-alt { top: 13px; }
-.lab-tick.is-alt::before { top: -15px; height: 18px; opacity: .6; }
-.lab-tick.is-red { color: var(--bad-ink); font-weight: 700; }
-.lab-ends { display: flex; justify-content: space-between; gap: 8px; margin-top: -4px; font-size: 12.5px; color: var(--fg-soft); }
-.lab-quick { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
-.lab-qbtn {
+.lab-range::-moz-range-thumb , .range::-moz-range-thumb { width: 24px; height: 24px; border-radius: 50%; background: var(--surface); border: 3px solid var(--accent); box-shadow: 0 2px 8px rgba(0, 0, 0, .3); }
+.lab-range:disabled , .range:disabled { cursor: default; }
+.lab-range:disabled::-webkit-slider-thumb , .range:disabled::-webkit-slider-thumb { border-color: var(--fg-soft); background: var(--surface-2); }
+.lab-range:disabled::-moz-range-thumb , .range:disabled::-moz-range-thumb { border-color: var(--fg-soft); background: var(--surface-2); }
+.lab-ticks , .ticks { position: relative; height: 15px; margin-top: -6px; font-family: var(--font-data); font-size: 10.5px; color: var(--fg-soft); }
+.lab-ticks:has(.is-alt) , .ticks:has(.is-alt) { height: 28px; }
+.lab-tick , .tick { position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap; line-height: 1.2; padding-top: 3px; }
+.lab-tick::before , .tick::before { content: ''; position: absolute; left: 50%; top: -2px; width: 1px; height: 5px; background: currentColor; }
+.lab-tick.is-alt , .tick.is-alt { top: 13px; }
+.lab-tick.is-alt::before , .tick.is-alt::before { top: -15px; height: 18px; opacity: .6; }
+.lab-tick.is-red , .tick.is-red { color: var(--bad-ink); font-weight: 700; }
+.lab-ends , .ctl-ends { display: flex; justify-content: space-between; gap: 8px; margin-top: -4px; font-size: 12.5px; color: var(--fg-soft); }
+.lab-quick , .quick { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.lab-qbtn , .qbtn {
   min-height: 32px; padding: 0 10px; border-radius: 16px; border: 1px solid var(--line); background: var(--surface);
   font-family: var(--font-data); font-size: 11.5px; color: var(--fg); white-space: nowrap;
 }
-.lab-qbtn:hover { border-color: var(--accent); }
-.lab-ctl-actions { padding: 4px 0 12px; }
+.lab-qbtn:hover , .qbtn:hover { border-color: var(--accent); }
+.lab-ctl-actions , .ctl-actions { padding: 4px 0 12px; }
 .lab-center-btn { width: 100%; }
-.app [data-lab-mode="vuelo"] .lab-ctl-group--wind .lab-quick { display: none; }
-.app [data-lab-mode="vuelo"] .lab-ctl-group--wind { background: color-mix(in srgb, var(--surface-2) 60%, transparent); border-style: dashed; }
+.app [data-lab-mode="vuelo"] .lab-ctl-group--wind .lab-quick , .app [data-lab-mode="vuelo"] .ctl-grp--wind .quick { display: none; }
+.app [data-lab-mode="vuelo"] .lab-ctl-group--wind , .app [data-lab-mode="vuelo"] .ctl-grp--wind { background: color-mix(in srgb, var(--surface-2) 60%, transparent); border-style: dashed; }
 
-.lab-detents { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0; margin-top: 8px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface); }
-.lab-detent { min-height: 48px; border: 0; border-left: 1px solid var(--line); background: none; color: var(--fg); padding: 0; }
-.lab-detent:first-child { border-left: 0; }
-.lab-detent:hover { background: var(--hover); }
-.lab-detent-n { font-family: var(--font-display); font-weight: 700; font-size: 20px; letter-spacing: .02em; }
-.lab-detent[aria-pressed="true"] { background: var(--accent-ink); color: var(--accent-fg); }
-.lab-detent.is-moving { animation: lab-blink .8s ease-in-out infinite alternate; }
+.lab-detents , .detents { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0; margin-top: 8px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface); }
+.lab-detent , .detent { min-height: 48px; border: 0; border-left: 1px solid var(--line); background: none; color: var(--fg); padding: 0; }
+.lab-detent:first-child , .detent:first-child { border-left: 0; }
+.lab-detent:hover , .detent:hover { background: var(--hover); }
+.lab-detent-n , .detent-n { font-family: var(--font-display); font-weight: 700; font-size: 20px; letter-spacing: .02em; }
+.lab-detent[aria-pressed="true"] , .detent[aria-pressed="true"] { background: var(--accent-ink); color: var(--accent-fg); }
+.lab-detent.is-moving , .detent.is-moving { animation: lab-blink .8s ease-in-out infinite alternate; }
 @keyframes lab-blink { from { opacity: 1; } to { opacity: .6; } }
 .lab-flapbar { position: relative; height: 8px; margin-top: 8px; border-radius: 4px; background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line); }
 .lab-flapbar-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; background: var(--accent); transition: width .1s linear; }
@@ -1177,18 +1073,18 @@ details.fold[open] > summary::after { content: '−'; }
 .lab-fbd-arrow--net .lab-fbd-label { font-weight: 400; font-style: italic; }
 .lab-ah--wind { fill: var(--sky); }
 
-.lab-bars { display: flex; flex-direction: column; gap: 6px; }
-.lab-bars-cap { margin: 6px 0 0; font-family: var(--font-data); font-size: 10.5px; text-transform: uppercase; letter-spacing: .1em; color: var(--fg-soft); }
-.lab-bar { display: grid; grid-template-columns: 104px minmax(0, 1fr) 70px; align-items: center; gap: 10px; }
-.lab-bar-name { font-family: var(--font-display); font-weight: 600; font-size: 15px; text-transform: uppercase; letter-spacing: .04em; display: flex; align-items: center; gap: 6px; }
-.lab-bar-name::before { content: ''; width: 10px; height: 10px; border-radius: 2px; background: var(--c); flex: none; }
-.lab-bar-track { position: relative; height: 12px; border-radius: 6px; background: var(--surface-2); overflow: hidden; }
-.lab-bar-fill { position: absolute; inset: 0; border-radius: 6px; background: var(--c); transform-origin: left center; transform: scaleX(0); transition: transform .18s linear; }
-.lab-bar-over { position: absolute; right: 2px; top: -3px; color: #fff; font-weight: 700; font-size: 13px; }
-.lab-bar--lift .lab-bar-track::after, .lab-bar--weight .lab-bar-track::after { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; background: var(--bg); opacity: .9; }
-.lab-bar-val { font-family: var(--font-data); font-size: 13px; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
-.lab-bar--lift { --c: var(--lab-lift); } .lab-bar--weight { --c: var(--lab-weight); }
-.lab-bar--thrust { --c: var(--lab-thrust); } .lab-bar--drag { --c: var(--lab-drag); }
+.lab-bars , .bars { display: flex; flex-direction: column; gap: 6px; }
+.lab-bars-cap , .bars-cap { margin: 6px 0 0; font-family: var(--font-data); font-size: 10.5px; text-transform: uppercase; letter-spacing: .1em; color: var(--fg-soft); }
+.lab-bar , .bar-row { display: grid; grid-template-columns: 104px minmax(0, 1fr) 70px; align-items: center; gap: 10px; }
+.lab-bar-name , .bar-name { font-family: var(--font-display); font-weight: 600; font-size: 15px; text-transform: uppercase; letter-spacing: .04em; display: flex; align-items: center; gap: 6px; }
+.lab-bar-name::before , .bar-name::before { content: ''; width: 10px; height: 10px; border-radius: 2px; background: var(--c); flex: none; }
+.lab-bar-track , .bar-track { position: relative; height: 12px; border-radius: 6px; background: var(--surface-2); overflow: hidden; }
+.lab-bar-fill , .bar-fill { position: absolute; inset: 0; border-radius: 6px; background: var(--c); transform-origin: left center; transform: scaleX(0); transition: transform .18s linear; }
+.lab-bar-over , .bar-over { position: absolute; right: 2px; top: -3px; color: #fff; font-weight: 700; font-size: 13px; }
+.lab-bar--lift .lab-bar-track::after, .bar-row--lift .bar-track::after, .lab-bar--weight .lab-bar-track::after , .bar-row--weight .bar-track::after { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; background: var(--bg); opacity: .9; }
+.lab-bar-val , .bar-val { font-family: var(--font-data); font-size: 13px; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+.lab-bar--lift , .bar-row--lift { --c: var(--lab-lift); } .lab-bar--weight , .bar-row--weight { --c: var(--lab-weight); }
+.lab-bar--thrust , .bar-row--thrust { --c: var(--lab-thrust); } .lab-bar--drag , .bar-row--drag { --c: var(--lab-drag); }
 .lab-balance { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-top: 12px; }
 .lab-bal { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: color-mix(in srgb, var(--surface) 90%, transparent); min-width: 0; }
 .lab-bal-k { font-family: var(--font-data); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--fg-soft); }
@@ -1208,121 +1104,119 @@ details.fold[open] > summary::after { content: '−'; }
 .lab-chart-read { margin: 8px 0 0; font-family: var(--font-data); font-size: 12px; color: var(--fg-soft); line-height: 1.5; }
 
 /* ---------- escenario sobre el 3D (vidrio oscuro) */
-.lab-stage { position: absolute; inset: 0; z-index: 3; pointer-events: none; color: var(--ov-fg); }
-.app[data-mode="aire"] .vp-top, .app[data-mode="aire"] .vp-cams, .app[data-mode="aire"] .inset-caption,
+.lab-stage , .vp-stage { position: absolute; inset: 0; z-index: 3; pointer-events: none; color: var(--ov-fg); }
+ .app[data-mode="aire"] .inset-caption,
 .app[data-mode="aire"] .vp-stall, .app[data-mode="aire"] #inset-labels { display: none !important; }
-.app[data-mode="aire"] .toasts { bottom: calc(var(--lab-bar-h) + 104px); }
-.lab-hud {
+.lab-hud , .hud {
   position: absolute; top: 12px; left: 12px; max-width: min(440px, calc(100% - var(--inset-w) - 44px));
   padding: 11px 16px 12px; border-radius: 12px; background: var(--lab-glass); border: 1px solid var(--lab-glass-line);
   backdrop-filter: blur(10px) saturate(1.15); -webkit-backdrop-filter: blur(10px) saturate(1.15);
   box-shadow: 0 10px 30px rgba(0, 0, 0, .28);
 }
-.lab-hud p { margin: 0; }
-.lab-hud-kicker { display: flex; align-items: center; gap: 8px; font-family: var(--font-data); font-size: 11px; text-transform: uppercase; letter-spacing: .14em; color: #FFC18F; }
-.lab-live-dot { width: 7px; height: 7px; border-radius: 50%; background: #5CC97E; box-shadow: 0 0 8px #5CC97E; animation: lab-pulse 1.4s ease-in-out infinite; }
+.lab-hud p , .hud p { margin: 0; }
+.lab-hud-kicker , .hud-kicker { display: flex; align-items: center; gap: 8px; font-family: var(--font-data); font-size: 11px; text-transform: uppercase; letter-spacing: .14em; color: #FFC18F; }
+.lab-live-dot , .live-dot { width: 7px; height: 7px; border-radius: 50%; background: #5CC97E; box-shadow: 0 0 8px #5CC97E; animation: lab-pulse 1.4s ease-in-out infinite; }
 @keyframes lab-pulse { 50% { opacity: .35; } }
-.lab-hud-big { display: flex; flex-wrap: wrap; gap: 4px 26px; margin: 6px 0 4px; }
-.lab-big { display: flex; flex-direction: column; }
-.lab-big-num { display: flex; align-items: baseline; font-family: var(--font-display); font-weight: 700; line-height: .92; }
-.lab-big-v { font-size: 54px; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
-.lab-big-u { font-size: 19px; margin-left: 4px; color: var(--ov-soft); text-transform: uppercase; }
-.lab-big-l { margin-top: 3px; font-family: var(--font-data); font-size: 10.5px; text-transform: uppercase; letter-spacing: .1em; color: var(--ov-soft); }
-.lab-hud-row { font-family: var(--font-data); font-size: 12px; color: var(--ov-soft); font-variant-numeric: tabular-nums; }
-.lab-flowstate {
+.lab-hud-big , .hud-big { display: flex; flex-wrap: wrap; gap: 4px 26px; margin: 6px 0 4px; }
+.lab-big , .big { display: flex; flex-direction: column; }
+.lab-big-num , .big-num { display: flex; align-items: baseline; font-family: var(--font-display); font-weight: 700; line-height: .92; }
+.lab-big-v , .big-v { font-size: 54px; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+.lab-big-u , .big-u { font-size: 19px; margin-left: 4px; color: var(--ov-soft); text-transform: uppercase; }
+.lab-big-l , .big-l { margin-top: 3px; font-family: var(--font-data); font-size: 10.5px; text-transform: uppercase; letter-spacing: .1em; color: var(--ov-soft); }
+.lab-hud-row , .hud-row { font-family: var(--font-data); font-size: 12px; color: var(--ov-soft); font-variant-numeric: tabular-nums; }
+.lab-flowstate , .hud-pill {
   display: inline-flex; align-items: center; gap: 7px; margin-top: 8px !important; padding: 3px 9px; border-radius: 999px;
   font-family: var(--font-data); font-size: 11px; text-transform: uppercase; letter-spacing: .08em;
   background: rgba(255, 255, 255, .08); border: 1px solid rgba(255, 255, 255, .14);
 }
-.lab-flowstate::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: #8A97A3; }
-.lab-flowstate.is-ok::before { background: #5CC97E; box-shadow: 0 0 6px #5CC97E; }
-.lab-flowstate.is-horn { background: rgba(217, 164, 0, .25); border-color: #D9A400; }
-.lab-flowstate.is-horn::before { background: #F2C230; }
-.lab-flowstate.is-stall { background: var(--arc-red); border-color: transparent; color: #fff; animation: stall-pulse .5s ease-in-out infinite alternate; }
-.lab-flowstate.is-stall::before { background: #fff; }
+.lab-flowstate::before , .hud-pill::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: #8A97A3; }
+.lab-flowstate.is-ok::before , .hud-pill.is-ok::before { background: #5CC97E; box-shadow: 0 0 6px #5CC97E; }
+.lab-flowstate.is-horn , .hud-pill.is-horn { background: rgba(217, 164, 0, .25); border-color: #D9A400; }
+.lab-flowstate.is-horn::before , .hud-pill.is-horn::before { background: #F2C230; }
+.lab-flowstate.is-stall , .hud-pill.is-stall { background: var(--arc-red); border-color: transparent; color: #fff; animation: stall-pulse .5s ease-in-out infinite alternate; }
+.lab-flowstate.is-stall::before , .hud-pill.is-stall::before { background: #fff; }
 
-.lab-stage-narr {
+.lab-stage-narr , .chain-bar {
   position: absolute; left: 50%; bottom: calc(var(--lab-bar-h) + 22px); transform: translateX(-50%);
   width: max-content; max-width: min(720px, calc(100% - 24px)); padding: 9px 11px; border-radius: 12px;
   background: var(--lab-glass); border: 1px solid var(--lab-glass-line);
   backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); box-shadow: 0 10px 30px rgba(0, 0, 0, .3);
 }
-.lab-stage-narr .lab-chain { justify-content: center; }
-.lab-stage-narr .lab-chain-item { background: rgba(255, 255, 255, .07); border-color: rgba(255, 255, 255, .16); color: var(--ov-fg); font-size: 14px; padding: 4px 8px; }
-.lab-stage-narr .lab-chain-cause { background: #F08A3C; color: #111; border-color: transparent; }
-.lab-stage-narr .lab-chain-effect { border-color: rgba(255, 255, 255, .7); }
-.lab-stage-narr .lab-chain.is-warn .lab-chain-cause { background: var(--arc-red); color: #fff; }
-.lab-stage-narr .lab-chain-arrow { color: var(--ov-soft); }
+.lab-stage-narr .lab-chain , .chain-bar .chain { justify-content: center; }
+.lab-stage-narr .lab-chain-item , .chain-bar .chain-item { background: rgba(255, 255, 255, .07); border-color: rgba(255, 255, 255, .16); color: var(--ov-fg); font-size: 14px; padding: 4px 8px; }
+.lab-stage-narr .lab-chain-cause , .chain-bar .chain-cause { background: #F08A3C; color: #111; border-color: transparent; }
+.lab-stage-narr .lab-chain-effect , .chain-bar .chain-effect { border-color: rgba(255, 255, 255, .7); }
+.lab-stage-narr .lab-chain.is-warn .lab-chain-cause , .chain-bar .chain.is-warn .chain-cause { background: var(--arc-red); color: #fff; }
+.lab-stage-narr .lab-chain-arrow , .chain-bar .chain-arrow { color: var(--ov-soft); }
 /* a new line slides in with a short glow, never from opacity 0: where CSS animations stall (throttled embeds) the text
    must still be there */
-.lab-stage-narr.is-new { animation: lab-narr-in .5s ease-out; }
+.lab-stage-narr.is-new , .chain-bar.is-new { animation: lab-narr-in .5s ease-out; }
 @keyframes lab-narr-in {
   from { transform: translate(-50%, 6px); box-shadow: 0 0 0 2px rgba(240, 138, 60, .7), 0 10px 30px rgba(0, 0, 0, .3); }
   to { transform: translate(-50%, 0); box-shadow: 0 0 0 0 rgba(240, 138, 60, 0), 0 10px 30px rgba(0, 0, 0, .3); }
 }
-@media (prefers-reduced-motion: reduce) { .lab-stage-narr.is-new { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .lab-stage-narr.is-new , .chain-bar.is-new { animation: none; } }
 
-.lab-toolbar { position: absolute; left: 12px; right: 12px; bottom: 12px; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; pointer-events: none; }
-.lab-bar-grp {
+.lab-toolbar , .dock { position: absolute; left: 12px; right: 12px; bottom: 12px; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; pointer-events: none; }
+.lab-bar-grp , .dock-group {
   display: flex; align-items: center; gap: 2px; padding: 4px; border-radius: 11px; pointer-events: auto;
   background: var(--lab-glass); border: 1px solid var(--lab-glass-line);
   backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); box-shadow: 0 6px 20px rgba(0, 0, 0, .25);
 }
-.lab-bar-k { padding: 0 6px 0 8px; font-family: var(--font-data); font-size: 10px; text-transform: uppercase; letter-spacing: .12em; color: var(--ov-soft); }
-.lab-tb {
+.lab-bar-k , .dock-label { padding: 0 6px 0 8px; font-family: var(--font-data); font-size: 10px; text-transform: uppercase; letter-spacing: .12em; color: var(--ov-soft); }
+.lab-tb , .seg-btn {
   display: inline-flex; align-items: center; min-height: 36px; padding: 0 10px; border: 0; border-radius: 8px;
   background: transparent; color: var(--ov-fg); font-family: var(--font-display); font-weight: 600; font-size: 15px;
   text-transform: uppercase; letter-spacing: .04em; white-space: nowrap;
 }
-.lab-tb:hover { background: rgba(255, 255, 255, .09); }
-.lab-tb[aria-pressed="true"] { background: rgba(255, 255, 255, .16); box-shadow: inset 0 -2px 0 #F08A3C; }
-.lab-tb--chip[aria-pressed="true"] { box-shadow: none; }
-.lab-tb-dot { width: 9px; height: 9px; margin-right: 7px; border-radius: 50%; border: 1.5px solid currentColor; opacity: .7; }
-.lab-tb--chip[aria-pressed="true"] .lab-tb-dot { background: #FFB066; border-color: #FFB066; box-shadow: 0 0 8px #FFB066; opacity: 1; }
-.lab-tb--chip[aria-pressed="false"] { color: var(--ov-soft); }
-.lab-tb:disabled { opacity: .45; }
-.lab-tb:focus-visible { outline: 2px solid #9CC6EE; outline-offset: -2px; }
+.lab-tb:hover , .seg-btn:hover { background: rgba(255, 255, 255, .09); }
+.lab-tb[aria-pressed="true"] , .seg-btn[aria-pressed="true"] { background: rgba(255, 255, 255, .16); box-shadow: inset 0 -2px 0 #F08A3C; }
+.lab-tb--chip[aria-pressed="true"] , .tchip[aria-pressed="true"] { box-shadow: none; }
+.lab-tb-dot , .tchip-dot { width: 9px; height: 9px; margin-right: 7px; border-radius: 50%; border: 1.5px solid currentColor; opacity: .7; }
+.lab-tb--chip[aria-pressed="true"] .lab-tb-dot , .tchip[aria-pressed="true"] .tchip-dot { background: #FFB066; border-color: #FFB066; box-shadow: 0 0 8px #FFB066; opacity: 1; }
+.lab-tb--chip[aria-pressed="false"] , .tchip[aria-pressed="false"] { color: var(--ov-soft); }
+.lab-tb:disabled , .seg-btn:disabled { opacity: .45; }
+.lab-tb:focus-visible , .seg-btn:focus-visible { outline: 2px solid #9CC6EE; outline-offset: -2px; }
 
 /* Explorar: botón "Ver el aire" */
 .btn--air { background: var(--sky-tint); border-color: color-mix(in srgb, var(--sky) 45%, transparent); }
 .btn--air:hover { background: color-mix(in srgb, var(--sky) 20%, transparent); }
 
 @container vp (max-width: 760px) {
-  .lab-hud { top: 8px; left: 8px; padding: 7px 10px 8px; border-radius: 10px; max-width: calc(100% - var(--inset-w) - 28px); }
-  .lab-hud-kicker { font-size: 9.5px; letter-spacing: .1em; }
-  .lab-hud-big { gap: 2px 14px; margin: 3px 0 0; }
-  .lab-big-v { font-size: 30px; }
-  .lab-big-u { font-size: 13px; }
-  .lab-big-l { font-size: 9px; }
-  .lab-hud-row { display: none; }
-  .lab-flowstate { margin-top: 5px !important; font-size: 9.5px; padding: 2px 7px; }
-  .lab-toolbar { left: 0; right: 0; bottom: 0; flex-wrap: nowrap; overflow-x: auto; padding: 6px 8px 8px; gap: 6px; scrollbar-width: none; pointer-events: auto; }
-  .lab-toolbar::-webkit-scrollbar { display: none; }
-  .lab-bar-grp { flex: none; }
-  .lab-tb { min-height: 40px; font-size: 14px; padding: 0 9px; }
-  .lab-stage-narr { bottom: calc(var(--lab-bar-h) + 6px); padding: 6px 8px; max-width: calc(100% - 16px); }
-  .lab-stage-narr .lab-chain--compact { display: flex; }
-  .lab-stage-narr .lab-chain:not(.lab-chain--compact) { display: none; }
-  .lab-stage-narr .lab-chain-item { font-size: 12.5px; padding: 3px 7px; }
-  .app[data-mode="aire"] .toasts { bottom: calc(var(--lab-bar-h) + 70px); }
+  .lab-hud , .hud { top: 8px; left: 8px; padding: 7px 10px 8px; border-radius: 10px; max-width: calc(100% - var(--inset-w) - 28px); }
+  .lab-hud-kicker , .hud-kicker { font-size: 9.5px; letter-spacing: .1em; }
+  .lab-hud-big , .hud-big { gap: 2px 14px; margin: 3px 0 0; }
+  .lab-big-v , .big-v { font-size: 30px; }
+  .lab-big-u , .big-u { font-size: 13px; }
+  .lab-big-l , .big-l { font-size: 9px; }
+  .lab-hud-row , .hud-row { display: none; }
+  .lab-flowstate , .hud-pill { margin-top: 5px !important; font-size: 9.5px; padding: 2px 7px; }
+  .lab-toolbar , .dock { left: 0; right: 0; bottom: 0; flex-wrap: nowrap; overflow-x: auto; padding: 6px 8px 8px; gap: 6px; scrollbar-width: none; pointer-events: auto; }
+  .lab-toolbar::-webkit-scrollbar , .dock::-webkit-scrollbar { display: none; }
+  .lab-bar-grp , .dock-group { flex: none; }
+  .lab-tb , .seg-btn { min-height: 40px; font-size: 14px; padding: 0 9px; }
+  .lab-stage-narr , .chain-bar { bottom: calc(var(--lab-bar-h) + 6px); padding: 6px 8px; max-width: calc(100% - 16px); }
+  .lab-stage-narr .lab-chain--compact , .chain-bar .chain--compact { display: flex; }
+  .lab-stage-narr .lab-chain:not(.lab-chain--compact) , .chain-bar .chain:not(.chain--compact) { display: none; }
+  .lab-stage-narr .lab-chain-item , .chain-bar .chain-item { font-size: 12.5px; padding: 3px 7px; }
 }
 @media (pointer: coarse) {
-  .lab-tb { min-height: 44px; }
-  .lab-qbtn { min-height: 44px; padding: 0 12px; }
-  .lab-run-dot { width: 44px; height: 44px; }
+  .lab-tb , .seg-btn { min-height: 44px; }
+  .lab-qbtn , .qbtn { min-height: 44px; padding: 0 12px; }
+  .lab-run-dot , .runner-dot { width: 44px; height: 44px; }
 }
 @media (max-width: 899px) {
   .app[data-mode="aire"] .viewport { height: 50svh; min-height: 300px; }
-  .lab-title { font-size: 26px; }
-  .lab-sub { display: none; }
-  .lab-head { padding-bottom: 12px; }
-  .lab-modes { margin-top: 10px; }
-  .lab-mode { min-height: 52px; }
-  .lab-mode-t { font-size: 17px; }
-  .lab-exps { grid-auto-columns: minmax(200px, 66%); }
-  .lab-bar { grid-template-columns: 96px minmax(0, 1fr) 64px; gap: 8px; }
+  .lab-title , .pg-title { font-size: 26px; }
+  .lab-sub , .pg-sub { display: none; }
+  .lab-head , .pg-head { padding-bottom: 12px; }
+  .lab-modes , .modes { margin-top: 10px; }
+  .lab-mode , .mode-btn { min-height: 52px; }
+  .lab-mode-t , .mode-t { font-size: 17px; }
+  .lab-exps , .cards-h { grid-auto-columns: minmax(200px, 66%); }
+  .lab-bar , .bar-row { grid-template-columns: 96px minmax(0, 1fr) 64px; gap: 8px; }
   .lab-chart { height: 190px; }
-  .lab-run-title { font-size: 24px; }
+  .lab-run-title , .runner-title { font-size: 24px; }
 }
 @media (max-width: 899px) and (orientation: landscape) and (max-height: 540px) {
   .app[data-mode="aire"] .viewport { height: auto; min-height: 0; }
@@ -1330,10 +1224,10 @@ details.fold[open] > summary::after { content: '−'; }
 @media (max-width: 380px) {
   .lab-balance { grid-template-columns: 1fr 1fr; }
   .lab-bal--ld { grid-column: 1 / -1; }
-  .lab-sec-meta { display: none; }
+  .lab-sec-meta , .sec-meta { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .lab-bar-fill, .lab-flapbar-fill { transition: none; }
+  .lab-bar-fill, .bar-fill, .lab-flapbar-fill { transition: none; }
 }
 
 /* ------------------------------------------------------------------ VOLAR: Practicar · Situaciones (contract v3) */
@@ -1808,7 +1702,6 @@ kbd { font-size: 13px; border-radius: 5px; min-width: 24px; box-shadow: 0 1px 0 
   .dlg { place-items: end center; padding: 0; }
   .dlg-card { width: 100%; border-radius: var(--radius-l) var(--radius-l) 0 0; max-height: 92%; transform: translateY(40px); padding-bottom: env(safe-area-inset-bottom, 0px); }
   .dlg-grip { display: block; width: 44px; height: 5px; margin: 8px auto 0; border-radius: 3px; background: var(--fg-soft); opacity: .45; }
-  .vp-status { max-width: 100%; }
 }
 @media (max-width: 760px) and (orientation: portrait) and (max-height: 640px) {
   .sheet-sub { display: none; }
@@ -2170,66 +2063,6 @@ kbd { font-size: 13px; border-radius: 5px; min-width: 24px; box-shadow: 0 1px 0 
   .ctl-accs .acc-sum, .ctl-accs .acc-body, .ctl-rel, .probalo { padding-left: var(--space-4); padding-right: var(--space-4); }
 }
 
-/* ---------- capa sobre el 3D: franja de estado, escenario, disposición, vistas ---------- */
-.vp-top { gap: 8px; }
-.vp-status { gap: 6px; max-width: 100%; }
-.chip-st {
-  gap: 7px; padding: 5px 12px 5px 9px; border-radius: 999px; background: var(--ov-bg); color: var(--ov-fg); border: 1px solid rgba(255, 255, 255, .14);
-  font-size: 12.5px; line-height: 18px; backdrop-filter: blur(10px) saturate(1.2); -webkit-backdrop-filter: blur(10px) saturate(1.2);
-  transition: background var(--motion-fast), border-color var(--motion-fast);
-}
-button.chip-st { cursor: pointer; text-align: left; font-family: var(--font-data); }
-button.chip-st:hover { background: var(--ov-bg-strong); border-color: rgba(255, 255, 255, .42); }
-button.chip-st[aria-expanded="true"] { border-color: var(--accent); background: var(--ov-bg-strong); }
-.chip-st > svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; color: #8FA2B1; }
-.chip-st-text { display: contents; }
-.chip-st-k { color: var(--ov-soft); }
-.chip-st-v { color: var(--ov-fg); font-weight: 700; }
-.chip-st-k:empty, .chip-st-v:empty { display: none; }
-.chip-st.is-on > svg { color: #5CC97E; filter: drop-shadow(0 0 4px rgba(76, 193, 116, .65)); }
-.chip-st.is-warn > svg { color: #E8C14A; }
-.chip-st.is-air > svg { color: #6FA8DC; }
-.chip-st.is-paused { background: var(--arc-yellow); color: #111; border-color: transparent; }
-.chip-st.is-demo { background: #F08A3C; color: #111; border-color: transparent; }
-.chip-st.is-paused > svg, .chip-st.is-demo > svg, .chip-st.is-paused .chip-st-v, .chip-st.is-demo .chip-st-v { color: inherit; }
-.vp-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; pointer-events: none; max-width: 100%; }
-.vp-scenario { padding: 0; gap: 6px; background: none; border-radius: 0; backdrop-filter: none; -webkit-backdrop-filter: none; box-shadow: none !important; }
-.vp-scn-btn {
-  display: inline-flex; align-items: center; gap: 8px; min-height: 42px; padding: 4px 10px 4px 11px; border-radius: 12px; text-align: left;
-  border: 1px solid rgba(255, 255, 255, .16); background: var(--ov-bg); color: var(--ov-fg);
-  backdrop-filter: blur(10px) saturate(1.2); -webkit-backdrop-filter: blur(10px) saturate(1.2);
-  transition: background var(--motion-fast), border-color var(--motion-fast);
-}
-.vp-scn-btn:hover { background: var(--ov-bg-strong); border-color: rgba(255, 255, 255, .42); }
-.vp-scn-btn[aria-expanded="true"] { border-color: var(--accent); }
-.vp-scn-btn > svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; color: #F5A869; }
-.vp-scn-btn .vp-scn-chev { width: 16px; height: 16px; color: var(--ov-soft); }
-.vp-scn-text { display: flex; flex-direction: column; line-height: 1.05; min-width: 0; }
-.vp-scn-k { font-family: var(--font-data); font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--ov-soft); }
-.vp-scn-v { font-family: var(--font-display); font-weight: 700; font-size: 18px; letter-spacing: .03em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 46vw; }
-.vp-scenario.is-demo .vp-scn-btn { border-color: #F08A3C; box-shadow: 0 0 0 1px #F08A3C inset; }
-.vp-scenario.is-demo .vp-scn-v { color: #F5A869; }
-.vp-scenario-back { min-height: 42px; border-radius: 12px; padding: 0 14px; font-size: 15px; }
-.vp-layout { padding: 3px; gap: 2px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, .16); backdrop-filter: blur(10px) saturate(1.2); -webkit-backdrop-filter: blur(10px) saturate(1.2); }
-.vp-layout-btn { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px 0 10px; border-radius: 9px; font-size: 15px; transition: background var(--motion-fast), color var(--motion-fast); }
-.vp-layout-btn > svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.vp-cams-toggle {
-  display: inline-flex; min-height: 44px; padding: 0 15px 0 12px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, .16); background: var(--ov-bg);
-  backdrop-filter: blur(10px) saturate(1.2); -webkit-backdrop-filter: blur(10px) saturate(1.2); transition: background var(--motion-fast), border-color var(--motion-fast);
-}
-.vp-cams-toggle:hover { background: var(--ov-bg-strong); border-color: rgba(255, 255, 255, .42); }
-.vp-cams-toggle[aria-expanded="true"] { border-color: var(--accent); }
-.vp-cams-toggle svg { width: 20px; height: 20px; }
-.vp-cams-list { display: none !important; }
-@container vp (max-width: 560px) {
-  .chip-st { font-size: 11.5px; padding: 4px 9px 4px 7px; gap: 5px; line-height: 17px; }
-  .chip-st > svg { width: 15px; height: 15px; }
-  .chip-st.st-ias .chip-st-k, .chip-st.st-alt .chip-st-k { display: none; }
-  .vp-layout-btn:not([aria-pressed="true"]) .vp-layout-lbl { display: none; }
-  .vp-layout-btn { padding: 0 10px; }
-  .vp-scn-v { font-size: 16px; max-width: 38vw; }
-}
-
 /* popovers de la capa 3D: escenario y vistas */
 .pop-sub { margin: 0 0 var(--space-3) !important; font-size: 14.5px !important; line-height: 1.4; color: var(--fg-soft); }
 .pop-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
@@ -2248,32 +2081,6 @@ button.chip-st[aria-expanded="true"] { border-color: var(--accent); background: 
 .scn-main strong { display: block; font-family: var(--font-display); font-weight: 700; font-size: 20px; line-height: 1.1; text-transform: uppercase; letter-spacing: .04em; }
 .scn-desc { display: block; margin-top: 2px; font-size: 14.5px; line-height: 1.4; }
 .scn-name { display: block; margin-top: 4px; font-family: var(--font-data); font-size: 11.5px; letter-spacing: .02em; color: var(--fg-soft); }
-.pop--cams { width: min(460px, calc(100vw - 16px)); }
-.cam-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
-.cam-btn {
-  position: relative; display: flex; flex-direction: column; align-items: stretch; gap: 4px; min-height: 0; padding: 6px 6px 8px; text-align: left; white-space: normal;
-  border: 1.5px solid var(--line); border-radius: var(--radius-s); background: var(--surface); color: var(--fg);
-  font-family: var(--font-body); font-weight: 400; text-transform: none; letter-spacing: 0; backdrop-filter: none; -webkit-backdrop-filter: none;
-  transition: border-color var(--motion-fast), background var(--motion-fast);
-}
-.cam-btn:hover { background: var(--hover); border-color: var(--accent); }
-.cam-btn[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-tint); box-shadow: none; }
-.cam-btn[aria-pressed="true"]::after {
-  content: ''; position: absolute; right: 5px; top: 5px; width: 18px; height: 18px; border-radius: 50%; background: var(--accent-ink);
-  -webkit-mask: none; mask: none; box-shadow: 0 0 0 2px var(--surface);
-}
-.cam-btn[aria-pressed="true"]::before {
-  content: ''; position: absolute; right: 10px; top: 8px; width: 4px; height: 8px; border: solid var(--accent-fg); border-width: 0 2px 2px 0; transform: rotate(45deg); z-index: 1;
-}
-.cam-name { font-family: var(--font-display); font-weight: 700; font-size: 16px; line-height: 1.1; text-transform: uppercase; letter-spacing: .04em; }
-.cam-sub { font-size: 12.5px; line-height: 1.25; color: var(--fg-soft); }
-.cam-thumb { display: block; width: 100%; height: auto; border-radius: 6px; background: var(--surface-2); }
-.ct-frame { fill: none; stroke: var(--fg-soft); stroke-width: 1.2; opacity: .7; }
-.ct-glass { fill: color-mix(in srgb, var(--sky) 24%, transparent); stroke: var(--fg-soft); stroke-width: .8; }
-.ct-panel { fill: color-mix(in srgb, var(--fg) 14%, transparent); stroke: var(--fg-soft); stroke-width: .8; }
-.ct-dial { fill: var(--surface); stroke: var(--fg-soft); stroke-width: .8; }
-.ct-zone { fill: color-mix(in srgb, var(--accent) 30%, transparent); stroke: var(--accent); stroke-width: 1.6; }
-@media (max-width: 520px) { .cam-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
 /* ---------- etiqueta flotante de un control (hover o seleccionado): nombre, resumen y una guía fina ---------- */
 .callout3d-svg line { stroke: #F5A869; stroke-width: 1.4; stroke-dasharray: none; }
@@ -2294,89 +2101,6 @@ button.chip-st[aria-expanded="true"] { border-color: var(--accent); background: 
   .callout3d-sum { font-size: 13px; }
   .callout3d-hint { display: none !important; }
 }
-
-/* ---------- consejo del instructor (abajo en el 3D) ---------- */
-.vp-coach {
-  position: absolute; z-index: 3; left: 50%; bottom: 10px; width: min(560px, calc(100% - 270px)); display: flex; align-items: center; gap: 12px;
-  padding: 10px 10px 10px 12px; border-radius: 16px; background: var(--ov-bg-strong); color: var(--ov-fg); pointer-events: auto;
-  border: 1px solid rgba(255, 255, 255, .16); border-left: 4px solid var(--accent); box-shadow: 0 14px 34px rgba(0, 0, 0, .42);
-  backdrop-filter: blur(12px) saturate(1.2); -webkit-backdrop-filter: blur(12px) saturate(1.2);
-  opacity: 0; transform: translate(-50%, 12px); transition: opacity var(--motion-base), transform var(--motion-base) var(--ease);
-}
-.vp-coach.is-on { opacity: 1; transform: translate(-50%, 0); }
-.vp-coach[hidden] { display: none; }
-.vp-coach-ico { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: var(--accent-ink); color: var(--accent-fg); }
-.vp-coach-ico svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
-.vp-coach-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.vp-coach-k { font-family: var(--font-data); font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: #F5A869; }
-.vp-coach-text { margin: 0; font-size: 15.5px; line-height: 1.38; }
-.vp-coach-act { flex: none; min-height: 40px; }
-.vp-coach-x { flex: none; display: grid; place-items: center; width: 40px; height: 40px; border: 0; border-radius: 50%; background: none; color: var(--ov-soft); }
-.vp-coach-x:hover { background: rgba(255, 255, 255, .1); color: var(--ov-fg); }
-.vp-coach-x svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
-.app.has-coach .toasts { bottom: calc(var(--coach-h, 64px) + 22px); }
-.app.has-coach .vp-stall:not([hidden]) ~ .toasts { bottom: calc(var(--coach-h, 64px) + 66px); }
-@container vp (max-width: 640px) {
-  .vp-coach { left: 10px; right: 10px; width: auto; bottom: 64px; transform: translateY(12px); }
-  .vp-coach.is-on { transform: none; }
-  .vp-coach-text { font-size: 15px; }
-  .app.has-coach .toasts { bottom: calc(var(--coach-h, 64px) + 74px); }
-}
-@media (max-width: 899px) and (min-height: 541px) {
-  .app.has-flypad .vp-coach { display: none; }
-}
-@media (prefers-reduced-motion: reduce) { .vp-coach { transition: none; } }
-.cam-btn .cam-thumb { width: 100%; height: auto; stroke: none; stroke-width: 1; }
-
-/* vista angosta (teléfonos): escenario y disposición abajo, junto a "Vistas"; arriba sólo el estado */
-.vp-cams .vp-tools { flex: 1 1 auto; min-width: 0; justify-content: flex-start; }
-@container vp (max-width: 560px) {
-  .chip-st.st-engine .chip-st-k, .chip-st.st-ground .chip-st-k, .chip-st.st-ias .chip-st-k, .chip-st.st-alt .chip-st-k { display: none; }
-  .chip-st .chip-st-x { display: none; }
-  .vp-status { gap: 4px; }
-  .vp-scn-btn { padding: 3px 8px 3px 9px; gap: 6px; min-height: 44px; }
-  .vp-scn-btn > svg:first-child { width: 18px; height: 18px; }
-  .vp-layout-btn { min-height: 38px; }
-  .vp-scn-v { max-width: 34vw; }
-}
-@container vp (max-width: 420px) {
-  .vp-cams-toggle span { display: none; }
-  .vp-cams-toggle { padding: 0 12px; }
-}
-.chip-st-x { color: var(--ov-soft); }
-.chip-st-x:empty { display: none; }
-.chip-st-x::before { content: "· "; }
-@container vp (max-width: 560px) {
-  .chip-st { font-size: 11px; padding: 3px 8px 3px 6px; gap: 4px; line-height: 17px; }
-  .chip-st.st-demo, .chip-st.st-paused { order: 0; }
-  .chip-st.st-engine { order: 1; } .chip-st.st-ias { order: 2; } .chip-st.st-master { order: 3; } .chip-st.st-ground { order: 4; } .chip-st.st-alt { order: 5; }
-}
-
-/* 'Las dos', lado a lado: el estado y las herramientas bajan a la esquina de abajo de la cabina, para no tapar el parabrisas
-   (ahí se lee el horizonte y la inclinación); el consejo pasa a la mitad de afuera */
-.app.is-dos-side .vp-top { top: auto; bottom: 62px; left: 10px; right: calc(50% + 10px); flex-direction: column; flex-wrap: nowrap; align-items: flex-start; }
-.app.is-dos-side .vp-top .vp-status { flex-basis: auto; }
-.app.is-dos-side .vp-coach { left: calc(50% + 12px); right: 12px; width: auto; transform: translateY(12px); }
-.app.is-dos-side .vp-coach.is-on { transform: none; }
-@container vp (max-width: 400px) {
-  .vp-layout-btn .vp-layout-lbl { display: none !important; }
-  .vp-layout-btn { padding: 0 11px; min-width: 40px; justify-content: center; }
-  .vp-scn-v { max-width: 30vw; }
-}
-
-/* consejo: el botón de acción va debajo del texto si no entra al lado; en vistas angostas sin ícono ni rótulo */
-.vp-coach-body { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 12px; }
-.vp-coach-k { flex: 0 0 100%; }
-.vp-coach-text { flex: 1 1 200px; }
-.vp-coach-act { flex: none; margin: 4px 0 2px; }
-@container vp (max-width: 640px) {
-  .vp-coach { padding: 8px 6px 8px 14px; border-radius: 14px; }
-  .vp-coach-ico, .vp-coach-k { display: none; }
-}
-@media (max-width: 899px) and (orientation: landscape) and (max-height: 460px) { .vp-coach { display: none !important; } }
-.vp-coach-body { flex-direction: row; }
-.vp-coach { opacity: 1; transition: transform var(--motion-base) var(--ease); }
-.vp-coach.is-on { opacity: 1; }
 
 /* ======================================================================================================
    v4 · U4 — Aprender y practicar: Lecciones, Recorrido, Checklists paso a paso, Misiones y situaciones, Quiz,
@@ -2577,17 +2301,17 @@ button.chip-st[aria-expanded="true"] { border-color: var(--accent); background: 
 .scen-btn[aria-pressed="true"] { background: var(--accent-tint); color: var(--fg); border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-tint); }
 
 /* instrumentos en vidrio oscuro (mismo lenguaje que la capa sobre el 3D y que AIRE) */
-.hud { gap: 1px; border-radius: var(--radius-m); border: 1px solid var(--ov-line); background: rgba(255, 255, 255, .12); box-shadow: var(--shadow-2); }
+.hud-panel { gap: 1px; border-radius: var(--radius-m); border: 1px solid var(--ov-line); background: rgba(255, 255, 255, .12); box-shadow: var(--shadow-2); }
 .hud-cell { background: var(--ov-bg-strong); padding: 9px 12px 10px; }
 .hud-lbl { color: var(--ov-soft); font-size: 12.5px; letter-spacing: .09em; }
 .hud-val { color: var(--ov-fg); font-size: 24px; line-height: 1.2; }
 .hud-val small { color: var(--ov-soft); font-size: 12.5px; margin-left: 4px; }
 .hud-cell.is-warn .hud-val { color: #FF9D8F; }
 .hud-cell--ball { grid-column: span 2; }
-.hud .ball-tube { background: rgba(255, 255, 255, .10); border-color: var(--ov-line); }
-.hud .ball-tube::before, .hud .ball-tube::after { background: var(--ov-soft); }
-.hud .ball { background: var(--ov-fg); }
-.hud + .sr-only + .acc, .hud ~ .acc { margin-top: var(--space-3); }
+.hud-panel .ball-tube { background: rgba(255, 255, 255, .10); border-color: var(--ov-line); }
+.hud-panel .ball-tube::before, .hud-panel .ball-tube::after { background: var(--ov-soft); }
+.hud-panel .ball { background: var(--ov-fg); }
+.hud-panel + .sr-only + .acc, .hud-panel ~ .acc { margin-top: var(--space-3); }
 .hud-explain { margin: 0; }
 .hud-explain dt { margin-top: var(--space-3); font-family: var(--font-display); font-weight: 700; font-size: 16px; letter-spacing: .05em; text-transform: uppercase; }
 .hud-explain dt:first-child { margin-top: 0; }
@@ -2688,7 +2412,6 @@ button.chip-st[aria-expanded="true"] { border-color: var(--accent); background: 
 /* ---------- teléfonos: leyenda (subtítulo) legible y sin tapar la fila de abajo ---------- */
 @media (max-width: 760px) and (orientation: portrait) {
   .inset-caption, .inset-caption.is-big { font-size: 16px; line-height: 1.36; padding: 7px 11px; -webkit-line-clamp: 5; text-wrap: pretty; }
-  .app.is-demonstrating .vp-status .chip-st:not(.st-demo) { display: none; }
 }
 /* teléfonos: la explicación del aire en Volar vive en la cabecera fija de la hoja (siempre a la vista) */
 .panel-live { display: none; margin: var(--space-2) var(--gutter) 0; padding: 8px 12px; border-left: 4px solid var(--info); border-radius: 0 var(--radius-s) var(--radius-s) 0; background: var(--info-tint); font-size: 16px; line-height: 1.4; }
@@ -2716,12 +2439,8 @@ button.chip-st[aria-expanded="true"] { border-color: var(--accent); background: 
   #nextbar-x { min-width: 44px; }
   .brand { min-width: 44px; justify-content: center; }
   .hm-req-go { width: 44px; height: 44px; }
-  #vp-scenario-back, .vp-layout-btn, .vp-cams-toggle { min-height: 44px; }
-  .vp-layout-btn { min-width: 44px; }
-  .lab-tb, .lab-qbtn { min-height: 44px; min-width: 44px; }
-  .stepbar-seg::after { content: ''; position: absolute; inset: -8px -2px; }   /* la barra se ve igual; el área de toque llega a 44 px */
-  button.chip-st { position: relative; min-height: 30px; }
-  button.chip-st::after { content: ''; position: absolute; inset: -7px -3px; }
+  .lab-tb, .seg-btn, .lab-qbtn , .qbtn { min-height: 44px; min-width: 44px; }
+  .stepbar-seg::after { content: ''; position: absolute; inset: -8px -2px; }
 }
 @media (max-width: 760px) {
   .vp-flypad .vsl-name { font-size: 13px; }
@@ -2732,9 +2451,9 @@ button.chip-st[aria-expanded="true"] { border-color: var(--accent); background: 
   .vo-air-s, .vo-tab-n { font-size: 13px; }
   .callout3d-sum { font-size: 14px; }
   .callout3d-en { font-size: 12.5px; }
-  .lab-big-l, .lab-hud-mode, .lab-flowstate, .lab-bar-k { font-size: 10.5px; }
-  .lab-stage-narr .lab-chain-item { font-size: 13.5px; }
-  .mode-kicker, .lab-kicker, .hm-kicker { font-size: 13px; }
+  .lab-big-l, .big-l, .lab-hud-mode, .hud-mode, .lab-flowstate, .hud-pill, .lab-bar-k , .dock-label { font-size: 10.5px; }
+  .lab-stage-narr .lab-chain-item , .chain-bar .chain-item { font-size: 13.5px; }
+  .mode-kicker, .lab-kicker, .pg-kicker, .hm-kicker { font-size: 13px; }
 }
 @media (max-width: 760px) and (orientation: portrait) {
   /* la barra "Siguiente paso" vive dentro del panel: en teléfonos se compacta para no comerse la hoja a media altura */
@@ -2747,6 +2466,244 @@ button.chip-st[aria-expanded="true"] { border-color: var(--accent); background: 
 }
 /* un solo lenguaje de botones: todos los .btn son cápsula (antes había 8, 12 y 999 px según la pestaña) */
 .btn, .btn--small, .btn--large, .btn--big { border-radius: 999px; }
+
+/* ======================================================================================================
+   v5 · V1 — EL LENGUAJE DE AIRE EN TODA LA APP (contrato v5)
+   Las clases .lab-* de AIRE (más arriba) tienen un alias con el nombre compartido: .hud .big .hud-pill · .dock .dock-group .dock-label
+   .seg-btn .tchip · .chain .chain-bar · .modes .mode-btn · .sec--num .sec-head … · .cards-h .card-h · .ctl .range .ticks .detents .quick ·
+   .bars .bar-row · .runner · .pg-head. Este bloque agrega lo que las otras pestañas necesitan: el panel de papel cuadriculado en todas,
+   el HUD con datos propios de cada pestaña, el dock inferior (VISTA · DISEÑO · ESCENARIO), la cadena causa → efecto, el cartel sobre el
+   3D (.callout3d) y el marco del recuadro de afuera. Todo sale de los tokens de AIRE: nada de colores nuevos.
+   ====================================================================================================== */
+:root {
+  --paper: var(--lab-paper); --grid: var(--lab-grid);
+  --glass-dark: var(--lab-glass); --glass-dark-line: var(--lab-glass-line);
+}
+
+/* ---------- panel de papel cuadriculado en TODAS las pestañas (antes sólo AIRE) */
+.panel, .paper {
+  background-color: var(--paper);
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 22px 22px; background-attachment: local;
+}
+.panel-head { background: var(--paper); }
+.sec.sec--num { padding-top: 0; margin-top: 0; }
+.sec--num > .sec-head { font: inherit; }
+
+/* ---------- HUD de vidrio (arriba a la izquierda): MOTOR · VELOCIDAD · ALTURA, línea mono, píldora y datos de cada pestaña */
+.hud .big--btn, .hud .hud-link { pointer-events: auto; }
+.big--btn { padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; border-radius: 6px; }
+.big--btn:hover .big-l, .big--btn:focus-visible .big-l { color: var(--ov-fg); }
+.big--btn:focus-visible { outline: 2px solid #9CC6EE; outline-offset: 3px; }
+.big.is-warn .big-v { color: #FF9D8F; }
+.big.is-dim .big-v { opacity: .5; }
+.big--sm .big-v { font-size: 30px; }
+.big--sm .big-u { font-size: 13px; }
+.big--sm .big-l { font-size: 9.5px; }
+.hud-link {
+  padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer;
+  text-decoration: underline dotted; text-decoration-color: rgba(255, 255, 255, .45); text-underline-offset: 3px;
+}
+.hud-link:hover { color: var(--ov-fg); text-decoration-color: currentColor; }
+.hud-link:focus-visible { outline: 2px solid #9CC6EE; outline-offset: 2px; }
+.live-dot.is-off { animation: none; background: #8A97A3; box-shadow: none; }
+.hud-pill { max-width: 100%; }
+.hud-pill.is-air::before { background: #6FA8DC; box-shadow: 0 0 6px #6FA8DC; }
+.hud-pill.is-demo { background: #F08A3C; border-color: transparent; color: #111; }
+.hud-pill.is-demo::before { background: #111; }
+.hud-pill.is-pause { background: rgba(217, 164, 0, .25); border-color: #D9A400; }
+.hud-pill.is-pause::before { background: #F2C230; }
+.hud-pill.is-ok::before { background: #5CC97E; box-shadow: 0 0 6px #5CC97E; }
+.hud-extra { display: flex; flex-direction: column; gap: 3px; margin-top: 10px; padding-top: 9px; border-top: 1px solid rgba(255, 255, 255, .14); }
+.hud-extra[hidden] { display: none; }
+.hud-ex-k { font-family: var(--font-data); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: #FFC18F; }
+.hud-ex-t { font-family: var(--font-display); font-weight: 700; font-size: 22px; line-height: 1.05; letter-spacing: .03em; text-transform: uppercase; }
+.hud-ex-v { font-family: var(--font-data); font-size: 12.5px; color: var(--ov-soft); font-variant-numeric: tabular-nums; }
+.hud-ex-bar { display: block; height: 4px; margin-top: 3px; border-radius: 2px; background: rgba(255, 255, 255, .14); overflow: hidden; }
+.hud-ex-bar > span { display: block; height: 100%; width: 0; background: #F08A3C; transition: width .3s; }
+.hud-ex-nums { display: flex; gap: 6px 24px; margin-top: 4px; }
+.app[data-mode="inicio"] .hud, .app[data-mode="aire"] #hud, .app[data-mode="aire"] #chain-bar, .app[data-mode="aire"] #dock { display: none !important; }
+@container vp (min-width: 561px) and (max-width: 760px) {
+  .hud-row { display: block; }
+  .hud-ex-t { font-size: 19px; }
+  .big--sm .big-v { font-size: 26px; }
+}
+@container vp (max-width: 560px) {
+  .hud-row, .hud-extra { display: none; }
+  .hud-pill { max-width: 100%; }
+}
+
+/* ---------- abajo: avisos, cadena y dock en una columna (nunca se pisan) */
+.vp-bottom {
+  position: absolute; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 0 12px 12px; pointer-events: none;
+}
+.vp-bottom > .toasts { position: static; right: auto; bottom: auto; width: min(360px, 100%); align-self: flex-end; z-index: auto; }
+.vp-bottom > .vp-stall { position: static; left: auto; bottom: auto; transform: none; z-index: auto; }
+.vp-bottom > .chain-bar {
+  position: static; left: auto; bottom: auto; transform: none; display: flex; align-items: center; gap: 8px; pointer-events: auto;
+  width: max-content; max-width: min(720px, 100%);
+}
+.vp-bottom > .chain-bar[hidden] { display: none; }
+.vp-bottom > .chain-bar.is-new { animation: chain-in .5s ease-out; }
+@keyframes chain-in {
+  from { transform: translateY(6px); box-shadow: 0 0 0 2px rgba(240, 138, 60, .7), 0 10px 30px rgba(0, 0, 0, .3); }
+  to { transform: none; box-shadow: 0 0 0 0 rgba(240, 138, 60, 0), 0 10px 30px rgba(0, 0, 0, .3); }
+}
+.chain-bar .chain { flex: 1 1 auto; min-width: 0; }
+.chain-bar .chain-item {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; max-width: 100%; text-align: left;
+  font-family: inherit;
+}
+.chain-act { cursor: pointer; }
+.chain-act:hover { background: rgba(255, 255, 255, .16); }
+.chain-act:focus-visible { outline: 2px solid #9CC6EE; outline-offset: 1px; }
+.chain-x {
+  flex: none; display: grid; place-items: center; width: 34px; height: 34px; border: 0; border-radius: 50%; background: none; color: var(--ov-soft);
+}
+.chain-x:hover { background: rgba(255, 255, 255, .1); color: var(--ov-fg); }
+.chain-x:focus-visible { outline: 2px solid #9CC6EE; outline-offset: -2px; }
+.chain-x .icon, .chain-x svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.vp-bottom > .dock { position: static; left: auto; right: auto; bottom: auto; width: 100%; }
+
+/* dock: el chip del escenario y el botón "Volver" de las demostraciones */
+.dock-group--scn .scn-btn { gap: 6px; max-width: 100%; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .16); }
+.dock-group--scn .scn-btn .icon, .dock-group--scn .scn-btn svg { width: 14px; height: 14px; opacity: .7; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.scn-btn-v { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 240px; }
+.dock-group--scn .scn-btn[aria-expanded="true"] { background: rgba(255, 255, 255, .16); box-shadow: inset 0 -2px 0 #F08A3C; }
+.dock-group--scn.is-demo .scn-btn { color: #F5A869; box-shadow: inset 0 0 0 1px #F08A3C; }
+.scn-back { background: #F08A3C; color: #111; font-weight: 700; margin-left: 2px; }
+.scn-back:hover { background: #F5A869; }
+.scn-back[hidden] { display: none; }
+.scn-back .vsb-short { display: none; }
+@container vp (max-width: 560px) {
+  .scn-back .vsb-long { display: none; }
+  .scn-back .vsb-short { display: inline; }
+  .scn-btn-v { max-width: 150px; }
+}
+.dock.has-more-r { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent); }
+.dock.has-more-l:not(.has-more-r) { -webkit-mask-image: linear-gradient(90deg, transparent, #000 28px); mask-image: linear-gradient(90deg, transparent, #000 28px); }
+.dock.has-more-l.has-more-r { -webkit-mask-image: linear-gradient(90deg, transparent, #000 28px, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(90deg, transparent, #000 28px, #000 calc(100% - 36px), transparent); }
+@container vp (max-width: 760px) {
+  .vp-bottom { padding: 0; }
+  .vp-bottom > .toasts, .vp-bottom > .chain-bar, .vp-bottom > .vp-stall { margin-inline: 8px; max-width: calc(100% - 16px); }
+  .vp-bottom > .toasts { width: min(360px, calc(100% - 16px)); }
+  .vp-bottom > .dock { padding: 0 8px 8px; }
+  .chain-bar .chain-item { font-size: 13.5px; }
+}
+@container vp (max-width: 420px) { .chain-bar { padding: 5px 7px; } .chain-x { width: 30px; height: 30px; } }
+.app[data-mode="aire"] .vp-bottom { bottom: calc(var(--lab-bar-h) + 80px); padding-bottom: 0; }
+@media (pointer: coarse) { .chain-act { min-height: 40px; } .chain-x { width: 44px; height: 44px; } .hud-link { padding: 8px 0; } }
+/* teléfonos en Volar con el pad de vuelo encima del 3D: el dock y la cadena suben, y el escenario se esconde */
+@media (max-width: 899px) and (min-height: 541px) {
+  .app.has-flypad .vp-bottom { bottom: calc(var(--flypad-h, 150px) + 8px); }
+  .app.has-flypad .dock-group--scn { display: none; }
+  .app.has-flypad .chain-bar { display: none !important; }
+}
+@media (max-width: 899px) and (orientation: landscape) and (max-height: 460px) { .vp-bottom > .chain-bar { display: none; } }
+
+/* 'Las dos' lado a lado: el HUD, la cadena y el dock quedan sobre la mitad de la cabina */
+.app.is-dos-side .vp-bottom { right: 50%; }
+.app.is-dos-side .hud { max-width: calc(50% - 22px); }
+.app.is-dos-side .hud .big-v { font-size: 28px; }
+.app.is-dos-side .hud .big-u { font-size: 12px; }
+.app.is-dos-side .hud .big-l { font-size: 9px; }
+.app.is-dos-side .hud-big { gap: 2px 14px; margin: 3px 0 0; }
+.app.is-dos-side .hud-row { display: none; }
+.app.is-dos-side .hud-extra { margin-top: 7px; padding-top: 6px; }
+.app.is-dos-side .hud-ex-t { font-size: 18px; }
+.app.is-dos-side .big--sm .big-v { font-size: 24px; }
+/* en 'Las dos' lado a lado el dock es una sola fila que se desliza (la mitad de la cabina es angosta) */
+.app.is-dos-side .vp-bottom > .dock { flex-wrap: nowrap; overflow-x: auto; padding: 0 8px 8px; gap: 6px; pointer-events: auto; scrollbar-width: none; }
+.app.is-dos-side .vp-bottom > .dock::-webkit-scrollbar { display: none; }
+.app.is-dos-side .vp-bottom > .chain-bar .chain:not(.chain--compact) { display: flex; }
+.app.is-dos-side .vp-bottom > .chain-bar .chain--compact { display: none; }
+
+/* ---------- el recuadro de afuera, con el marco y las etiquetas de vidrio de AIRE */
+.inset-frame { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .24), 0 10px 28px rgba(0, 0, 0, .35); }
+.inset-label, .pane-label-text {
+  padding: 3px 9px; border-radius: 7px; background: var(--lab-glass); border: 1px solid var(--lab-glass-line); color: var(--ov-fg);
+  font-family: var(--font-data); font-weight: 400; font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase;
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+.pane-label--cockpit .pane-label-text { border-left: 1px solid var(--lab-glass-line); box-shadow: inset 3px 0 0 #F08A3C; }
+.inset-btn {
+  min-height: 32px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--lab-glass-line); background: var(--lab-glass); color: var(--ov-fg);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+.inset-btn:hover { background: rgba(9, 14, 22, .85); border-color: rgba(255, 255, 255, .3); }
+.inset-btn[aria-pressed="true"] { background: rgba(255, 255, 255, .16); color: var(--ov-fg); border-color: var(--lab-glass-line); box-shadow: inset 0 -2px 0 #F08A3C; }
+.inset-btn:focus-visible { outline: 2px solid #9CC6EE; outline-offset: 1px; }
+
+/* ---------- el cartel sobre el 3D (control tocado, elegido o a mirar): píldora oscura con guía, como las fuerzas de AIRE */
+.callout3d-svg line { stroke: rgba(255, 255, 255, .8); stroke-width: 1.2; stroke-dasharray: none; }
+.callout3d-svg circle { fill: rgba(240, 138, 60, .3); stroke: #F08A3C; stroke-width: 1.6; }
+.callout3d {
+  max-width: 260px; padding: 6px 13px 7px 12px; gap: 1px; border-radius: 16px; background: rgba(9, 14, 22, .84); color: #fff;
+  border: 1px solid rgba(255, 255, 255, .2); border-left: 1px solid rgba(255, 255, 255, .2); box-shadow: 0 8px 22px rgba(0, 0, 0, .4);
+  backdrop-filter: blur(10px) saturate(1.1); -webkit-backdrop-filter: blur(10px) saturate(1.1);
+}
+.callout3d-name { font-size: 17px; line-height: 1.1; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #fff; }
+.callout3d-name::before {
+  content: ''; display: inline-block; width: 8px; height: 8px; margin: 0 7px 1px 0; border-radius: 50%; vertical-align: middle;
+  background: var(--cat, #F08A3C); box-shadow: 0 0 0 2px rgba(255, 255, 255, .22);
+}
+.callout3d-en { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-data); font-size: 10.5px; letter-spacing: .04em; color: var(--ov-soft); }
+.callout3d-sum { display: none; margin-top: 3px; font-size: 13.5px; line-height: 1.35; color: #DCE4EA; }
+.callout3d.is-hover .callout3d-sum { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.callout3d.is-hover .callout3d-sum:empty { display: none; }
+.callout3d-hint { margin-top: 5px; padding-top: 4px; font-size: 10px; letter-spacing: .12em; color: #FFC18F; }
+@media (max-width: 899px) { .callout3d { max-width: 220px; padding: 5px 11px 6px 10px; } .callout3d-name { font-size: 15px; } .callout3d.is-hover .callout3d-sum { font-size: 13px; } }
+
+/* ---------- piezas nuevas del Kit (tarjetas con etiqueta, listas en columna, interruptor de 3 modos) */
+.card-h-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 16px; }
+.card-h-tag {
+  padding: 1px 7px; border-radius: 999px; background: var(--accent-ink); color: var(--accent-fg);
+  font-family: var(--font-data); font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; white-space: nowrap;
+}
+.card-h.is-current .card-h-code { color: var(--accent-ink); }
+.cards-h--list {
+  grid-auto-flow: row; grid-auto-columns: auto; overflow: visible; scroll-snap-type: none; margin: 0; padding: 2px 0 8px;
+}
+.cards-h--list > li { scroll-snap-align: none; }
+div.card-h { cursor: default; }
+div.card-h:hover { border-color: var(--line); transform: none; }
+.modes--3 .mode-t { font-size: 16px; }
+.modes--3 .mode-btn { padding: 8px 10px; min-width: 0; }
+.modes--3 .mode-s { overflow-wrap: anywhere; }
+.pg-head .modes { margin-top: 10px; }
+.bars-cap:first-child { margin-top: 0; }
+
+/* vistas medianas (el 3D de una computadora con el panel al lado): el dock baja a dos renglones en lugar de deslizarse */
+@container vp (min-width: 561px) and (max-width: 760px) {
+  .vp-bottom > .dock { flex-wrap: wrap; overflow: visible; padding: 0 12px 12px; pointer-events: none; -webkit-mask-image: none; mask-image: none; }
+  .vp-bottom > .dock .dock-group { flex: none; }
+}
+@container vp (max-width: 560px) { .vp-bottom > .dock { pointer-events: auto; } }
+/* la cadena completa (los 3 eslabones) se ve desde 561 px de ancho; la compacta (primero y último) queda para los teléfonos */
+@container vp (min-width: 561px) {
+  .vp-bottom > .chain-bar .chain:not(.chain--compact) { display: flex; }
+  .vp-bottom > .chain-bar .chain--compact { display: none; }
+}
+/* teléfonos: HUD y cadena más chicos, para que el 3D siga viéndose arriba de la hoja */
+@container vp (max-width: 560px) {
+  .hud { padding: 7px 10px 8px; }
+  .hud-big { gap: 1px 11px; margin: 2px 0 1px; }
+  .hud .big-v { font-size: 25px; }
+  .hud .big-u { font-size: 10.5px; margin-left: 2px; }
+  .hud .big-l { font-size: 8.5px; letter-spacing: .08em; margin-top: 1px; }
+  .hud-pill { margin-top: 5px !important; font-size: 9px; padding: 2px 7px; max-width: 100%; }
+  .chain-bar .chain { flex-wrap: nowrap; align-items: stretch; }
+  .chain-bar .chain-item { min-width: 0; flex: 0 1 auto; font-size: 13px; padding: 3px 7px; -webkit-line-clamp: 2; }
+  .chain-bar .chain-cause { max-width: 55%; -webkit-line-clamp: 2; }
+}
+
+.hud-kicker { min-width: 0; }
+.hud-mode { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (pointer: coarse) {
+  .big--btn { position: relative; }
+  .big--btn::after { content: ''; position: absolute; inset: -4px -6px; }
+}
 
 </style>
 </head>
@@ -2809,22 +2766,13 @@ button.chip-st[aria-expanded="true"] { border-color: var(--accent); background: 
 
   <main class="main">
     <section id="viewport" class="viewport" aria-label="Cabina en 3D. Arrastrá para mirar, tocá un control para conocerlo.">
-      <div class="vp-top">
-        <div id="vp-status" class="vp-status" role="group" aria-label="Estado del avión: tocá cada dato para saber qué significa"></div>
-        <div class="vp-tools" id="vp-tools">
-          <div id="vp-scenario" class="vp-scenario">
-            <button type="button" id="vp-scenario-btn" class="vp-scn-btn" aria-haspopup="dialog" aria-label="Escenario: dónde y cómo está el avión. Tocá para cambiarlo">
-              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-map"/></svg>
-              <span class="vp-scn-text"><span class="vp-scn-k">Escenario</span><span class="vp-scn-v" id="vp-scenario-v">Estacionado</span></span>
-              <svg class="vp-scn-chev" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-chevron-down"/></svg>
-            </button>
-            <button type="button" id="vp-scenario-back" class="vp-scenario-back" aria-label="Volver al escenario" hidden><span class="vsb-long">Volver al escenario</span><span class="vsb-short">Volver</span></button>
+      <div id="vp-stage" class="vp-stage" role="group" aria-label="Datos del avión y controles de la vista 3D">
+        <div id="vp-bottom" class="vp-bottom">
+          <div id="toasts" class="toasts" role="status" aria-live="polite" aria-relevant="additions"></div>
+          <div id="vp-stall" class="vp-stall" hidden role="status">
+            <span class="vp-stall-dot" aria-hidden="true"></span>Bocina de pérdida
           </div>
         </div>
-      </div>
-
-      <div id="vp-stall" class="vp-stall" hidden role="status">
-        <span class="vp-stall-dot" aria-hidden="true"></span>Bocina de pérdida
       </div>
 
       <div id="inset-frame" class="inset-frame" hidden>
@@ -2837,20 +2785,6 @@ button.chip-st[aria-expanded="true"] { border-color: var(--accent); background: 
         </div>
       </div>
       <p id="inset-caption" class="inset-caption" hidden aria-live="off"></p>
-
-      <div id="vp-tooltip" class="vp-tooltip" hidden aria-hidden="true">
-        <strong class="vp-tooltip-name"></strong>
-        <span class="vp-tooltip-en"></span>
-      </div>
-
-      <div id="vp-cams" class="vp-cams">
-        <button type="button" id="vp-cams-toggle" class="vp-cams-toggle" aria-haspopup="dialog" title="Vistas: mirá la cabina desde otro lugar (teclas 1 a 8)">
-          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-camera"/></svg>
-          <span>Vistas</span>
-        </button>
-      </div>
-
-      <div id="toasts" class="toasts" role="status" aria-live="polite" aria-relevant="additions"></div>
 
       <div id="vp-overlay" class="vp-overlay" role="status">
         <div class="vp-overlay-card">
@@ -2930,7 +2864,7 @@ button.chip-st[aria-expanded="true"] { border-color: var(--accent); background: 
           <li><strong>Arrastrá</strong> con el mouse o el dedo para girar la mirada.</li>
           <li><strong>Rueda del mouse</strong> o <strong>pellizco</strong> con dos dedos para acercarte o alejarte.</li>
           <li><strong>Clic derecho y arrastrar</strong> (o dos dedos) para desplazarte de costado.</li>
-          <li>Los botones de <strong>Vistas</strong>, abajo a la izquierda, te llevan a cada zona: tablero, piso, techo…</li>
+          <li>Abajo, el grupo <strong>Vista</strong> te lleva a cada zona: tablero, piso, techo… (también con las teclas 1 a 8). <strong>Diseño</strong> elige qué ver en grande y <strong>Escenario</strong> cambia dónde está el avión.</li>
           <li>El cuadrito de arriba a la derecha muestra el avión <strong>desde afuera</strong>. Tocá las flechas para agrandarlo.</li>
         </ul>
         <h3 class="placard placard--small">Tocar los controles</h3>
@@ -26415,6 +26349,24 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
  *   Kit.kbd(text)
  *   Kit.toast(text, kind)                          → puente a C150.UI.toast (kind: info|warn|good)
  *   Kit.reducedMotion()
+ *
+ * v5 · lenguaje de AIRE (contrato v5): los mismos componentes en TODAS las pestañas (mismo DOM que lab.js; las clases .lab-* y las compartidas valen igual):
+ *   Kit.pageHeader({kicker, title, sub, children})                  → <header class="pg-head">: kicker mono "NN · SECCIÓN · SUB", título enorme, párrafo
+ *   Kit.hud({label, kicker, bigs:[{label, unit, title, onClick}]})  → .hud de vidrio · .set({kicker, live, bigs:[{v,u,l,warn}], row:[{text,onClick}]|texto,
+ *                                                                      pill:{text, tone:"is-ok|is-air|is-warn|is-demo|is-pause|is-stall"},
+ *                                                                      extra:{k, t, v, bar:0..1, nums:[{v,u,l}]}|null})
+ *   Kit.dockGroup({label, aria, kind:"seg"|"chips", items:[{value,label,title,aria,data}], value, onChange|onToggle}) → .dock-group · .setValue(v) · .btn(v) · .setPressed(v,on)
+ *   Kit.dock([grupos], {label})                                     → .dock: fila de cristal con grupos; en vistas angostas se desliza de costado
+ *   Kit.tchip({label, pressed, onClick, title})                     → ficha con punto que se prende (.seg-btn.tchip)
+ *   Kit.chain(items, {tone:"info|warn|good", compact})              → .chain: [causa naranja] → [paso] → [efecto con borde]; items: texto o {text, onClick, keep} (keep: se queda en la versión compacta)
+ *   Kit.chainBar()                                                  → .chain-bar: barra de vidrio sobre el 3D (vacía = oculta) · .set(items, {tone, key, dismiss, dismissLabel}) · .clear()
+ *   Kit.modes({items:[{value,label,sub}], value, onChange, label})  → .modes de 2 o 3 opciones (.mode-btn con .mode-t y .mode-s) · .setValue(v)
+ *                                                                      (el botón es .mode-btn y no .mode porque .mode ya es el <section> de cada panel)
+ *   Kit.section({num, title, meta, open, body, id, onToggle})       → <section class="sec sec--num"> plegable "01 TÍTULO … meta ⌄" · .setOpen(b) · .setMeta(t) · .body
+ *   Kit.cardCarousel({items:[{code,title,sum,meta,current,tag,onClick}], label, list})
+ *                                                                   → <ul class="cards-h"> de .card-h con código (E1, L2…), título, 2 líneas y meta mono; list:true = en columna
+ *   Kit.slider({label,min,max,step,value,format,big,center,zones:[{from,to,color}],ticks:[{v,t,cls}],ends,detents,quick:[{v,t}],sub,onInput}) → .ctl · .set(v) · .setSub(t)
+ *   Kit.bars({rows:[{key,label,color,caption}]})                    → .bars de .bar-row con valor mono · .set(key, 0..1, texto)
  */
 (function (C150) {
   'use strict';
@@ -26909,6 +26861,339 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     if (live) { var d = h('div', { 'class': 'toast toast--' + (kind || 'info') }, h('span', { text: text })); live.appendChild(d); setTimeout(function () { if (d.parentNode) d.parentNode.removeChild(d); }, 4000); }
   }
 
+  /* ------------------------------------------------------------------ v5 · lenguaje de AIRE (contrato v5 §2)
+   * HUD de vidrio, dock inferior, cadena causa → efecto, interruptor de modos, secciones numeradas, tarjetas con código,
+   * deslizadores con marcas y barras vivas. Mismo DOM que arma lab.js (clases .lab-*): los estilos valen para los dos nombres. */
+  var tick_ = function (node, text) { if (node && node.textContent !== text) node.textContent = text; };
+  function fmtCode(n) { return typeof n === 'number' ? (n < 10 ? '0' + n : String(n)) : n; }
+
+  /** Cabecera de página: kicker mono con punto, título enorme y un párrafo. */
+  function pageHeader(o) {
+    o = o || {};
+    var el = h('header', { 'class': 'pg-head' },
+      o.kicker ? h('p', { 'class': 'pg-kicker' }, h('span', { 'class': 'pg-kicker-dot', 'aria-hidden': 'true' }), h('span', { text: o.kicker })) : null,
+      o.title ? h('h2', { 'class': 'pg-title', text: o.title }) : null,
+      o.sub ? h('p', { 'class': 'pg-sub', text: o.sub }) : null);
+    add(el, o.children);
+    return el;
+  }
+
+  /** HUD de vidrio sobre el 3D. o = {label, kicker, bigs:[{label, unit, title, onClick}]}.
+   *  el.set({kicker, live:bool, bigs:[{v, u, l, warn}], row:[{text, onClick, title}] | string, pill:{text, tone}, extra:{k, t, v, bar:0..1, nums:[{v,u,l}]} | null}) */
+  function hud(o) {
+    o = o || {};
+    var kick = h('span', { 'class': 'hud-mode', text: o.kicker || '' });
+    var dot = h('span', { 'class': 'live-dot', 'aria-hidden': 'true' });
+    var bigWrap = h('div', { 'class': 'hud-big' });
+    var cells = [];
+    (o.bigs || []).forEach(function (b) {
+      var v = h('span', { 'class': 'big-v' }), u = h('span', { 'class': 'big-u', text: b.unit || '' }), l = h('span', { 'class': 'big-l', text: b.label || '' });
+      var kids = [h('span', { 'class': 'big-num' }, v, u), l];
+      var el = isFn(b.onClick)
+        ? h('button', { type: 'button', 'class': 'big big--btn', title: b.title, 'aria-haspopup': 'dialog', onclick: b.onClick }, kids)
+        : h('div', { 'class': 'big', title: b.title }, kids);
+      bigWrap.appendChild(el);
+      cells.push({ el: el, v: v, u: u, l: l });
+    });
+    var row = h('p', { 'class': 'hud-row' });
+    var pill = h('p', { 'class': 'hud-pill' });
+    var exK = h('span', { 'class': 'hud-ex-k' }), exT = h('span', { 'class': 'hud-ex-t' }), exV = h('span', { 'class': 'hud-ex-v' });
+    var exBar = h('span', { 'class': 'hud-ex-bar', hidden: true }, h('span')), exNums = h('div', { 'class': 'hud-ex-nums', hidden: true });
+    var extra = h('div', { 'class': 'hud-extra', hidden: true }, exK, exT, exV, exBar, exNums);
+    var el = h('div', { 'class': 'hud', role: 'group', 'aria-label': o.label }, h('p', { 'class': 'hud-kicker' }, dot, kick), bigWrap, row, pill, extra);
+    var rowSig = '', exSig = '';
+    el.set = function (d) {
+      d = d || {};
+      if (d.kicker !== undefined) tick_(kick, d.kicker);
+      if (d.live !== undefined) dot.classList.toggle('is-off', !d.live);
+      (d.bigs || []).forEach(function (b, i) {
+        var c = cells[i];
+        if (!c) return;
+        tick_(c.v, b.v === undefined ? '' : String(b.v));
+        if (b.u !== undefined) tick_(c.u, b.u);
+        if (b.l !== undefined) tick_(c.l, b.l);
+        c.el.classList.toggle('is-warn', !!b.warn);
+        c.el.classList.toggle('is-dim', !!b.dim);
+      });
+      if (d.row !== undefined) {
+        var segs = typeof d.row === 'string' ? [{ text: d.row }] : (d.row || []);
+        var sig = segs.map(function (s) { return s.text; }).join('·');
+        if (sig !== rowSig) {
+          rowSig = sig;
+          while (row.firstChild) row.removeChild(row.firstChild);
+          segs.forEach(function (s, i) {
+            if (i) row.appendChild(doc.createTextNode(' · '));
+            row.appendChild(isFn(s.onClick) ? h('button', { type: 'button', 'class': 'hud-link', title: s.title, onclick: s.onClick, text: s.text }) : h('span', { text: s.text }));
+          });
+        }
+        row.hidden = !segs.length;
+      }
+      if (d.pill !== undefined) {
+        var cn = 'hud-pill' + (d.pill && d.pill.tone ? ' ' + d.pill.tone : '');
+        if (pill.className !== cn) pill.className = cn;
+        tick_(pill, d.pill ? d.pill.text : '');
+        pill.hidden = !d.pill;
+      }
+      if (d.extra !== undefined) {
+        var x = d.extra;
+        var xs = x ? [x.k, x.t, x.v, x.bar, (x.nums || []).map(function (n) { return n.v + n.u + n.l; }).join('|')].join('~') : '';
+        if (xs !== exSig) {
+          exSig = xs;
+          extra.hidden = !x;
+          if (x) {
+            tick_(exK, x.k || ''); tick_(exT, x.t || ''); tick_(exV, x.v || '');
+            exT.hidden = !x.t; exV.hidden = !x.v; exK.hidden = !x.k;
+            exBar.hidden = x.bar === undefined || x.bar === null;
+            if (!exBar.hidden) exBar.firstChild.style.width = (clamp(+x.bar || 0, 0, 1) * 100).toFixed(1) + '%';
+            var nn = x.nums || [];
+            exNums.hidden = !nn.length;
+            while (exNums.firstChild) exNums.removeChild(exNums.firstChild);
+            nn.forEach(function (n) {
+              exNums.appendChild(h('div', { 'class': 'big big--sm' }, h('span', { 'class': 'big-num' }, h('span', { 'class': 'big-v', text: n.v }), h('span', { 'class': 'big-u', text: n.u || '' })), h('span', { 'class': 'big-l', text: n.l || '' })));
+            });
+          }
+        }
+      }
+    };
+    el.cells = cells; el.pill = pill;
+    return el;
+  }
+
+  /** Grupo del dock: rótulo mono en versalitas + botones segmentados (kind 'seg') o fichas con punto que se prenden (kind 'chips').
+   *  o = {label, aria, kind, items:[{value, label, title, aria, data:{x:1}}], value, onChange(value) | onToggle(value, on)} → .setValue(v) · .btn(v) · .setPressed(v, on) */
+  function dockGroup(o) {
+    o = o || {};
+    var chips = o.kind === 'chips';
+    var g = h('div', { 'class': 'dock-group', role: 'group', 'aria-label': o.aria || o.label }, o.label ? h('span', { 'class': 'dock-label', text: o.label }) : null);
+    var btns = {};
+    (o.items || []).forEach(function (it) {
+      var b = h('button', {
+        type: 'button', 'class': 'seg-btn' + (chips ? ' tchip' : ''), 'aria-pressed': 'false', title: it.title, 'aria-label': it.aria,
+        onclick: function () {
+          if (chips) { var on = b.getAttribute('aria-pressed') !== 'true'; b.setAttribute('aria-pressed', on ? 'true' : 'false'); if (isFn(o.onToggle)) o.onToggle(it.value, on); }
+          else g.setValue(it.value, true);
+        }
+      }, chips ? h('span', { 'class': 'tchip-dot', 'aria-hidden': 'true' }) : null, it.label);
+      if (it.data) for (var k in it.data) b.setAttribute('data-' + k, it.data[k]);
+      btns[it.value] = b;
+      g.appendChild(b);
+    });
+    g.value = o.value;
+    g.setValue = function (v, fire) {
+      g.value = v;
+      for (var k in btns) btns[k].setAttribute('aria-pressed', String(k) === String(v) ? 'true' : 'false');
+      if (fire && isFn(o.onChange)) o.onChange(v);
+    };
+    g.setPressed = function (v, on) { if (btns[v]) btns[v].setAttribute('aria-pressed', on ? 'true' : 'false'); };
+    g.btn = function (v) { return btns[v] || null; };
+    if (!chips && o.value !== undefined) g.setValue(o.value, false);
+    return g;
+  }
+
+  /** El dock inferior: una fila de grupos de cristal. Cuando no entra, se desliza de costado y muestra una sombra en el borde que corta. */
+  function dock(groups, o) {
+    o = o || {};
+    var el = h('div', { 'class': 'dock', role: 'toolbar', 'aria-label': o.label || 'Controles de la vista 3D' });
+    add(el, groups);
+    function more() {
+      var max = el.scrollWidth - el.clientWidth;
+      el.classList.toggle('has-more-r', max > 3 && el.scrollLeft < max - 3);
+      el.classList.toggle('has-more-l', max > 3 && el.scrollLeft > 3);
+    }
+    el.addEventListener('scroll', more, { passive: true });
+    if (root.ResizeObserver) new ResizeObserver(more).observe(el); else root.addEventListener('resize', more);
+    el.refresh = more;
+    return el;
+  }
+  function tchip(o) {
+    o = o || {};
+    return h('button', { type: 'button', 'class': 'seg-btn tchip', 'aria-pressed': o.pressed ? 'true' : 'false', title: o.title, onclick: o.onClick },
+      h('span', { 'class': 'tchip-dot', 'aria-hidden': 'true' }), o.label);
+  }
+
+  /** Cadena causa → efecto. items: textos o {text, onClick} (un botón). tone: 'info' | 'warn' | 'good'. compact: sólo el primero y el último. */
+  function chain(items, o) {
+    o = o || {};
+    var list = (items || []).filter(Boolean);
+    var shown = o.compact && list.length > 2 ? list.filter(function (it, i) { return i === 0 || i === list.length - 1 || (typeof it === 'object' && it.keep); }) : list;
+    var el = h('div', { 'class': 'chain' + (o.compact ? ' chain--compact' : '') + ' is-' + (o.tone || 'info'), role: 'group' });
+    function txt(it) { return typeof it === 'string' ? it : it.text; }
+    el.setAttribute('aria-label', list.map(txt).join(', entonces '));
+    shown.forEach(function (it, i) {
+      if (i > 0) el.appendChild(h('span', { 'class': 'chain-arrow', 'aria-hidden': 'true' }));
+      var cl = 'chain-item ' + (i === 0 ? 'chain-cause' : (i === shown.length - 1 ? 'chain-effect' : 'chain-step'));
+      if (typeof it === 'object' && isFn(it.onClick)) el.appendChild(h('button', { type: 'button', 'class': cl + ' chain-act', onclick: it.onClick, text: it.text }));
+      else el.appendChild(h('span', { 'class': cl, text: txt(it) }));
+    });
+    return el;
+  }
+  /** La barra de vidrio que lleva la cadena sobre el 3D (vacía = oculta). .set(items, {tone, key}) · .clear() */
+  function chainBar() {
+    var el = h('div', { 'class': 'chain-bar', hidden: true });
+    var sig = '';
+    el.set = function (items, o) {
+      o = o || {};
+      var list = (items || []).filter(Boolean);
+      if (!list.length) { el.clear(); return; }
+      var s = (o.tone || '') + (o.dismiss ? 'x' : '') + '|' + list.map(function (i) { return typeof i === 'string' ? i : i.text; }).join('→');
+      if (s === sig && !el.hidden) return;
+      var fresh = o.key === undefined || o.key !== el._key;
+      sig = s; el._key = o.key;
+      while (el.firstChild) el.removeChild(el.firstChild);
+      el.appendChild(chain(list, { tone: o.tone }));
+      el.appendChild(chain(list, { tone: o.tone, compact: true }));
+      if (isFn(o.dismiss)) el.appendChild(h('button', { type: 'button', 'class': 'chain-x', 'aria-label': o.dismissLabel || 'Cerrar', title: o.dismissLabel || 'Cerrar', onclick: o.dismiss }, icon('close')));
+      el.hidden = false;
+      if (fresh && !reducedMotion()) { el.classList.remove('is-new'); void el.offsetWidth; el.classList.add('is-new'); }
+    };
+    el.clear = function () { if (sig || !el.hidden) { sig = ''; el._key = undefined; while (el.firstChild) el.removeChild(el.firstChild); el.hidden = true; } };
+    return el;
+  }
+
+  /** Interruptor de 2 o 3 modos con rótulo grande y sub-rótulo mono. o = {items:[{value,label,sub}], value, onChange, label} → .setValue(v) */
+  function modes(o) {
+    o = o || {};
+    var items = o.items || [];
+    var el = h('div', { 'class': 'modes' + (items.length > 2 ? ' modes--' + items.length : ''), role: 'group', 'aria-label': o.label, style: { 'grid-template-columns': 'repeat(' + items.length + ', minmax(0, 1fr))' } });
+    var btns = {};
+    items.forEach(function (it) {
+      var b = h('button', { type: 'button', 'class': 'mode-btn', 'aria-pressed': 'false', 'data-value': it.value, onclick: function () { el.setValue(it.value, true); } },
+        h('span', { 'class': 'mode-t', text: it.label }), it.sub ? h('span', { 'class': 'mode-s', text: it.sub }) : null);
+      btns[it.value] = b; el.appendChild(b);
+    });
+    el.value = o.value;
+    el.setValue = function (v, fire) {
+      var changed = v !== el.value;
+      el.value = v;
+      for (var k in btns) btns[k].setAttribute('aria-pressed', String(k) === String(v) ? 'true' : 'false');
+      if (fire && changed && isFn(o.onChange)) o.onChange(v);
+    };
+    el.setValue(o.value, false);
+    return el;
+  }
+
+  /** Sección numerada que se pliega ("01 MANDOS ... meta ⌄"). o = {num, title, meta, open, body, id, onToggle} → .setOpen(b) · .setMeta(text) · .body */
+  function section(o) {
+    o = o || {};
+    var id = o.id || nid('sec');
+    var open = o.open !== false;
+    var meta = h('span', { 'class': 'sec-meta', text: o.meta || '' });
+    var body = h('div', { 'class': 'sec-body', id: id + '-body' });
+    add(body, o.body);
+    body.hidden = !open;
+    var head = h('button', { type: 'button', 'class': 'sec-head', 'aria-expanded': open ? 'true' : 'false', 'aria-controls': id + '-body' },
+      (o.num !== undefined && o.num !== null && o.num !== '') ? h('span', { 'class': 'sec-num', text: fmtCode(o.num) }) : null,
+      h('span', { 'class': 'sec-title', text: o.title }), meta, h('span', { 'class': 'sec-chev', 'aria-hidden': 'true' }));
+    var el = h('section', { 'class': 'sec sec--num', 'data-sec': o.key || null }, head, body);
+    el.setOpen = function (v) {
+      v = v === undefined ? head.getAttribute('aria-expanded') !== 'true' : !!v;
+      head.setAttribute('aria-expanded', v ? 'true' : 'false'); body.hidden = !v;
+      if (isFn(o.onToggle)) o.onToggle(v);
+    };
+    head.addEventListener('click', function () { el.setOpen(); });
+    el.setMeta = function (t) { tick_(meta, t || ''); };
+    el.body = body; el.head = head;
+    return el;
+  }
+
+  /** Carrusel horizontal de tarjetas con código (E1, L2, C3…), título en versalitas, dos líneas y meta mono.
+   *  o = {items:[{code, title, sum, meta, current, tag, onClick}], label, list:true (en columna)} */
+  function cardCarousel(o) {
+    o = o || {};
+    var ul = h('ul', { 'class': 'cards-h' + (o.list ? ' cards-h--list' : ''), 'aria-label': o.label });
+    (o.items || []).forEach(function (it) {
+      var act = isFn(it.onClick);
+      var b = h(act ? 'button' : 'div', { type: act ? 'button' : null, 'class': 'card-h' + (it.current ? ' is-current' : ''), 'aria-current': it.current ? 'true' : null, onclick: act ? it.onClick : null },
+        h('span', { 'class': 'card-h-top' }, it.code ? h('span', { 'class': 'card-h-code', text: it.code }) : null, it.tag ? h('span', { 'class': 'card-h-tag', text: it.tag }) : null),
+        h('span', { 'class': 'card-h-title', text: it.title }),
+        it.sum ? h('span', { 'class': 'card-h-sum', text: it.sum }) : null,
+        it.meta ? h('span', { 'class': 'card-h-meta', text: it.meta }) : null);
+      ul.appendChild(h('li', null, b));
+    });
+    return ul;
+  }
+
+  /** Deslizador con lectura grande, marcas, zonas de color, detents y valores rápidos.
+   *  o = {label, min, max, step, value, format(v), big, center, zones:[{from,to,color}], ticks:[{v,t,cls}], ends:[a,b], detents:[v…] | [{v,t}], quick:[{v,t}], sub, onInput(v), id}
+   *  → .set(v) · .value · .input · .setSub(text) */
+  function slider(o) {
+    o = o || {};
+    var id = o.id || nid('rng');
+    var fmt = isFn(o.format) ? o.format : function (v) { return String(v); };
+    var inp = h('input', { type: 'range', 'class': 'range', min: o.min, max: o.max, step: o.step || 1, 'aria-label': o.label, id: id });
+    var val = h('output', { 'class': 'ctl-val', 'for': id });
+    var sub = o.sub !== undefined ? h('p', { 'class': 'ctl-sub', text: o.sub }) : null;
+    var span = (+o.max) - (+o.min) || 1;
+    var track = h('div', { 'class': 'ctl-track' }, inp);
+    if (o.zones && o.zones.length) {
+      track.style.setProperty('--trk', 'linear-gradient(90deg,' + o.zones.map(function (z) {
+        return z.color + ' ' + ((z.from - o.min) / span * 100).toFixed(1) + '% ' + ((z.to - o.min) / span * 100).toFixed(1) + '%';
+      }).join(',') + ')');
+    }
+    if (o.center) track.appendChild(h('span', { 'class': 'ctl-center', 'aria-hidden': 'true' }));
+    var ticks = null;
+    if (o.ticks) {
+      ticks = h('div', { 'class': 'ticks', 'aria-hidden': 'true' });
+      o.ticks.forEach(function (tk, i) {
+        var sp = h('span', { 'class': 'tick' + (i % 2 ? ' is-alt' : '') + (tk.cls ? ' ' + tk.cls : ''), text: tk.t });
+        sp.style.left = ((tk.v - o.min) / span * 100) + '%';
+        ticks.appendChild(sp);
+      });
+    }
+    var ends = o.ends ? h('div', { 'class': 'ctl-ends', 'aria-hidden': 'true' }, h('span', { text: o.ends[0] }), h('span', { text: o.ends[1] })) : null;
+    var api = null, detents = null, dBtns = [];
+    if (o.detents) {
+      detents = h('div', { 'class': 'detents', role: 'group', 'aria-label': o.label + ': posiciones', style: { 'grid-template-columns': 'repeat(' + o.detents.length + ', 1fr)' } });
+      o.detents.forEach(function (d) {
+        var dv = typeof d === 'object' ? d.v : d, dt = typeof d === 'object' && d.t ? d.t : fmt(dv);
+        var b = h('button', { type: 'button', 'class': 'detent', 'aria-pressed': 'false', onclick: function () { api.set(dv); if (isFn(o.onInput)) o.onInput(dv); } }, h('span', { 'class': 'detent-n', text: dt }));
+        b._v = dv; dBtns.push(b); detents.appendChild(b);
+      });
+    }
+    var quick = null;
+    if (o.quick) {
+      quick = h('div', { 'class': 'quick', role: 'group', 'aria-label': o.label + ': valores rápidos' });
+      o.quick.forEach(function (q) { quick.appendChild(h('button', { type: 'button', 'class': 'qbtn', onclick: function () { api.set(q.v); if (isFn(o.onInput)) o.onInput(q.v); }, text: q.t })); });
+    }
+    api = h('div', { 'class': 'ctl' + (o.big ? ' ctl--big' : '') },
+      h('div', { 'class': 'ctl-top' }, h('label', { 'class': 'ctl-lbl', 'for': id, text: o.label }), val), track, ticks, ends, detents, sub, quick);
+    api.input = inp;
+    api.set = function (v) {
+      v = clamp(+v, +o.min, +o.max);
+      if (+inp.value !== v) inp.value = v;
+      var t = fmt(v);
+      tick_(val, t);
+      inp.setAttribute('aria-valuetext', t);
+      dBtns.forEach(function (b) { b.setAttribute('aria-pressed', Math.abs(b._v - v) < (+o.step || 1) / 2 ? 'true' : 'false'); });
+      api.value = v;
+    };
+    api.setSub = function (t) { if (sub) tick_(sub, t); };
+    inp.addEventListener('input', function () { var v = parseFloat(inp.value); api.set(v); if (isFn(o.onInput)) o.onInput(v); });
+    api.set(o.value !== undefined ? o.value : o.min);
+    return api;
+  }
+
+  /** Barras vivas con valor mono. o = {rows:[{key, label, color, caption}]} → .set(key, frac 0..1, text) */
+  function bars(o) {
+    o = o || {};
+    var el = h('div', { 'class': 'bars' });
+    var rows = {};
+    (o.rows || []).forEach(function (r) {
+      if (r.caption) el.appendChild(h('p', { 'class': 'bars-cap', text: r.caption }));
+      var fill = h('span', { 'class': 'bar-fill' }), v = h('span', { 'class': 'bar-val' });
+      var row = h('div', { 'class': 'bar-row', style: r.color ? { '--c': r.color } : null }, h('span', { 'class': 'bar-name', text: r.label }), h('span', { 'class': 'bar-track', 'aria-hidden': 'true' }, fill), v);
+      rows[r.key] = { fill: fill, v: v };
+      el.appendChild(row);
+    });
+    el.set = function (key, frac, text) {
+      var r = rows[key];
+      if (!r) return;
+      r.fill.style.transform = 'scaleX(' + clamp(+frac || 0, 0, 1).toFixed(3) + ')';
+      if (text !== undefined) tick_(r.v, text);
+    };
+    return el;
+  }
+
   /* ------------------------------------------------------------------ API pública */
   Kit.el = h; Kit.add = add; Kit.cls = cls;
   Kit.icon = icon; Kit.button = button; Kit.iconButton = iconButton; Kit.chip = chip; Kit.badge = badge;
@@ -26918,6 +27203,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   Kit.tooltip = tooltip; Kit.popover = popover; Kit.closePopover = function () { closePopover(true); };
   Kit.dialog = dialog; Kit.emptyState = emptyState; Kit.skeleton = skeleton; Kit.kbd = kbd; Kit.toast = toast;
   Kit.reducedMotion = reducedMotion; Kit.place = place;
+  Kit.pageHeader = pageHeader; Kit.hud = hud; Kit.dockGroup = dockGroup; Kit.dock = dock; Kit.tchip = tchip; Kit.chain = chain; Kit.chainBar = chainBar;
+  Kit.modes = modes; Kit.section = section; Kit.cardCarousel = cardCarousel; Kit.slider = slider; Kit.bars = bars;
 })(root.C150);
 
 </script>
@@ -28576,36 +28863,22 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
  *    what was already opened. The card: category / Esencial / Visto badges, summary, actions (Mostrámelo en 3D · Ver en el avión · Ver el
  *    aire), "Probalo" (kit-styled widgets), then accordions: Dónde está + Qué hace (open), Cada parte, Qué pasa en el avión, Cómo se usa
  *    (numbered), Cuándo se usa, Errores comunes, Truco, Dato curioso, Marcas de colores, En otros años y modelos; related chips; prev/next.
- *  - Over the 3D: status strip (Motor · Corriente (master) · En tierra/En vuelo · Velocidad · Altura; each chip opens a popover with the
- *    plain explanation and "Ver en 3D"), ONE "Escenario" button (popover with SCN_PLAIN + C150.Sim.PRESETS labels; shows "Demostración en
- *    curso" + "Volver al escenario" during a demonstration), layout switch with icons, "Vistas" popover with cockpit pictograms (the active
- *    camera marked), restyled hover callout, and the COACH bubble (COACH_TIPS; dismissals in localStorage 'c150.coach'; UI.resetTips()).
- *    Narrow views (< 560 px) move the scenario button and the layout switch to the bottom row; 'Las dos' side by side moves the status
- *    and tools to the bottom of the cockpit half so they never cover the windshield.
- *
- *  Contract v4, wave U4 — Aprender y Practicar (Lecciones · Recorrido · Checklists · Misiones y situaciones · Quiz · AIRE):
- *  - Shared pieces (before the Lecciones section): diffDots(n) (3 dots + word), metaItem(icon, text), stepBar(n, cur, seen, onGo?) (one segment per
- *    step; without onGo it is a static progress strip), celebrateEl() (calm CSS burst, off with reduced motion), sgCard({icon,title,text,primary,onClick})
- *    and doneCard({id,kicker,title,text,icon,suggestions[],actions[]}) = completion screen with "Seguí con…"; pgBar(frac, text), isDone(kind,id),
- *    firstUndone(list, kind, skipId), callK(variant,title,text) (Kit.callout), glossText(root, selector) (glossary only in reading text).
- *  - Lecciones: cards (number/check, title, summary, minutes = steps × 1.5, steps, difficulty dots from LESSON_LEVEL, "Empezá por acá / Siguiente");
- *    player = back + "Lección n de 12", step bar, title 32 px, text 19 px, "Probá el movimiento" with big pill buttons, "Que lo haga solo"
- *    (Automático + Repetir sin parar) grouped, "Ver el aire", "Ahora" caption, "Qué mirar" callout; completion = doneCard with the next
- *    lesson / "Probalo en el Aire" (LESSON_LAB) / checklist / quiz. Recorrido: same player shape + doneCard.
- *  - Checklists: cards + "¿Por qué los pilotos usan checklists?"; a run is a STEPPER: header with static stepBar, the last 3 ticked rows (older ones in
- *    an accordion), the CURRENT item large (name, "Dejalo en" pill with the value, "Mostrámelo en 3D", Hecho for manual items, "¿Por qué importa?"
- *    accordion, Probalo, the live "✓ Bien — soltá" status .cl-ok), "Lo que sigue" accordion, doneCard with the next checklist / mission / quiz.
- *    Evaluation rules (0.8 s stable + hands off) are untouched.
- *  - Misiones y situaciones (mode 'volar'): segmented "Misiones | Situaciones", "Mostrar el aire" card (default on on computers, off on phones;
- *    on a phone portrait with the flight pad the air explanation is shown in #panel-live, the fixed sheet header, not over the 3D), numbered
- *    sections (Misiones as cards with progress ring + difficulty · Dónde está el avión · Instrumentos on dark glass with units and "¿Qué mide
- *    cada número?" · Mandos); a running mission shows the mission bar, steps accordion, tip callout and a doneCard when achieved.
- *    situations.js gets the same helpers through sitApi() (kic, callK, acc, sectHead, diffDots, pgBar, sgCard, go).
+ *  - Over the 3D (contract v5 — the AIRE language on every tab, Kit.hud / Kit.dock / Kit.chainBar):
+ *      HUD (top-left, #hud): big MOTOR · VELOCIDAD · ALTURA (each opens a popover with the plain explanation and "Ver en 3D"), a mono line
+ *      (Corriente (master) · flaps · en tierra/en vuelo) and a status pill; below it the tab's extras (hudExtra): the control picked in
+ *      Cabina + its live value, the lesson step + its two live numbers, the checklist / mission progress. Hidden in Inicio.
+ *      Dock (bottom, #dock): VISTA (camera presets, keys 1–8) · DISEÑO (Cabina · Las dos · Afuera) · ESCENARIO chip (popover with SCN_PLAIN +
+ *      C150.Sim.PRESETS; "Demostración en curso" + "Volver al escenario" during a demonstration). On phones one scrollable row above the sheet.
+ *      Chain bar (#chain-bar, over the dock): max 3 chips, hidden when empty (chainContent): Cabina [control → what it does → what it moves],
+ *      Recorrido / Lecciones [step → what is happening], checklists [item → why], missions [goal → hint]; with nothing contextual, the
+ *      instructor's tip (COACH_TIPS; dismissals in localStorage 'c150.coach'; UI.resetTips()) is shown there as "Consejo".
+ *      Hover / selected / target controls get the .callout3d pill with a leader line (Core.projectControl).
+ *      'Las dos' side by side keeps the dock and the chain under the cockpit half.
  *  - Quiz: start card, one question per card with progress and score, big options, friendly feedback (+ "La correcta: …"), result with score ring,
  *    "Temas para repasar" (QZ_TOPICS → lesson), the wrong ones in an accordion and "Seguí con…".
  *  - "Siguiente paso" bar (#nextbar, NX): one suggestion from Progress + the open tab (nxPick), hidden while an activity runs or a completion
  *    screen is up (nxBusy), dismissible per tab for the session (sessionStorage 'c150.nx'), sticky at the panel bottom (above the nav on phones).
- *  - Subtitle on phones: positionCaption() measures the bottom row (capBottom) so it never covers Escenario / layout / Vistas; ≥ 16 px, up to 5 lines.
+ *  - The subtitle box (#inset-caption) is gone: its text now goes into the chain bar (v5).
  *
  * Decisions where the contract leaves room (other agents: please read):
  *  - Every Core call goes through cc(): a missing core.js, a missing method or a failed WebGL start never
@@ -28636,7 +28909,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
  *    animation looped) + "Automático" (the step animation, optional loop). Desktop (≥ 700 px, not mobile) switches to
  *    the 'dos' layout for the lesson and gives the previous layout back at the end; phones keep the inset. The cockpit
  *    view is labelled "Así se ve desde adentro" while a lesson / pose / animation is mirrored.
- *  - Layout switch "Cabina · Las dos · Afuera" in .vp-top (Core.setLayout; 'Las dos' hidden without it), persisted
+ *  - Layout switch "Cabina · Las dos · Afuera" in the dock (Core.setLayout; 'Las dos' hidden without it), persisted
  *    in localStorage 'c150.layout'. 3D callouts: label + leader line for the hovered control (any mode) or the
  *    selected one (Explorar, Recorrido, Checklists, Lo básico), anchored with Core.projectControl.
  *  - VOLAR has two sections: "Practicar" (as before) and "Situaciones" (C150.Situations, situations.js + data).
@@ -29674,46 +29947,16 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   var extraCaption = '';
   var status = {};
 
-  /* ---------------------------------------------------------------- "Vistas": cámaras como pictogramas en un popover (la activa marcada) */
+  /* ---------------------------------------------------------------- dock (contract v5 §3): VISTA · DISEÑO · ESCENARIO
+   * ONE row of glass groups at the bottom of the 3D view, styled like AIRE's toolbars (Kit.dock): the camera presets as segmented
+   * buttons, the layout switch and the "Escenario" chip with its popover. On phones it becomes one scrollable row above the sheet. */
   var CAM_DESC = { pilot: 'Tus ojos, en el asiento del piloto', flight: 'Mirar afuera, como en vuelo', panel: 'Todo el tablero de frente',
     left: 'Instrumentos de vuelo', center: 'Motor y radio', right: 'El lado derecho', floor: 'Pedales y combustible', overhead: 'Techo y parabrisas' };
-  // zone of the little cockpit sketch that each view looks at: [x, y, w, h] in a 64×40 box
-  var CAM_ZONE = { pilot: [3, 2, 58, 36], flight: [8, 7, 48, 11], panel: [8, 18, 48, 11], left: [8, 18, 21, 11], center: [28, 18, 12, 21],
-    right: [39, 18, 17, 11], floor: [6, 30, 52, 8], overhead: [9, 2, 46, 5] };
+  var CAM_SHORT = { pilot: 'Piloto', flight: 'Horizonte', panel: 'Tablero', left: 'Izq.', center: 'Centro', right: 'Der.', floor: 'Piso', overhead: 'Techo' };
   var currentCam = null;
-  function sv(tag, attrs) { var e = doc.createElementNS(SVGNS, tag); for (var k in attrs) e.setAttribute(k, attrs[k]); return e; }
-  /** A tiny cockpit sketch with the part this camera looks at lit up: a preview you can read at a glance. */
-  function camThumb(id) {
-    var s = sv('svg', { viewBox: '0 0 64 40', 'class': 'cam-thumb', 'aria-hidden': 'true', focusable: 'false' });
-    s.appendChild(sv('rect', { x: 2, y: 1, width: 60, height: 38, rx: 5, 'class': 'ct-frame' }));
-    s.appendChild(sv('path', { d: 'M10 8h44l-3 10H13z', 'class': 'ct-glass' }));
-    s.appendChild(sv('rect', { x: 8, y: 18, width: 48, height: 11, rx: 1.5, 'class': 'ct-panel' }));
-    [[13, 23.5], [21.5, 23.5], [45, 23.5], [52, 23.5]].forEach(function (p) { s.appendChild(sv('circle', { cx: p[0], cy: p[1], r: 3, 'class': 'ct-dial' })); });
-    s.appendChild(sv('rect', { x: 29.5, y: 20, width: 6, height: 7, rx: 1, 'class': 'ct-dial' }));
-    s.appendChild(sv('rect', { x: 28.5, y: 29.5, width: 7, height: 8, rx: 1, 'class': 'ct-dial' }));
-    s.appendChild(sv('rect', { x: 12, y: 33, width: 6, height: 4, rx: 1, 'class': 'ct-dial' }));
-    s.appendChild(sv('rect', { x: 44, y: 33, width: 6, height: 4, rx: 1, 'class': 'ct-dial' }));
-    var z = CAM_ZONE[id];
-    if (z) s.appendChild(sv('rect', { x: z[0], y: z[1], width: z[2], height: z[3], rx: 2.5, 'class': 'ct-zone' }));
-    return s;
-  }
-  function openCams(anchor) {
-    var K = C150.Kit;
-    if (!K || !isFn(K.popover)) return;
-    var pop = null;
-    var grid = h('div', { class: 'cam-grid', role: 'group', 'aria-label': 'Posiciones de la cámara' });
-    CAMS.forEach(function (c) {
-      grid.appendChild(h('button', {
-        type: 'button', class: 'cam-btn', 'data-cam': c[0], 'aria-pressed': currentCam === c[0] ? 'true' : 'false',
-        onclick: function () { cc('focusPreset', c[0]); if (pop) pop.close(); }
-      }, camThumb(c[0]), h('span', { class: 'cam-name', text: c[1] }), h('span', { class: 'cam-sub', text: CAM_DESC[c[0]] || '' })));
-    });
-    pop = K.popover(anchor, {
-      title: 'Mirar desde…', label: 'Vistas de la cámara',
-      content: [h('p', { class: 'pop-sub', text: 'Elegí desde dónde mirar la cabina. También podés arrastrar con el mouse o el dedo, o usar las teclas 1 a 8.' }), grid]
-    });
-    pop.el.classList.add('pop--cams');
-  }
+  var DOCK = { el: null, cams: null, layout: null, scn: null };
+  var HUD = { el: null };
+  var CH = { bar: null };
 
   /* ---------------------------------------------------------------- "Escenario": un botón con un popover (en lugar del <select>) */
   var SCN_PLAIN = {
@@ -29754,21 +29997,70 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       : 'Escenario: ' + scenarioName(currentPreset) + '. Tocá para cambiarlo');
   }
 
-  function setupViewport() {
-    var K = C150.Kit;
-    function popToggle(btn, open) {
-      if (!btn) return;
-      btn.addEventListener('click', function () {
-        if (btn.getAttribute('aria-expanded') === 'true') { if (K && isFn(K.closePopover)) K.closePopover(); return; }
-        open(btn);
-      });
-    }
-    popToggle($('vp-cams-toggle'), openCams);
-    popToggle($('vp-scenario-btn'), openScenarios);
-    var back = $('vp-scenario-back');
-    if (back) back.addEventListener('click', function () { endDemo(); });
+  /** The bottom dock: VISTA (camera presets) · DISEÑO (Cabina · Las dos · Afuera) · ESCENARIO (chip + popover). */
+  function buildDock() {
+    var K = C150.Kit, bottom = $('vp-bottom');
+    if (!K || !isFn(K.dock) || !bottom) return;
+    CH.bar = K.chainBar(); CH.bar.id = 'chain-bar';
+    DOCK.cams = K.dockGroup({
+      label: 'Vista', aria: 'Vista de la cámara: desde dónde mirar la cabina (teclas 1 a 8)', value: null,
+      items: CAMS.map(function (c) { return { value: c[0], label: CAM_SHORT[c[0]] || c[1], title: c[1] + ': ' + (CAM_DESC[c[0]] || ''), aria: 'Mirar desde: ' + c[1], data: { cam: c[0] } }; }),
+      onChange: function (id) { cc('focusPreset', id); }
+    });
+    DOCK.layout = K.dockGroup({
+      label: 'Diseño', aria: 'Qué ver en grande: la cabina, las dos vistas o el avión desde afuera', value: layoutMode,
+      items: LAYOUT_IDS.map(function (id) {
+        return { value: id, label: LAYOUT_NAMES[id], data: { layout: id },
+          aria: LAYOUT_NAMES[id] + ': ' + (id === 'dos' ? 'la cabina y el avión de afuera, lado a lado' : (id === 'cabina' ? 'la cabina en grande' : 'el avión desde afuera en grande')),
+          title: id === 'dos' ? 'Las dos vistas: la cabina y el avión de afuera, lado a lado' : (id === 'cabina' ? 'La cabina en grande' : 'El avión desde afuera en grande') };
+      }),
+      onChange: function (id) { chooseLayout(id); }
+    });
+    var scnBtn = h('button', { type: 'button', id: 'vp-scenario-btn', class: 'seg-btn scn-btn', 'aria-haspopup': 'dialog', 'aria-expanded': 'false' },
+      h('span', { class: 'scn-btn-v', id: 'vp-scenario-v' }), kic('chevron-down'));
+    var back = h('button', { type: 'button', id: 'vp-scenario-back', class: 'seg-btn scn-back', 'aria-label': 'Volver al escenario', hidden: true },
+      h('span', { class: 'vsb-long', text: 'Volver al escenario' }), h('span', { class: 'vsb-short', text: 'Volver' }));
+    DOCK.scn = h('div', { id: 'vp-scenario', class: 'dock-group dock-group--scn', role: 'group', 'aria-label': 'Escenario: dónde y cómo está el avión' },
+      h('span', { class: 'dock-label', text: 'Escenario' }), scnBtn, back);
+    scnBtn.addEventListener('click', function () {
+      if (scnBtn.getAttribute('aria-expanded') === 'true') { K.closePopover(); return; }
+      openScenarios(scnBtn);
+    });
+    back.addEventListener('click', function () { endDemo(); });
+    DOCK.el = K.dock([DOCK.cams, DOCK.layout, DOCK.scn], { label: 'Vista de la cámara, diseño y escenario' });
+    DOCK.el.id = 'dock';
+    bottom.appendChild(CH.bar);
+    bottom.appendChild(DOCK.el);
     syncScenarioBtn();
+    syncLayoutSwitch();
+  }
 
+  /** The glass HUD (top-left): big MOTOR · VELOCIDAD · ALTURA, one mono line, a status pill and tab-specific extras. */
+  function infoToggle(key) {
+    return function (e) {
+      var el = e.currentTarget, K = C150.Kit;
+      if (el.getAttribute('aria-expanded') === 'true') { if (K) K.closePopover(); return; }
+      openStatusInfo(key, el);
+    };
+  }
+  function buildStageHud() {
+    var K = C150.Kit, stage = $('vp-stage');
+    if (!K || !isFn(K.hud) || !stage) return;
+    HUD.el = K.hud({
+      label: 'Estado del avión: tocá cada dato para saber qué significa', kicker: 'Cabina',
+      bigs: [
+        { label: 'Motor', unit: 'rpm', title: 'Motor: tocá para saber qué es', onClick: infoToggle('engine') },
+        { label: 'Velocidad', unit: 'nudos', title: 'Velocidad (IAS): tocá para saber qué es', onClick: infoToggle('ias') },
+        { label: 'Altura', unit: 'pies', title: 'Altura: tocá para saber qué es', onClick: infoToggle('alt') }
+      ]
+    });
+    HUD.el.id = 'hud';
+    stage.insertBefore(HUD.el, stage.firstChild);
+    if (root.ResizeObserver) new ResizeObserver(function () { if (layoutMode === 'dos') positionPaneLabels(); }).observe(HUD.el);
+  }
+
+  function setupViewport() {
+    syncScenarioBtn();
     // inset buttons
     $('inset-swap').addEventListener('click', function () {
       cc('setMainView', mainView === 'exterior' ? 'cockpit' : 'exterior');
@@ -29780,19 +30072,13 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       syncLabelsBtns();
     });
 
-    buildStatus();
-    safe(buildLayoutSwitch, 'layout switch');
+    safe(buildStageHud, 'hud');
+    safe(buildDock, 'dock');
     safe(buildPaneLabels, 'pane labels');
     safe(buildCallout, 'callout');
-    safe(coachBuild, 'coach');
 
     var vp = $('viewport');
-    var tools = $('vp-tools'), top = doc.querySelector('.vp-top'), cams = $('vp-cams');
-    function place() {
-      // narrow view (phones): the scenario button and the layout switch move to the bottom row, next to "Vistas"; the top keeps only the status
-      if (tools && top && cams) { var parent = vp.clientWidth < 560 ? cams : top; if (tools.parentNode !== parent) parent.appendChild(tools); }
-      positionInset(); positionPaneLabels(); coachPlace();
-    }
+    function place() { positionInset(); positionPaneLabels(); if (DOCK.el && DOCK.el.refresh) DOCK.el.refresh(); }
     if (root.ResizeObserver) new ResizeObserver(place).observe(vp);
     else root.addEventListener('resize', place);
     place();
@@ -29845,7 +30131,6 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   var userLayout = (function () { var l = store.get('layout', 'cabina'); return LAYOUT_IDS.indexOf(l) >= 0 ? l : 'cabina'; })();
   var paneRects = null;                 // { cockpit:{x,y,w,h}, exterior:{x,y,w,h} } in 'dos'
   var dosShrinkPending = false;
-  var layoutBtns = {};
   function canDos() { return has('setLayout') && dosFits(); }
   /** 'Las dos' needs room: two halves of at least ~300 px (side by side) or ~250 px tall (stacked). On a phone the
    *  halves would be tiny and buried under the overlays, so there the cockpit + inset layout is used instead. */
@@ -29882,28 +30167,11 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     LB.userChose = LB.idx >= 0 && mode === 'basico';
     applyLayout(name);
   }
-  var LAYOUT_ICON = { cabina: 'cabin', dos: 'split', afuera: 'plane' };
-  function buildLayoutSwitch() {
-    var top = doc.querySelector('.vp-tools') || doc.querySelector('.vp-top');
-    if (!top) return;
-    var seg = h('div', { class: 'vp-layout', role: 'group', 'aria-label': 'Qué ver en grande: la cabina, las dos vistas o el avión desde afuera' });
-    LAYOUT_IDS.forEach(function (id) {
-      var b = h('button', { type: 'button', class: 'vp-layout-btn', 'data-layout': id, 'aria-pressed': 'false',
-        'aria-label': LAYOUT_NAMES[id] + ': ' + (id === 'dos' ? 'la cabina y el avión de afuera, lado a lado' : (id === 'cabina' ? 'la cabina en grande' : 'el avión desde afuera en grande')),
-        title: id === 'dos' ? 'Las dos vistas: la cabina y el avión de afuera, lado a lado' : (id === 'cabina' ? 'La cabina en grande' : 'El avión desde afuera en grande'),
-        onclick: function () { chooseLayout(id); } }, kic(LAYOUT_ICON[id]), h('span', { class: 'vp-layout-lbl', text: LAYOUT_NAMES[id] }));
-      layoutBtns[id] = b;
-      seg.appendChild(b);
-    });
-    top.appendChild(seg);
-    syncLayoutSwitch();
-  }
   function syncLayoutSwitch() {
-    for (var id in layoutBtns) {
-      if (!Object.prototype.hasOwnProperty.call(layoutBtns, id)) continue;
-      setAttr(layoutBtns[id], 'aria-pressed', layoutMode === id ? 'true' : 'false');
-      if (id === 'dos') layoutBtns[id].hidden = coreReady && !canDos() && layoutMode !== 'dos';
-    }
+    if (!DOCK.layout) return;
+    DOCK.layout.setValue(layoutMode, false);
+    var b = DOCK.layout.btn('dos');
+    if (b) b.hidden = coreReady && !canDos() && layoutMode !== 'dos';
   }
 
   /* pane labels for 'dos': "Así se ve desde adentro" / "Cabina" over the cockpit, "Afuera" over the exterior */
@@ -29940,7 +30208,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     if (app) toggleClass(app, 'is-dos', on);
     paneEls.cockpit.hidden = !on;
     paneEls.exterior.hidden = !on;
-    if (!on) return;
+    if (!on) { if (app) toggleClass(app, 'is-dos-side', false); return; }
     var R = dosRects();
     var side = R.exterior.x > R.cockpit.x + 1;      // side by side (else stacked)
     if (app) toggleClass(app, 'is-dos-side', side);
@@ -29950,15 +30218,11 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       el.style.top = Math.round(r.y + 10) + 'px';
       el.style.maxWidth = Math.max(80, Math.round(r.w - 20)) + 'px';
     });
-    // the toolbar (.vp-top: status, scenario, layout switch) sits top-left: a label it would cover goes below it
-    var vtop = doc.querySelector('.vp-top'), vp = $('viewport');
-    if (vtop && vp && vtop.children.length && vtop.offsetTop < vp.clientHeight / 2) {      // (not when the toolbar sits at the bottom, 'Las dos' side by side)
-      var vb = vp.getBoundingClientRect(), right = 0, bottom = 0;
-      for (var i = 0; i < vtop.children.length; i++) {
-        var cr = vtop.children[i].getBoundingClientRect();
-        if (!cr.width) continue;
-        right = Math.max(right, cr.right - vb.left); bottom = Math.max(bottom, cr.bottom - vb.top);
-      }
+    // the HUD sits top-left: a pane label it would cover goes below it
+    var hudEl = HUD.el, vp = $('viewport');
+    if (hudEl && vp && !hudEl.hidden && hudEl.offsetHeight) {
+      var vb = vp.getBoundingClientRect(), hr = hudEl.getBoundingClientRect();
+      var right = hr.right - vb.left, bottom = hr.bottom - vb.top;
       ['cockpit', 'exterior'].forEach(function (k) {
         var r = R[k];
         if (r.x + 10 < right && r.y + 10 < bottom) paneEls[k].style.top = Math.round(bottom + 8) + 'px';
@@ -30004,54 +30268,11 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     positionCaption();
   }
   var captionText = '';
-  /** Bottom offset (px) that keeps a subtitle above the controls of the bottom row of the 3D view (Escenario, layout switch,
-   *  Vistas): measured, because on phones those rows stack (2 rows when a demonstration shows "Volver al escenario"). */
-  function capBottom() {
-    var vp = $('viewport');
-    if (!vp) return 62;
-    var H = vp.clientHeight, vr = vp.getBoundingClientRect(), top = H;
-    ['vp-tools', 'vp-cams', 'vp-scenario', 'vp-scenario-back'].forEach(function (id) {
-      var el = $(id);
-      if (!el || !el.offsetHeight) return;
-      var t = el.getBoundingClientRect().top - vr.top;
-      if (t > H * 0.45 && t < top) top = t;
-    });
-    var lay = doc.querySelector('.vp-layout');
-    if (lay && lay.offsetHeight) { var tl = lay.getBoundingClientRect().top - vr.top; if (tl > H * 0.45 && tl < top) top = tl; }
-    return top < H ? Math.max(62, Math.round(H - top + 8)) : 62;
-  }
+  /** The subtitle box is gone (contract v5): what it said now travels in the chain bar over the dock (chainContent). */
+  function capBottom() { return 62; }
   function positionCaption() {
     var cap = $('inset-caption');
-    if (!cap) return;
-    var dos = layoutMode === 'dos';
-    if (!captionText || (!dos && !insetRect && mainView !== 'exterior')) { cap.hidden = true; return; }
-    if (airInPanel()) { cap.hidden = true; return; }              // phones in Volar: the 3D view is full, the explanation goes in the panel
-    cap.hidden = false;
-    var st = cap.style;
-    toggleClass(cap, 'is-big', dos || mainView === 'exterior' || mirroring() || !insetRect || insetRect.w < 240);   // a subtitle (not a caption under a wide inset)
-    if (dos) {                                     // 'Las dos': subtitle at the bottom of the exterior pane
-      var R = dosRects(), r = R.exterior, vp = $('viewport'), H = vp ? vp.clientHeight : 0;
-      st.left = Math.round(r.x + 12) + 'px'; st.right = 'auto'; st.top = 'auto';
-      // side by side, the camera buttons stay under the cockpit half (CSS): the subtitle can sit lower
-      var sideBySide = R.exterior.x > R.cockpit.x + 1;
-      st.bottom = Math.round(Math.max(0, H - (r.y + r.h)) + (flypadShown() ? VO.overlay.offsetHeight + 74 : (sideBySide ? 18 : 62))) + 'px';
-      st.width = 'fit-content'; st.marginLeft = st.marginRight = '0';
-      st.maxWidth = Math.max(120, Math.round(r.w - 24)) + 'px'; st.transform = 'none'; st.textAlign = 'left';
-      return;
-    }
-    // big exterior, or a small inset (phones, where a caption under it would be clipped): caption as a subtitle
-    if (mainView === 'exterior' || !insetRect || insetRect.w < 240) {
-      // left+right+fit-content+auto margins: centred, and it may use the whole width (left:50% would halve it);
-      // phones get 8 px gutters so a long lesson line needs fewer lines
-      var vpw = $('viewport') ? $('viewport').clientWidth : 0, gut = vpw && vpw < 560 ? 8 : 12;
-      st.left = gut + 'px'; st.right = gut + 'px'; st.top = 'auto'; st.bottom = (flypadShown() ? VO.overlay.offsetHeight + 74 : capBottom()) + 'px';
-      st.width = 'fit-content'; st.marginLeft = st.marginRight = 'auto';
-      st.maxWidth = 'min(560px, calc(100% - ' + (2 * gut) + 'px))'; st.transform = 'none'; st.textAlign = 'center';
-    } else {
-      st.left = insetRect.x + 'px'; st.right = 'auto'; st.top = (insetRect.y + insetRect.h + 6) + 'px'; st.bottom = 'auto';
-      st.marginLeft = st.marginRight = '0';
-      st.width = insetRect.w + 'px'; st.maxWidth = 'none'; st.transform = 'none'; st.textAlign = 'left';
-    }
+    if (cap && !cap.hidden) cap.hidden = true;
   }
   function updateCaption() {
     var t = getCaption();
@@ -30132,12 +30353,18 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     }
     var vp = $('viewport');
     var area = layoutMode === 'dos' ? dosRects().cockpit : { x: 0, y: 0, w: vp.clientWidth, h: vp.clientHeight };
-    var x = p.x, y = p.y, bw = CO.bw, bh = CO.bh, gap = 46;
+    var x = p.x, y = p.y, bw = CO.bw, bh = CO.bh, gap = 40;
+    // keep clear of the HUD (top-left) and of the chain bar + dock (bottom): measured, they change height with the tab
+    var vr0 = vp.getBoundingClientRect(), hudBottom = 0, hudRight = 0, botTop = area.y + area.h;
+    if (HUD.el && !HUD.el.hidden && HUD.el.offsetHeight) { var hr0 = HUD.el.getBoundingClientRect(); hudBottom = hr0.bottom - vr0.top; hudRight = hr0.right - vr0.left; }
+    var vb0 = $('vp-bottom');
+    if (vb0 && vb0.offsetHeight) botTop = Math.min(botTop, vp.clientHeight - vb0.offsetHeight);
     var bx = x + gap, by = y - bh - gap * 0.7;
     if (bx + bw > area.x + area.w - 8) bx = x - gap - bw;
-    if (by < area.y + 56) by = y + gap * 0.7;
+    if (by < area.y + 12 || (by < hudBottom + 6 && bx < hudRight + 6)) by = y + gap * 0.7;
     bx = Math.max(area.x + 8, Math.min(area.x + area.w - bw - 8, bx));
-    by = Math.max(area.y + 8, Math.min(area.y + area.h - bh - 8, by));
+    by = Math.max(area.y + 8, Math.min(botTop - bh - 8, by));
+    if (by < hudBottom + 6 && bx < hudRight + 6) bx = Math.min(area.x + area.w - bw - 8, hudRight + 10);
     var tx = Math.max(bx, Math.min(bx + bw, x)), ty = Math.max(by, Math.min(by + bh, y));
     CO.box.style.transform = 'translate(' + Math.round(bx) + 'px,' + Math.round(by) + 'px)';
     CO.line.setAttribute('x1', x.toFixed(1)); CO.line.setAttribute('y1', y.toFixed(1));
@@ -30158,22 +30385,10 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     }
     return { name: name, en: en };
   }
-  function onHover(id, sub, pos) {
-    var tt = $('vp-tooltip');
+  function onHover(id, sub) {
     var c = id && CTRL[id];
     CO.hoverId = c ? id : null; CO.hoverSub = c ? (sub || null) : null;
-    if (c && has('projectControl')) { tt.hidden = true; updateCallout(); return; }   // the 3D callout replaces the tooltip
-    if (!c || !pos) { tt.hidden = true; updateCallout(); return; }
-    var lb = ctrlLabel(c, sub), name = lb.name, en = lb.en;
-    setText(tt.querySelector('.vp-tooltip-name'), name);
-    setText(tt.querySelector('.vp-tooltip-en'), en);
-    tt.hidden = false;
-    var vp = $('viewport');
-    var x = num(pos.x, 0) + 16, y = num(pos.y, 0) + 16;
-    var w = tt.offsetWidth, hh = tt.offsetHeight;
-    if (x + w > vp.clientWidth - 6) x = Math.max(6, num(pos.x, 0) - w - 12);
-    if (y + hh > vp.clientHeight - 6) y = Math.max(6, num(pos.y, 0) - hh - 12);
-    tt.style.transform = 'translate(' + Math.round(x) + 'px,' + Math.round(y) + 'px)';
+    updateCallout();
   }
 
   /* ---------------------------------------------------------------- demonstrations vs the "Escenario" selector
@@ -30294,55 +30509,187 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     pop = K.popover(anchor, { title: info.title, content: body, label: info.title });
   }
 
-  function buildStatus() {
-    var box = $('vp-status');
-    function chip(key, iconName, interactive, title) {
-      var k = h('span', { class: 'chip-st-k' }), v = h('span', { class: 'chip-st-v' }), x = h('span', { class: 'chip-st-x' });
-      var el = h(interactive ? 'button' : 'span', { class: 'chip-st', type: interactive ? 'button' : null, title: title || null,
-        'aria-haspopup': interactive ? 'dialog' : null }, kic(iconName), k, v, x);
-      if (interactive) el.addEventListener('click', function () {
-        if (el.getAttribute('aria-expanded') === 'true') { if (C150.Kit) C150.Kit.closePopover(); return; }
-        openStatusInfo(key, el);
-      });
-      box.appendChild(el);
-      status[key] = { el: el, k: k, v: v, x: x, cls: '', key: key };
+  /* ---------------------------------------------------------------- the HUD (top-left of the 3D view), plain words
+   * MOTOR · VELOCIDAD · ALTURA as big numbers (each one opens a short explanation, with "Ver en 3D"), a mono line (Corriente (master) ·
+   * flaps · en tierra / en vuelo) and a pill with a dot; below, what the tab is about: the control picked in Cabina, the lesson step
+   * and its live numbers, the checklist or mission progress. Updates only touch the DOM when the text changes. */
+  var HUD_KICK = { inicio: 'Cabina', explorar: 'Cabina', recorrido: 'Recorrido guiado', basico: 'Lecciones', checklists: 'Checklists',
+    volar: 'Misiones', quiz: 'Quiz', escuela: 'Escuela', aire: 'Aire' };
+  /** Live value of a cockpit control, in plain words ('' when it only makes sense to look at it). */
+  function ctrlLiveValue(id, s) {
+    var a = s.air || {}, e = s.engine || {};
+    switch (id) {
+      case 'throttle': return pct(s.throttle) + ' · ' + (e.running ? Math.round(num(e.rpm, 0) / 10) * 10 + ' rpm' : 'motor apagado');
+      case 'mixture': return s.mixture < 0.04 ? 'Corte (idle cut-off)' : (s.mixture > 0.96 ? 'Rica (full rich)' : pct(s.mixture) + ' (empobrecida)');
+      case 'carb-heat': return s.carbHeat < 0.04 ? 'Fría (cold)' : (s.carbHeat > 0.96 ? 'Caliente (hot)' : pct(s.carbHeat));
+      case 'trim-wheel': return Math.abs(num(s.trim, 0)) < 0.04 ? 'Despegue (take off)' : fmtSigned(num(s.trim, 0), 2) + (s.trim > 0 ? ' · nariz arriba' : ' · nariz abajo');
+      case 'flap-switch': case 'flap-indicator': return Math.round(num(s.flaps, 0)) + '° de flaps';
+      case 'ignition': return 'Llave en ' + s.ignition;
+      case 'master': return 'Batería ' + (s.masterBat ? 'ON' : 'OFF') + ' · alternador ' + (s.masterAlt ? 'ON' : 'OFF');
+      case 'fuel-shutoff': return s.fuelValve ? 'Abierta (ON)' : 'Cerrada (OFF)';
+      case 'parking-brake': return s.parkingBrake ? 'Puesto' : 'Suelto';
+      case 'control-lock': return s.controlLock ? 'Puesta' : 'Sacada';
+      case 'cabin-heat': return s.cabinHeat < 0.04 ? 'Cerrada' : 'Abierta ' + pct(s.cabinHeat);
+      case 'cabin-air': return s.cabinAir < 0.04 ? 'Cerrada' : 'Abierta ' + pct(s.cabinAir);
+      case 'tachometer': return Math.round(num(e.rpm, 0) / 10) * 10 + ' rpm';
+      case 'asi': return Math.round(Math.max(0, num(a.ias, 0))) + ' nudos';
+      case 'altimeter': return Math.round(num(a.indicatedAlt, num(a.altitude, 0)) / 10) * 10 + ' pies';
+      case 'vsi': return fmtSigned(Math.round(num(a.vs, 0) / 10) * 10, 0) + ' pies/min';
+      case 'heading-indicator': case 'compass': return heading3(a.heading) + '°';
+      case 'attitude': case 'yoke': return 'Alabeo ' + Math.round(num(a.bank, 0)) + '° · cabeceo ' + Math.round(num(a.pitch, 0)) + '°';
+      case 'rudder-pedals': return 'Pedal ' + (s.rudder < -0.04 ? 'izquierdo' : (s.rudder > 0.04 ? 'derecho' : 'al medio'));
+      case 'toe-brakes': return (s.brakeL > 0.1 || s.brakeR > 0.1) ? 'Frenando' : 'Sin frenar';
+      default: return '';
     }
-    chip('demo', 'eye', false); chip('paused', 'pause', false);
-    chip('engine', 'engine', true, 'Motor: tocá para saber qué es');
-    chip('master', 'bolt', true, 'Corriente (master): tocá para saber qué es');
-    chip('ground', 'plane', true, 'En tierra o en vuelo: tocá para saber qué significa');
-    chip('ias', 'gauge', true, 'Velocidad (IAS): tocá para saber qué es');
-    chip('alt', 'alt', true, 'Altura: tocá para saber qué es');
-    status.paused.el.classList.add('is-paused');
-    setText(status.paused.v, 'Pausa');
-    status.paused.el.hidden = true;
-    status.demo.el.classList.add('is-demo');
-    status.demo.el.hidden = true;
   }
-  function setChip(c, k, v, cls, x) {
-    setText(c.k, k); setText(c.v, v); setText(c.x, x || '');
-    cls = 'chip-st st-' + c.key + (cls ? ' ' + cls : '') + (c.el.classList.contains('is-paused') ? ' is-paused' : '') + (c.el.classList.contains('is-demo') ? ' is-demo' : '');
-    if (c.cls !== cls) { c.cls = cls; c.el.className = cls; }
+  /** The two live numbers each lesson is about (alabeo, cabeceo, flaps…). */
+  var LESSON_NUMS = { 'tres-ejes': ['bank', 'pitch'], coordinacion: ['bank', 'slip'], 'cuatro-fuerzas': ['pitch', 'ias'], 'ala-angulo-ataque': ['aoa', 'ias'],
+    perdida: ['aoa', 'ias'], flaps: ['flaps', 'ias'], compensador: ['trim', 'pitch'], motor: ['rpm', 'thr'], instrumentos: ['ias', 'alt'],
+    'actitud-potencia': ['pitch', 'rpm'], 'en-tierra': ['gs', 'ias'], 'primera-clase': ['ias', 'rpm'] };
+  function numCell(kind, s) {
+    var a = s.air || {}, e = s.engine || {}, b, p;
+    switch (kind) {
+      case 'bank': b = num(a.bank, 0); return { v: Math.abs(Math.round(b)), u: b > 1.5 ? '° der.' : (b < -1.5 ? '° izq.' : '°'), l: 'Alabeo' };
+      case 'pitch': p = num(a.pitch, 0); return { v: Math.abs(Math.round(p)), u: p > 1.5 ? '° arriba' : (p < -1.5 ? '° abajo' : '°'), l: 'Cabeceo' };
+      case 'slip': return { v: Math.round(Math.abs(num(a.slip, 0)) * 100), u: '% ' + (num(a.slip, 0) > 0.05 ? 'der.' : (num(a.slip, 0) < -0.05 ? 'izq.' : '')), l: 'Bolita' };
+      case 'aoa': return { v: fmt(num(a.aoa, 0), 1), u: '°', l: 'Ángulo de ataque' };
+      case 'ias': return { v: Math.round(Math.max(0, num(a.ias, 0))), u: 'nudos', l: 'Velocidad' };
+      case 'gs': return { v: Math.round(num(a.groundSpeed, 0)), u: 'nudos', l: 'En tierra' };
+      case 'alt': return { v: Math.round(num(a.indicatedAlt, num(a.altitude, 0)) / 10) * 10, u: 'pies', l: 'Altura' };
+      case 'flaps': return { v: Math.round(num(s.flaps, 0)), u: '°', l: 'Flaps' };
+      case 'trim': return { v: fmtSigned(num(s.trim, 0), 2), u: '', l: 'Compensador' };
+      case 'rpm': return { v: Math.round(num(e.rpm, 0) / 10) * 10, u: 'rpm', l: 'Motor' };
+      case 'thr': return { v: Math.round(clamp(num(s.throttle, 0), 0, 1) * 100), u: '%', l: 'Acelerador' };
+      default: return { v: '', u: '', l: '' };
+    }
   }
-  function updateStatus(s) {
-    if (!status.engine || !s) return;
-    var e = s.engine || {}, a = s.air || {};
+  function hudExtra(s) {
+    var c, id;
+    switch (mode) {
+      case 'explorar': case 'recorrido':
+        id = mode === 'explorar' ? (EX.id || CO.selId) : ((!TR.finished && TOUR[TR.i] && TOUR[TR.i].control) || CO.selId);
+        c = id && CTRL[id];
+        return c ? { k: mode === 'explorar' ? 'Elegiste' : 'Mirá este control', t: c.nombre, v: ctrlLiveValue(id, s) } : null;
+      case 'basico': {
+        if (LB.idx < 0 || LB.finished) return null;
+        var L = LESSONS[LB.idx], n = arr(L && L.pasos).length, kinds = LESSON_NUMS[L && L.id] || ['bank', 'pitch'];
+        return { k: 'Lección ' + (LB.idx + 1) + ' · paso ' + (LB.i + 1) + ' de ' + n, t: '', nums: kinds.map(function (kd) { return numCell(kd, s); }) };
+      }
+      case 'checklists': {
+        var cur = CL.cur;
+        if (!cur || cur.finished) return null;
+        var items = arr(cur.cl.items), dn = 0;
+        for (var i = 0; i < cur.done.length; i++) if (cur.done[i]) dn++;
+        return { k: 'Checklist', t: cur.cl.titulo || '', v: dn + ' de ' + items.length + ' pasos', bar: items.length ? dn / items.length : 0 };
+      }
+      case 'volar':
+        if (!VO.m) return null;
+        return { k: VO.achieved ? 'Misión cumplida' : 'Misión', t: VO.m.titulo || '', v: Math.round(VO.progress * 100) + ' % del objetivo', bar: VO.progress };
+      default: return null;
+    }
+  }
+  function updateHud(s) {
+    if (!s) return;
     syncDemo();
-    // during a demonstration the chips show the airplane of the demonstration (the mirrored state), labelled as such
-    if (status.demo.el.hidden === demoOn) status.demo.el.hidden = !demoOn;           // only touch the DOM when it changes
-    if (demoOn) setChip(status.demo, '', demoLabel(), '');
-    var pausedHidden = !s.paused || demoOn;
-    if (status.paused.el.hidden !== pausedHidden) status.paused.el.hidden = pausedHidden;
-    if (e.running) setChip(status.engine, 'Motor', 'en marcha', 'is-on', Math.round(num(e.rpm, 0) / 10) * 10 + ' RPM');
-    else if (e.cranking) setChip(status.engine, 'Motor', 'arrancando…', 'is-warn');
-    else setChip(status.engine, 'Motor', 'apagado', '');
-    setChip(status.master, 'Corriente', s.masterBat ? (s.masterAlt ? 'encendida' : 'sólo batería') : 'apagada',
-      s.masterBat ? (s.masterAlt ? 'is-on' : 'is-warn') : '');
-    var gs = num(a.groundSpeed, 0);
-    if (a.onGround === false) setChip(status.ground, '', 'En vuelo', 'is-air');
-    else setChip(status.ground, '', 'En tierra', '', gs >= 1 ? Math.round(gs) + ' nudos' : '');
-    setChip(status.ias, 'Velocidad', Math.round(Math.max(0, num(a.ias, 0))) + ' nudos', '');
-    setChip(status.alt, 'Altura', Math.round(num(a.indicatedAlt, num(a.altitude, 0)) / 10) * 10 + ' pies', '');
+    if (!HUD.el) return;
+    var e = s.engine || {}, a = s.air || {};
+    var rpm = Math.round(num(e.rpm, 0) / 10) * 10;
+    var ias = Math.round(Math.max(0, num(a.ias, 0)));
+    var alt = Math.round(num(a.indicatedAlt, num(a.altitude, 0)) / 10) * 10;
+    var stalled = !!a.stallWarning && !s.paused;
+    var air = a.onGround === false;
+    var pill;
+    if (demoOn) pill = { text: demoLabel(), tone: 'is-demo' };
+    else if (s.paused) pill = { text: 'En pausa', tone: 'is-pause' };
+    else if (stalled) pill = { text: 'Bocina de pérdida', tone: 'is-stall' };
+    else if (air) pill = { text: 'En vuelo', tone: 'is-air' };
+    else if (e.running) pill = { text: 'Motor en marcha', tone: 'is-ok' };
+    else if (e.cranking) pill = { text: 'Arrancando el motor…', tone: 'is-horn' };
+    else pill = { text: 'Motor apagado', tone: '' };
+    HUD.el.set({
+      kicker: (HUD_KICK[mode] || 'Cabina') + (mode === 'recorrido' && !TR.finished && TOUR.length ? ' ' + (TR.i + 1) + '/' + TOUR.length : '') + (demoOn ? '' : ' · ' + scenarioName(currentPreset)),
+      live: !s.paused,
+      bigs: [{ v: rpm, u: 'rpm', l: 'Motor', dim: !e.running && !e.cranking }, { v: ias, u: 'nudos', l: 'Velocidad', warn: stalled }, { v: alt, u: 'pies', l: 'Altura' }],
+      row: [
+        { text: 'Corriente (master) ' + (s.masterBat ? (s.masterAlt ? 'encendida' : 'sólo batería') : 'apagada'), onClick: infoToggle('master'), title: 'Corriente (master): tocá para saber qué es' },
+        { text: 'Flaps ' + Math.round(num(s.flaps, 0)) + '°' },
+        { text: air ? 'En vuelo' : 'En tierra', onClick: infoToggle('ground'), title: 'En tierra o en vuelo: tocá para saber qué significa' }
+      ],
+      pill: pill,
+      extra: hudExtra(s)
+    });
+  }
+
+  /* ---------------------------------------------------------------- the chain bar (over the dock): cause → effect, 3 chips at most
+   * Cabina: [control] → [what it does] → [what it moves]; Recorrido and Lecciones: [step] → [what is happening]; checklists:
+   * [item] → [why it matters]; missions: [goal] → [hint]. With nothing contextual, the instructor's tip (coach) takes its place. */
+  /** A short one-line version of a sentence: cut at the first clause, then at a word boundary. */
+  function shortText(t, max, clause) {
+    t = String(t || '').replace(/\s+/g, ' ').trim();
+    if (!t) return '';
+    if (clause) {
+      var m = t.search(/[;:]|\s[—–]\s|\.\s|\.$/);
+      if (m > 14) t = t.slice(0, m);
+      if (t.length > max) { var cm = t.lastIndexOf(',', max); if (cm > 24) t = t.slice(0, cm); }
+    }
+    t = t.replace(/[.,;:\s]+$/, '');
+    if (t.length > max) {
+      t = t.slice(0, max);
+      var sp = t.lastIndexOf(' ');
+      if (sp > max * 0.6) t = t.slice(0, sp);
+      t = t.replace(/[.,;:\s(]+$/, '') + '…';
+    }
+    return t;
+  }
+  function chainContent() {
+    var c, id;
+    switch (mode) {
+      case 'explorar':
+        id = EX.id || CO.selId; c = id && CTRL[id];
+        if (!c) return null;
+        return { key: 'c:' + id, items: [c.nombre, shortText(c.resumen, 72, true), shortText(c.enElAvion, 84, true)] };
+      case 'recorrido': {
+        if (TR.finished || !TOUR.length) return null;
+        var st = TOUR[TR.i];
+        return st ? { key: 'r:' + TR.i, items: [shortText(st.titulo, 64), shortText(st.texto, 100, true)] } : null;
+      }
+      case 'basico': {
+        if (LB.idx < 0 || LB.finished) return null;
+        var p = lbStep();
+        if (!p) return null;
+        var cap = LB.poseCaption || captionText;
+        return { key: 'l:' + LB.idx + ':' + LB.i, items: [shortText(p.titulo, 64), cap ? shortText(cap, 110, true) : shortText(p.texto, 100, true)] };
+      }
+      case 'checklists': {
+        var cur = CL.cur;
+        if (!cur || cur.finished) return null;
+        var it = arr(cur.cl.items)[cur.i];
+        if (!it) return null;
+        return { key: 'k:' + cur.cl.id + ':' + cur.i, items: [shortText(it.texto, 72), shortText(it.detalle, 104, true)] };
+      }
+      case 'volar': {
+        var m = VO.m;
+        if (!m) return null;
+        var ps = arr(m.pasos), k = ps.length ? clamp(Math.floor(VO.progress * ps.length), 0, ps.length - 1) : 0;
+        if (VO.achieved) return { key: 'm:' + m.id + ':ok', tone: 'good', items: ['¡Misión cumplida!', shortText(m.titulo, 64)] };
+        return { key: 'm:' + m.id, items: [shortText(m.objetivo || m.titulo, 84, true), ps.length ? shortText(ps[k], 110, true) : null] };
+      }
+      default: return null;
+    }
+  }
+  function chainUpdate(ts) {
+    if (!CH.bar) return;
+    var c = chainContent();
+    if (c) { COACH.tip = null; COACH.shownId = null; COACH.cand = null; CH.bar.set(c.items, { tone: c.tone, key: c.key }); return; }
+    var tip = coachPick(ts);
+    if (!tip) { CH.bar.clear(); return; }
+    var text = '';
+    try { text = tip.text(); } catch (e) { text = ''; }
+    if (!text) { CH.bar.clear(); return; }
+    COACH.tip = tip; COACH.shownId = tip.id;
+    var items = ['Consejo', { text: shortText(text, 150), keep: true }];
+    if (tip.action) items.push({ text: tip.action[0], onClick: function () { safe(tip.action[1], 'coach action'); } });
+    CH.bar.set(items, { tone: 'info', key: 'tip:' + tip.id, dismiss: coachDismiss, dismissLabel: 'Cerrar este consejo' });
   }
 
   /* toasts from state.events (consumed and cleared here) */
@@ -30463,50 +30810,28 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       text: function () { return 'Si la pregunta dice “¿dónde está…?”, tocá ese control directamente en la cabina 3D.'; } }
   ];
 
-  function coachBuild() {
-    var vp = $('viewport');
-    if (!vp) return;
-    COACH.txt = h('p', { class: 'vp-coach-text' });
-    COACH.act = h('button', { type: 'button', class: 'btn btn--small btn--primary vp-coach-act', hidden: true,
-      onclick: function () { var t = COACH.tip; if (t && t.action) safe(t.action[1], 'coach action'); } });
-    var x = h('button', { type: 'button', class: 'vp-coach-x', 'aria-label': 'Cerrar este consejo', title: 'Cerrar este consejo', onclick: function () { coachDismiss(); } }, kic('close'));
-    COACH.el = h('div', { id: 'vp-coach', class: 'vp-coach', role: 'status', 'aria-live': 'polite', hidden: true },
-      h('span', { class: 'vp-coach-ico', 'aria-hidden': 'true' }, kic('bulb')),
-      h('div', { class: 'vp-coach-body' }, h('span', { class: 'vp-coach-k', text: 'Consejo' }), COACH.txt, COACH.act),
-      x);
-    vp.appendChild(COACH.el);
-  }
-  function coachPlace() {
-    var el = COACH.el, app = $('app');
-    if (!el || !app) return;
-    var shown = !el.hidden;
-    toggleClass(app, 'has-coach', shown);
-    if (shown) {                                       // only write the custom property when the height changed (it restyles the whole app)
-      var hgt = el.offsetHeight;
-      if (hgt && hgt !== COACH.h) { COACH.h = hgt; app.style.setProperty('--coach-h', hgt + 'px'); }
-    }
-  }
+  function coachBuild() { /* the tip now lives in the chain bar over the dock (chainUpdate) */ }
+  function coachPlace() { /* nothing to measure any more */ }
   function coachDismiss() {
     if (!COACH.tip) return;
     COACH.dismissed[COACH.tip.id] = 1;
     store.set('coach', COACH.dismissed);
     coachHide();
+    COACH.last = 0;
+    chainUpdate(now());
   }
-  function coachHide() {
-    COACH.tip = null; COACH.shownId = null;
-    if (COACH.el && !COACH.el.hidden) { COACH.el.hidden = true; COACH.el.classList.remove('is-on'); coachPlace(); }
-  }
+  function coachHide() { COACH.tip = null; COACH.shownId = null; COACH.cand = null; }
   /** Reserved: the student wants the tips back (Ayuda). */
   function coachReset() { COACH.dismissed = {}; store.set('coach', {}); COACH.cand = null; }
   function coachBlocked() {
     if (!coreReady || !overlayDone || mode === 'aire') return true;
-    if (stallOn || captionText || flypadShown()) return true;
+    if (stallOn || flypadShown()) return true;
     if (SH.active && SH.snap !== 'peek') return true;           // phones: the sheet needs the room
     return false;
   }
-  function coachUpdate(ts) {
-    if (!COACH.el) return;
-    if (ts - COACH.last < 250) return;
+  /** The tip to show now (first whose condition holds and that the student has not closed), after a short wait so it does not flicker. */
+  function coachPick(ts) {
+    if (ts - COACH.last < 250) return COACH.tip;
     COACH.last = ts;
     var tip = null;
     if (!coachBlocked()) {
@@ -30518,24 +30843,10 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         if (ok) { tip = t; break; }
       }
     }
-    if (!tip) { COACH.cand = null; coachHide(); return; }
+    if (!tip) { COACH.cand = null; return null; }
     if (COACH.cand !== tip.id) { COACH.cand = tip.id; COACH.candT = ts; }
-    if (COACH.shownId !== tip.id && ts - COACH.candT < 1400) { if (COACH.shownId) coachHide(); return; }   // wait a moment: no flicker while the tab changes
-    var text = '';
-    try { text = tip.text(); } catch (e2) { text = ''; }
-    if (!text) { coachHide(); return; }
-    COACH.tip = tip;
-    setText(COACH.txt, text);
-    var act = tip.action;
-    if (COACH.act.hidden === !!act) COACH.act.hidden = !act;
-    if (act) setText(COACH.act, act[0]);
-    if (COACH.shownId !== tip.id) {
-      COACH.shownId = tip.id;
-      COACH.el.hidden = false;
-      void COACH.el.offsetWidth;
-      COACH.el.classList.add('is-on');
-    }
-    coachPlace();
+    if (COACH.shownId !== tip.id && ts - COACH.candT < 1400) return null;
+    return tip;
   }
 
   /* ================================================================== frame loop */
@@ -30566,9 +30877,9 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     slowAcc += dt;
     if (kickFlag || slowAcc >= 0.06) {          // Core sends ~15 frames/s: refresh text on each
       slowAcc = 0; kickFlag = false;
-      updateStatus(s);
+      updateHud(s);
       updateCaption();
-      coachUpdate(now());
+      chainUpdate(now());
       if (!insetRect && coreReady) { var r = cc('getInsetRect'); if (r) onLayout(r); }
       if (impl && impl.slow) { try { impl.slow(s); } catch (e3) { logError('slow ' + mode, e3); } }
       runLive(liveGlobal, s);
@@ -32476,7 +32787,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     var dl = h('dl', { class: 'hud-explain' });
     HUD_EXPLAIN.forEach(function (x) { dl.appendChild(h('dt', { text: x[0] })); dl.appendChild(h('dd', { text: x[1] })); });
     return h('div', { role: 'group', 'aria-label': 'Instrumentos principales' },
-      h('div', { class: 'hud' }, ias, alt, vs, rpm, hdg, bank, ballCell, flaps), sr,
+      h('div', { class: 'hud-panel' }, ias, alt, vs, rpm, hdg, bank, ballCell, flaps), sr,
       acc('¿Qué mide cada número?', dl, { icon: 'gauge' }));
   }
 
@@ -33098,7 +33409,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     if (q.tipo === 'donde') {
       body = h('div', null,
         QZ.answered ? null : h('div', { class: 'pick-hint' }, kic('hand'),
-          h('span', { text: 'Tocá el control en la cabina 3D. Podés girar la vista o usar los botones de Vistas.' })),
+          h('span', { text: 'Tocá el control en la cabina 3D. Podés girar la vista o usar los botones de Vista, abajo.' })),
         !QZ.answered ? h('div', { class: 'btn-row' }, h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: qzGiveUp }, 'No sé: mostrámelo')) : null);
     } else {
       body = h('div', { class: 'opts', role: 'group', 'aria-label': 'Opciones' });
@@ -33327,8 +33638,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       Co.on('quality', function () { syncQuality(); });
       Co.on('preset', function (name) {         // mark the camera preset in use ("Vistas")
         currentCam = name || null;
-        var bs = doc.querySelectorAll('.cam-btn');
-        for (var i = 0; i < bs.length; i++) bs[i].setAttribute('aria-pressed', bs[i].getAttribute('data-cam') === name ? 'true' : 'false');
+        if (DOCK.cams) DOCK.cams.setValue(currentCam, false);
       });
       Co.on('scenario', function (name) { if (!applyingPreset && name) presetApplied(name); });
       Co.on('interactionend', function () { kick(); });
@@ -33343,6 +33653,13 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     return true;
   }
 
+  /** On phones .main clips the sheet that sits below the 3D view; focusing something inside the closed sheet could scroll the 3D view out of sight. */
+  function guardMainScroll() {
+    var m = doc.querySelector('.main');
+    if (!m) return;
+    m.addEventListener('scroll', function () { if (m.scrollTop || m.scrollLeft) { m.scrollTop = 0; m.scrollLeft = 0; } }, { passive: true });
+  }
+
   UI.init = function () {
     if (UI._booted) return;
     UI._booted = true;
@@ -33355,6 +33672,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     safe(setupQuality, 'quality');
     safe(setupNav, 'nav');
     safe(setupSheet, 'sheet');
+    safe(guardMainScroll, 'main scroll');
     safe(setupViewport, 'viewport');
     safe(setupPeek, 'peek');
     safe(setupInteractionTracking, 'interaction');
