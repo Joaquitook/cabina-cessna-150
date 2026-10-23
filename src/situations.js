@@ -140,39 +140,66 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     return A.h('span', { class: 'sit-tipo sit-tipo--' + t.replace(/\s+/g, '-'), text: TIPO[t] || t });
   }
 
+  /* Visual alignment with the rest of the app (contract v4 U4): every helper below comes from ui.js through the api and has a plain fallback. */
+  var NIVEL = { 'en tierra': 1, anormal: 2, emergencia: 3 };
+  function nivelOf(x) { return NIVEL[x.tipo || 'anormal'] || 2; }
+  function ico(name) { return (A.kic ? A.kic(name) : A.icon(name)); }
+  function practicas(x) {
+    var names = [];
+    (Array.isArray(x.mandos) ? x.mandos : []).forEach(function (id) { var c = A.CTRL[id]; if (c && names.length < 3) names.push(c.nombre); });
+    return names.length ? names.join(' · ') : '';
+  }
+  function callout(variant, title, text) {
+    if (A.callK) return A.callK(variant, title, text);
+    return A.h('aside', { class: 'callout callout--' + variant }, A.h('h3', { class: 'placard', text: title }), A.h('p', { text: text }));
+  }
+  function fold(title, content, open) {
+    if (A.acc) return A.acc(title, content, { open: !!open });
+    var d = A.h('details', { class: 'fold' }, A.h('summary', null, title), content);
+    if (open) d.open = true;
+    return d;
+  }
+  function head(n, title, meta) { return A.sectHead ? A.sectHead(n, title, meta) : A.h('h3', { class: 'placard placard--small block-title', text: title }); }
+
   function renderList() {
     var h = A.h;
-    // panel header in the app's family: numbered mono kicker + display title + lead, closed by a hairline
-    V.appendChild(h('div', { class: 'mode-head' },
-      h('p', { class: 'mode-kicker' }, h('span', { class: 'mode-kicker-dot', 'aria-hidden': 'true' }), '05 · Situaciones prácticas'),
-      h('h2', { class: 'placard mode-title', text: '¿Qué harías?' }),
-      h('p', { class: 'mode-sub sit-intro', text: 'Cosas que pueden pasar en un vuelo y qué hacés. No es teoría: el avión las vive en el simulador y vos actuás con los mandos (los botones de acá, el teclado o la cabina 3D).' })));
+    V.appendChild(h('p', { class: 'sit-intro', text: 'Cosas que pueden pasar en un vuelo y qué hacés. No es teoría: el avión las vive en el simulador y vos actuás con los mandos (los botones de acá, el teclado o la cabina 3D).' }));
     if (!SIT.length) { V.appendChild(h('p', { class: 'empty', text: 'Las situaciones todavía no están cargadas.' })); return; }
-    var grid = h('ul', { class: 'sit-grid', 'aria-label': 'Situaciones prácticas' });
+    var doneN = SIT.filter(function (x) { return !!R.best[x.id]; }).length, nextIdx = -1;
+    for (var q = 0; q < SIT.length; q++) if (!R.best[SIT[q].id]) { nextIdx = q; break; }
+    if (A.pgBar) V.appendChild(h('div', { class: 'lc-prog' }, A.pgBar(doneN / SIT.length, doneN + ' de ' + SIT.length + ' resueltas', doneN === SIT.length)));
+    var grid = h('ul', { class: 'lc-list sit-grid', 'aria-label': 'Situaciones prácticas' });
     SIT.forEach(function (x, i) {
-      var done = !!R.best[x.id];
-      grid.appendChild(h('li', null, h('button', { type: 'button', class: 'sit-card' + (done ? ' is-done' : ''), onclick: function () { open(x.id); } },
-        h('span', { class: 'sit-card-top' }, h('span', { class: 'sit-num', text: ('0' + (i + 1)).slice(-2) }), tipoBadge(x),
-          done ? h('span', { class: 'sit-done' }, A.icon('check'), 'Resuelta') : null),
-        h('span', { class: 'sit-card-title', text: x.titulo }),
-        h('span', { class: 'sit-card-ctx', text: x.contexto }))));
+      var done = !!R.best[x.id], pr = practicas(x);
+      grid.appendChild(h('li', null, h('button', { type: 'button', class: 'lcard sit-card' + (done ? ' is-done' : '') + (i === nextIdx ? ' is-next' : ''), onclick: function () { open(x.id); } },
+        h('span', { class: 'lcard-n', 'aria-hidden': 'true' }, done ? ico('check') : ('0' + (i + 1)).slice(-2)),
+        h('span', { class: 'lcard-main' },
+          h('span', { class: 'sit-card-top' }, tipoBadge(x), i === nextIdx ? h('span', { class: 'lcard-flag', text: doneN ? 'Siguiente' : 'Empezá por acá' }) : null),
+          h('span', { class: 'lcard-t', text: x.titulo }),
+          h('span', { class: 'lcard-d sit-card-ctx', text: x.contexto }),
+          pr ? h('span', { class: 'sit-practicas' }, ico('target'), h('span', null, h('b', { text: 'Qué practicás: ' }), pr)) : null,
+          h('span', { class: 'lcard-meta' }, A.diffDots ? A.diffDots(nivelOf(x)) : null,
+            done ? h('span', { class: 'lcard-ok' }, ico('check'), 'Resuelta') : null)),
+        h('span', { class: 'lcard-go', 'aria-hidden': 'true' }, ico('chevron-right')))));
     });
     V.appendChild(grid);
-    V.appendChild(h('p', { class: 'aviso', text: 'Procedimientos según el POH del 150M, simplificados para practicar. En el avión mandan el manual, la checklist de tu escuela y el instructor.' }));
+    V.appendChild(callout('cuidado', 'Para practicar', 'Procedimientos según el POH del 150M, simplificados. En el avión mandan el manual, la checklist de tu escuela y el instructor.'));
   }
 
   function renderBrief() {
-    var h = A.h, x = R.x;
+    var h = A.h, x = R.x, pr = practicas(x);
     var sen = h('ul', { class: 'bullets' });
     senales(x).forEach(function (t) { sen.appendChild(h('li', { text: t })); });
     V.appendChild(h('div', { class: 'detail-top' },
       h('button', { type: 'button', class: 'btn btn--ghost btn--small back-btn', onclick: backToList }, A.icon('back'), 'Situaciones')));
-    V.appendChild(h('article', { class: 'card sit-brief', 'aria-labelledby': 'sit-title' },
+    V.appendChild(h('article', { class: 'card sit-brief lp-card', 'aria-labelledby': 'sit-title' },
       h('p', { class: 'kicker' }, tipoBadge(x), ' Situación práctica'),
       h('h2', { class: 'placard detail-title', id: 'sit-title', tabindex: '-1', text: x.titulo }),
+      h('div', { class: 'sit-brief-meta' }, A.diffDots ? A.diffDots(nivelOf(x)) : null),
       h('p', { class: 'sit-ctx', text: x.contexto }),
-      h('div', { class: 'sit-goal' }, h('span', { class: 'sit-goal-k', text: 'Tu objetivo' }), h('p', { text: x.objetivo })),
-      h('details', { class: 'fold' }, h('summary', null, 'Qué vas a notar'), sen),
+      callout('tip', 'Tu objetivo', x.objetivo),
+      pr ? h('p', { class: 'sit-practicas sit-practicas--big' }, ico('target'), h('span', null, h('b', { text: 'Qué practicás: ' }), pr)) : null,
+      fold('Qué vas a notar', sen, true),
       h('div', { class: 'btn-row' },
         h('button', { type: 'button', class: 'btn btn--primary btn--big', onclick: start }, A.icon('play'), 'Empezar'),
         h('button', { type: 'button', class: 'btn btn--ghost', onclick: backToList }, 'Elegir otra')),
@@ -213,8 +240,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     V.appendChild(h('article', { class: 'card sit-run', 'aria-labelledby': 'sit-title' },
       h('p', { class: 'kicker' }, tipoBadge(x), ' En curso'),
       h('h2', { class: 'placard detail-title', id: 'sit-title', tabindex: '-1', text: x.titulo }),
-      h('div', { class: 'sit-goal' }, h('span', { class: 'sit-goal-k', text: 'Objetivo' }), h('p', { text: x.objetivo })),
-      h('details', { class: 'fold' }, h('summary', null, 'Qué notás'), sen),
+      callout('tip', 'Objetivo', x.objetivo),
+      fold('Qué notás', sen, false),
       h('div', { class: 'sit-pistas-box' }, pl, pbtn),
       h('div', { class: 'btn-row' },
         h('button', { type: 'button', class: 'btn btn--small', onclick: start }, A.icon('retry'), 'Empezar de nuevo'),
@@ -232,14 +259,12 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       var w = A.probalo(id, R.live);
       if (w) widgets.appendChild(h('div', { class: 'sit-widget' }, h('h4', { class: 'sit-widget-name', text: c.nombre }), w));
     });
-    V.appendChild(h('div', { class: 'block' },
-      h('h3', { class: 'placard placard--small block-title', text: 'Mandos de esta situación' }),
+    V.appendChild(h('div', { class: 'block vo-sec' },
+      head('01', 'Mandos de esta situación'),
       h('p', { class: 'soft small', text: 'Tocá un nombre para que la cámara te lo muestre en la cabina.' }), chips,
       widgets.firstChild ? widgets : null));
-    V.appendChild(h('div', { class: 'block' },
-      h('h3', { class: 'placard placard--small block-title', text: 'Instrumentos' }), A.buildHud(R.live)));
-    V.appendChild(h('div', { class: 'block' },
-      h('h3', { class: 'placard placard--small block-title', text: 'Mandos de vuelo' }), A.flightPad(R.live)));
+    V.appendChild(h('div', { class: 'block vo-sec' }, head('02', 'Instrumentos', 'en vivo'), A.buildHud(R.live)));
+    V.appendChild(h('div', { class: 'block vo-sec' }, head('03', 'Mandos de vuelo'), A.flightPad(R.live)));
   }
 
   function renderFin() {
@@ -247,19 +272,24 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     var errs = h('ul', { class: 'bullets bullets--warn' });
     (Array.isArray(x.errores) ? x.errores : []).forEach(function (t) { errs.appendChild(h('li', { text: t })); });
     var t = R.ctx ? num(R.ctx.final, R.ctx.t) : 0;
+    var nx = -1;
+    for (var k = 0; k < SIT.length; k++) if (SIT[k].id !== x.id && !R.best[SIT[k].id]) { nx = k; break; }
+    var sg = [];
+    if (!r.ok) sg.push({ primary: true, icon: 'retry', title: 'Probar de nuevo', text: 'Con lo que viste, ahora sale', onClick: start });
+    if (nx >= 0) sg.push({ primary: !!r.ok, icon: 'flag', title: 'Situación: ' + (SIT[nx].titulo || ''), text: practicas(SIT[nx]) ? 'Practicás: ' + practicas(SIT[nx]) : '', onClick: function () { open(SIT[nx].id); } });
+    else if (r.ok) sg.push({ primary: true, icon: 'quiz', title: 'Quiz rápido', text: 'Probá lo que aprendiste', onClick: function () { stop(); backToList(); if (A.go) A.go('quiz'); } });
+    if (r.ok) sg.push({ icon: 'retry', title: 'Otra vez', text: 'Para hacerlo más prolijo', onClick: start });
+    sg.push({ icon: 'plane', title: 'Seguir volando libre', text: 'Misiones, instrumentos y mandos', onClick: function () { stop(); backToList(); if (A.showPractice) A.showPractice(); } });
     V.appendChild(h('div', { class: 'detail-top' },
       h('button', { type: 'button', class: 'btn btn--ghost btn--small back-btn', onclick: backToList }, A.icon('back'), 'Situaciones')));
-    V.appendChild(h('article', { class: 'card sit-debrief ' + (r.ok ? 'is-ok' : 'is-fail'), 'aria-labelledby': 'sit-title' },
-      h('p', { class: 'kicker' }, tipoBadge(x), ' Repaso'),
+    V.appendChild(h('article', { class: 'card sit-debrief lp-card ' + (r.ok ? 'is-ok' : 'is-fail'), 'aria-labelledby': 'sit-title' },
+      h('p', { class: 'kicker' }, tipoBadge(x), ' Repaso de la situación'),
       h('h2', { class: 'placard detail-title', id: 'sit-title', tabindex: '-1', text: r.ok ? '¡Bien resuelta!' : 'Esta vez no salió' }),
-      h('p', { class: 'sit-result' }, A.icon(r.ok ? 'check' : 'warn'), h('span', { text: r.mensaje || '' })),
-      h('p', { class: 'soft small', text: x.titulo + ' · ' + Math.floor(t / 60) + ' min ' + Math.round(t % 60) + ' s · el avión quedó en pausa.' }),
-      h('section', { class: 'sec' }, h('h3', { class: 'placard placard--small', text: 'Lo que hace un piloto' }), h('p', { class: 'sit-debrief-text', text: x.debrief || '' })),
-      h('section', { class: 'sec' }, h('h3', { class: 'placard placard--small', text: 'Errores comunes' }), errs),
-      h('div', { class: 'btn-row' },
-        h('button', { type: 'button', class: 'btn btn--primary', onclick: start }, A.icon('retry'), r.ok ? 'Otra vez' : 'Probar de nuevo'),
-        h('button', { type: 'button', class: 'btn', onclick: backToList }, 'Otra situación'),
-        h('button', { type: 'button', class: 'btn btn--ghost', onclick: function () { stop(); backToList(); if (A.showPractice) A.showPractice(); } }, 'Seguir volando libre'))));
+      callout(r.ok ? 'ok' : 'cuidado', r.ok ? 'Lo lograste' : 'Qué pasó', r.mensaje || ''),
+      h('p', { class: 'soft small sit-time' }, ico('clock'), x.titulo + ' · ' + Math.floor(t / 60) + ' min ' + Math.round(t % 60) + ' s · el avión quedó en pausa para que lo leas con calma.'),
+      fold('Lo que hace un piloto', h('p', { class: 'sit-debrief-text', text: x.debrief || '' }), true),
+      errs.firstChild ? fold('Errores comunes', errs, false) : null,
+      h('div', { class: 'sg-wrap' }, h('p', { class: 'sg-k', text: 'Seguí con…' }), h('div', { class: 'sg-list' }, sg.map(function (s) { return A.sgCard ? A.sgCard(s) : null; })))));
   }
 
   function render(focusTitle) {
@@ -272,7 +302,10 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     else if (R.phase === 'run' && R.x) renderRun();
     else if (R.phase === 'fin' && R.x) renderFin();
     else { R.phase = 'lista'; renderList(); }
-    if (A.annotate && R.phase !== 'run') A.annotate(V);
+    if (A.annotate && R.phase !== 'run') {          // glossary popovers only in the reading text, not in titles or kickers
+      var txt = V.querySelectorAll('.sit-intro, .sit-ctx, .callout-body, .acc-body, .sit-debrief-text, .lcard-d');
+      for (var q = 0; q < txt.length; q++) A.annotate(txt[q]);
+    }
     var s = A.S();
     if (s) runLive(s);
     if (focusTitle || hadFocus) {

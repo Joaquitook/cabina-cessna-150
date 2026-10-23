@@ -45,7 +45,9 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
  *     (select(id,{focus}), focusPreset) never starts while interacting or while a pointer is down on the 3D view: it
  *     waits and starts 0.25 s after the release (a newer select without focus cancels it).
  *   Contract v4 (UI/UX): *setIdleOrbit(bool) → bool · *isIdleOrbit(). A slow cinematic drift of the camera for the Inicio screen:
- *     in the cockpit view the eye sways a few centimetres and looks around (±14° yaw, ≈ 70 s per cycle); in the exterior view
+ *     in the cockpit view the camera first flies to the 'inside' preset (horizon, whole panel and yoke in frame; the previous pose
+ *     is restored with a fly-to when the orbit ends), then the eye sways a few centimetres (±9° yaw, ≈ 80 s per cycle; a resting
+ *     mouse pointer does not raise hover callouts until it really moves); in the exterior view
  *     (or the 'afuera' / 'dos' layouts) the orbit camera turns around the airplane (autoRotate). It never fights the student: a
  *     pointer press on the 3D view, a drag/zoom of the orbit controls, a held control or a camera fly-to ends it for good (event
  *     *'idleorbit'(false)); the UI turns it on again when Inicio is entered.
@@ -897,12 +899,16 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     return true;
   }
   /* ------------------------------------------------------------------ idle orbit (Inicio) */
-  var idle = { on: false, base: null, t0: 0 };
+  var idle = { on: false, base: null, t0: 0, prev: null, homed: false, pointed: false };
+  /** The "home" framing of Inicio: horizon through the windshield + the whole instrument panel + the yoke ('inside' preset). */
+  function homePose() { return presetSpec('inside') || presetSpec('pilot'); }
   function stopIdleOrbit(restore) {
     if (!idle.on) return;
-    if (restore && idle.base && camera && controls) { camera.position.copy(idle.base.p); controls.target.copy(idle.base.t); camera.lookAt(controls.target); }   // leaving Inicio: put the eye back
-    idle.on = false; idle.base = null;
+    var prev = idle.prev;
+    idle.on = false; idle.base = null; idle.prev = null; idle.homed = false; idle.pointed = false;
+    if (restore && prev && camera && controls && !userBusy()) flyTo(prev.p, prev.t, false);   // leaving Inicio: ease the eye back
     if (extControls) extControls.autoRotate = false;
+    hoverPos.dirty = true;
     emit('idleorbit', false);
   }
   function setIdleOrbit(on) {
@@ -910,29 +916,38 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     if (!inited) return false;
     if (on === idle.on) return on;
     if (!on) { stopIdleOrbit(true); return false; }
-    idle.on = true; idle.base = null;
+    idle.on = true; idle.base = null; idle.prev = null; idle.homed = false; idle.pointed = false;
     if (extControls) { extControls.autoRotate = true; extControls.autoRotateSpeed = 0.7; }
     emit('idleorbit', true);
     return true;
   }
-  /** Cockpit sway: offsets the eye sideways/up a little and yaws the target; base is captured once the camera is still. */
+  /** Cockpit sway: first frames the whole cockpit (home pose), then drifts the eye sideways / forward a little and
+   *  yaws the target (a few degrees, so the panel and the windshield always stay in view). */
   function updateIdleOrbit() {
     if (!idle.on) return;
     if (userBusy()) { stopIdleOrbit(); return; }
     if (fly || !camera || !controls || !(mainView === 'cockpit' || layout === 'dos')) { idle.base = null; return; }
     if (!idle.base) {
+      var home = idle.homed ? null : homePose();
+      if (home) {                                          // not yet framed: fly to the home view, then start the sway
+        idle.homed = true;
+        idle.prev = { p: camera.position.clone(), t: controls.target.clone() };
+        flyTo(home.position, home.target, false);
+        if (fly) return;                                   // (instant under reduced motion: the base is captured below)
+      }
       idle.base = { p: camera.position.clone(), t: controls.target.clone() };
       idle.t0 = clock;
     }
-    var w = (clock - idle.t0) * (Math.PI * 2 / 70);
-    var b = idle.base, sway = Math.sin(w), bob = Math.sin(w * 1.7 + 0.8);
+    var w = (clock - idle.t0) * (Math.PI * 2 / 80);
+    var b = idle.base, sway = Math.sin(w), bob = Math.sin(w * 1.7 + 0.8), push = Math.sin(w * 0.6 + 1.9);
     vA.subVectors(b.t, b.p);                              // view direction at the base pose
     var len = vA.length();
     if (len < 0.01) return;
     vB.set(0, 1, 0).cross(vA).normalize();                // camera-right (horizontal)
-    camera.position.copy(b.p).addScaledVector(vB, -0.05 * sway);
+    camera.position.copy(b.p).addScaledVector(vB, -0.06 * sway);
     camera.position.y += 0.012 * bob;
-    var ang = 0.25 * sway;                                // ±14° of yaw around the vertical axis
+    camera.position.z += 0.05 * push;                     // slow dolly along the cockpit
+    var ang = 0.16 * sway;                                // about ±9° of yaw around the vertical axis
     var ca = Math.cos(ang), sa = Math.sin(ang);
     controls.target.set(b.p.x + vA.x * ca - vA.z * sa, b.t.y + 0.015 * bob, b.p.z + vA.x * sa + vA.z * ca);
   }
@@ -1171,7 +1186,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     if (!hoverPos.dirty || ptr) return;
     hoverPos.dirty = false;
     var id = null, sub = null, cursor = '';
-    if (hoverPos.inside) {
+    if (hoverPos.inside && (!idle.on || idle.pointed)) {      // Inicio: a resting pointer is not "pointing at something"
       if (inRect(hoverPos.x, hoverPos.y, insetRect)) cursor = 'pointer';
       else if (isSplit() && !inRect(hoverPos.x, hoverPos.y, cockRect)) cursor = '';
       else {
@@ -1257,7 +1272,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     if (ptr) return;
     if (ev.target === canvas && ev.pointerType !== 'touch') {
       localXY(ev, pxy);
-      hoverPos.x = pxy.x; hoverPos.y = pxy.y; hoverPos.inside = true; hoverPos.dirty = true;
+      hoverPos.x = pxy.x; hoverPos.y = pxy.y; hoverPos.inside = true; hoverPos.dirty = true; idle.pointed = true;
     } else if (hoverPos.inside) {
       hoverPos.inside = false; hoverPos.dirty = true;
     }

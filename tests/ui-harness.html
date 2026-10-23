@@ -18,6 +18,8 @@
 <link rel="stylesheet" href="../src/styles.css">
 
 <div id="app" class="app">
+  <a class="skip-link" id="skip-link" href="#panel">Saltar al contenido</a>
+  <h1 class="sr-only">Cabina Cessna 150: aprendé a volar un Cessna 150 en 3D</h1>
   <header class="topbar">
     <button type="button" class="brand" id="brand" data-go="inicio" aria-label="Cabina Cessna 150: ir al inicio" title="Ir al inicio">
       <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
@@ -144,6 +146,7 @@
           <button type="button" class="subtab" role="tab" id="tab-volar" data-mode="volar" aria-controls="panel-volar" aria-selected="false" tabindex="-1">Misiones y situaciones</button>
           <button type="button" class="subtab" role="tab" id="tab-quiz" data-mode="quiz" aria-controls="panel-quiz" aria-selected="false" tabindex="-1">Quiz</button>
         </div>
+        <p id="panel-live" class="panel-live" role="status" aria-live="polite" hidden></p>
       </div>
       <section id="panel-inicio" class="mode" role="region" aria-labelledby="nav-inicio" tabindex="-1"></section>
       <section id="panel-explorar" class="mode" role="region" aria-labelledby="nav-cabina" tabindex="-1" hidden></section>
@@ -159,6 +162,14 @@
         <span class="peek-text"><span class="peek-kicker">Tocaste</span> <strong id="peek-name"></strong></span>
         <button type="button" id="peek-open" class="btn btn--small">Ver ficha</button>
         <button type="button" id="peek-close" class="icon-btn icon-btn--small" aria-label="Cerrar">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <div id="nextbar" class="nextbar" hidden role="region" aria-label="Siguiente paso sugerido">
+        <span class="nextbar-ico" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><use href="#i-flag"/></svg></span>
+        <span class="nextbar-text"><span class="nextbar-k" id="nextbar-k">Seguí con</span><strong class="nextbar-t" id="nextbar-t"></strong></span>
+        <button type="button" id="nextbar-go" class="btn btn--primary btn--small nextbar-go">Empezar</button>
+        <button type="button" id="nextbar-x" class="icon-btn icon-btn--small" aria-label="Ocultar esta sugerencia" title="Ocultar">
           <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg>
         </button>
       </div>
@@ -194,7 +205,7 @@
           <li><strong>Otro toque</strong> sobre el mismo control lo acciona: prende una luz, mueve la llave, saca la traba… En las perillas (acelerador, mezcla, calefacción) y en el compensador, cada toque lo corre <strong>un cuarto</strong> de su recorrido.</li>
           <li><strong>Arrastrá</strong> las perillas (acelerador, mezcla, calefacción), el volante, la rueda del compensador y los pedales para moverlos.</li>
           <li>En cada ficha, la sección <strong>Probalo</strong> te deja mover el mismo control con botones grandes.</li>
-          <li>En <strong>Volar</strong>, en el celular, el volante, los pedales, los frenos y el acelerador aparecen sobre la vista 3D, abajo.</li>
+          <li>En <strong>Practicar &rarr; Misiones y situaciones</strong>, en el celular, el volante, los pedales, los frenos y el acelerador aparecen sobre la vista 3D, abajo.</li>
           <li>En <strong>Aire</strong> (laboratorio del aire) ves cómo se mueve el aire alrededor del avión: elegí un experimento guiado o mové los mandos y mirá las fuerzas, el ala por dentro y la curva de sustentación.</li>
         </ul>
         <h3 class="placard placard--small" id="quality-title">Calidad gráfica</h3>

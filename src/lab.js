@@ -898,7 +898,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       h('div', { class: 'lab-balance' },
         h('div', { class: 'lab-bal' }, h('span', { class: 'lab-bal-k', text: 'Vertical' }), balV),
         h('div', { class: 'lab-bal' }, h('span', { class: 'lab-bal-k', text: 'Horizontal' }), balH),
-        h('div', { class: 'lab-bal lab-bal--ld' }, h('span', { class: 'lab-bal-k', text: 'Eficiencia L/D' }), ld,
+        h('div', { class: 'lab-bal lab-bal--ld' }, h('span', { class: 'lab-bal-k', text: 'Eficiencia del ala (L/D)', title: 'Cuántos metros avanza el avión por cada metro que baja, planeando' }), ld,
           h('span', { class: 'lab-ld-track', 'aria-hidden': 'true' }, ldBar))));
   }
 
@@ -1175,13 +1175,13 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     var tun = c.tunel;
     A.setText(H.kick, tun ? 'Túnel de viento · avión quieto' + (L.fake ? ' (estimado)' : '') : 'En vuelo · el avión reacciona');
     if (tun) {
-      A.setText(H.b1[0], f0(c.ias)); A.setText(H.b1[1], 'kt'); A.setText(H.b1[2], 'viento');
+      A.setText(H.b1[0], f0(c.ias)); A.setText(H.b1[1], 'nudos'); A.setText(H.b1[2], 'viento');
       A.setText(H.b2[0], f1(c.aoa)); A.setText(H.b2[1], '°'); A.setText(H.b2[2], 'ángulo de ataque');
     } else {
-      A.setText(H.b1[0], f0(c.ias)); A.setText(H.b1[1], 'kt'); A.setText(H.b1[2], 'velocidad');
-      A.setText(H.b2[0], (c.vs > 0 ? '+' : '') + f0(Math.round(c.vs / 10) * 10)); A.setText(H.b2[1], 'ft/min'); A.setText(H.b2[2], c.vs > 100 ? 'subiendo' : (c.vs < -100 ? 'bajando' : 'nivelado'));
+      A.setText(H.b1[0], f0(c.ias)); A.setText(H.b1[1], 'nudos'); A.setText(H.b1[2], 'velocidad');
+      A.setText(H.b2[0], (c.vs > 0 ? '+' : '') + f0(Math.round(c.vs / 10) * 10)); A.setText(H.b2[1], 'pies/min'); A.setText(H.b2[2], c.vs > 100 ? 'subiendo' : (c.vs < -100 ? 'bajando' : 'nivelado'));
     }
-    A.setText(H.row, Math.round(c.rpm / 10) * 10 + ' RPM · flaps ' + f0(c.flaps) + '° · L/D ' + f1(c.lOverD) +
+    A.setText(H.row, Math.round(c.rpm / 10) * 10 + ' RPM · flaps ' + f0(c.flaps) + '° · eficiencia (L/D) ' + f1(c.lOverD) +
       (tun ? '' : ' · inclinación ' + f0(Math.abs(c.bank)) + '°' + (Math.abs(c.bank) >= 1 ? (c.bank > 0 ? ' der.' : ' izq.') : '')));
     var st = c.ias < 3 ? ['sin viento', 'is-calm'] : (c.stalled ? ['pérdida · aire despegado', 'is-stall'] : (c.horn ? ['bocina · cerca de la pérdida', 'is-horn'] : ['aire pegado al ala', 'is-ok']));
     A.setText(H.flow, st[0]);
@@ -1266,11 +1266,16 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     L.el.modeBtns = modeBtns;
 
     var head = h('header', { class: 'lab-head' },
-      h('p', { class: 'lab-kicker' }, h('span', { class: 'lab-kicker-dot', 'aria-hidden': 'true' }), 'Laboratorio del aire'),
+      h('p', { class: 'lab-kicker' }, h('span', { class: 'lab-kicker-dot', 'aria-hidden': 'true' }), '04 · Aire · Laboratorio del aire'),
       h('h2', { class: 'lab-title', text: 'Cómo el aire hace volar al avión' }),
       h('p', { class: 'lab-sub', text: 'Mové los mandos y mirá en vivo cómo se mueve el aire, qué fuerzas aparecen y cómo reacciona el avión.' }),
       h('div', { class: 'lab-modes', role: 'group', 'aria-label': 'Modo del laboratorio' }, modeBtns.tunel, modeBtns.vuelo));
 
+    var how = A.acc ? A.acc('Cómo se usa el laboratorio', h('ol', { class: 'steps' },
+      h('li', { text: 'Elegí “Túnel de viento” (el avión queda quieto y el aire se mueve) o “En vuelo” (el avión vuela de verdad).' }),
+      h('li', { text: 'Empezá por un experimento guiado: te dice qué mover y qué mirar.' }),
+      h('li', { text: 'O mové vos los mandos y leé abajo, en “Qué está pasando”, qué le hace eso al aire y al avión.' }),
+      h('li', { text: 'Las capas (líneas de aire, fuerzas, presión) se prenden y apagan con los botones sobre el 3D.' })), { icon: 'help' }) : null;
     L.el.run = h('div', { class: 'lab-run', hidden: true, 'aria-live': 'polite' });
     L.el.expList = h('ul', { class: 'lab-exps' });
 
@@ -1289,14 +1294,15 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     var afBody = buildAirfoil();
     var secs = [
       secBlock('EX', 'exps', 'Experimentos', function () { return EXPS().length + ' guiados'; }, L.el.expList, true),
-      secBlock('01', 'mandos', 'Mandos', function (s, c) { return c ? (c.tunel ? f0(c.ias) + ' kt · ' + f1(c.aoa) + '°' : f0(c.ias) + ' kt') : ''; }, buildControls(), true),
+      secBlock('01', 'mandos', 'Mandos', function (s, c) { return c ? (c.tunel ? f0(c.ias) + ' nudos · ángulo ' + f1(c.aoa) + '°' : f0(c.ias) + ' nudos') : ''; }, buildControls(), true),
       secBlock('02', 'pasa', 'Qué está pasando', null, h('div', null, narrNow, nowLine, narrLogWrap, colors), true),
-      secBlock('03', 'fuerzas', 'Fuerzas', function (s, c) { return c ? 'n ' + A.fmt(c.n, 2) + ' · L/D ' + f1(c.lOverD) : ''; }, buildForces(), true)
+      secBlock('03', 'fuerzas', 'Fuerzas', function (s, c) { return c ? A.fmt(c.n, 2) + ' g · eficiencia ' + f1(c.lOverD) + ' a 1' : ''; }, buildForces(), true)
     ];
-    if (afBody) { L.el.secAirfoil = secBlock('04', 'ala', 'El ala por dentro', function (s, c) { return c ? 'cl ' + A.fmt(c.cl, 2) : ''; }, afBody, true); secs.push(L.el.secAirfoil); }
+    if (afBody) { L.el.secAirfoil = secBlock('04', 'ala', 'El ala por dentro', function (s, c) { return c ? 'sustentación ' + A.fmt(c.cl, 2) : ''; }, afBody, true); secs.push(L.el.secAirfoil); }
     secs.push(secBlock(afBody ? '05' : '04', 'curva', 'Curva de sustentación', function (s, c) { return c ? 'pérdida ' + f0(c.stallAoa) + '°' : ''; }, buildChart(), true));
 
     section.appendChild(head);
+    if (how) section.appendChild(h('div', { class: 'lab-how' }, how));
     section.appendChild(L.el.run);
     secs.forEach(function (x) { section.appendChild(x); });
     section.appendChild(h('p', { class: 'aviso lab-aviso', text: 'Física simplificada para aprender: los números son aproximados. En el avión real siempre manda el manual (POH) y tu instructor.' }));
@@ -1305,6 +1311,10 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     syncCapas();
     syncMode();
     renderNarration();
+    if (A.annotate) A.safe(function () {              // glossary popovers in the reading text only
+      var txt = section.querySelectorAll('.lab-sub, .lab-how .acc-body, .lab-sec-body > p, .lab-aviso');
+      for (var q = 0; q < txt.length; q++) A.annotate(txt[q]);
+    }, 'lab.annotate');
   };
   function stopExperimentIfAny() { if (L.exp) stopExperiment(); }
 

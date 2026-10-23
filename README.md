@@ -6,12 +6,20 @@ Una cabina 3D interactiva del **Cessna 150M (1976)** para aprender, antes de la 
 
 ## Qué tiene
 
-- **Explorar:** los 45 mandos e instrumentos de la cabina, cada uno con su ficha: dónde está, qué hace, qué se mueve en el avión, cómo se usa, errores comunes y rangos de los instrumentos. Se pueden tocar y mover en 3D.
-- **Lo básico:** 12 lecciones (las 4 fuerzas, los 3 ejes, la pérdida, los flaps, el compensador, el motor…) con animaciones del avión visto desde afuera.
-- **Recorrido:** un paseo guiado por la cabina, control por control, como el primer día con el instructor.
-- **Checklists:** antes de arrancar, arranque, prueba de motor, antes de aterrizar y apagado. Se tildan solas cuando ponés cada mando en la posición correcta.
-- **Volar:** un simulador sencillo con 8 misiones (arrancar, carretear, despegar, vuelo recto y nivelado, viraje coordinado, ascenso, pérdida y aproximación).
-- **Quiz:** preguntas de "¿dónde está?" (se contestan tocando la cabina) y de opción múltiple.
+Cinco secciones (arriba en la compu, abajo en el celular) pensadas para alguien que no sabe casi nada de aviación:
+
+- **Inicio:** de dónde arrancar. "Continuar" donde dejaste, "Tu camino" en 5 etapas (conocé la cabina, entendé cómo vuela, practicá los procedimientos, volá y resolvé situaciones, probá lo que sabés), acciones rápidas y tu avance. Mientras mirás Inicio, la cámara 3D muestra toda la cabina con un movimiento lento.
+- **Cabina:** los 45 mandos e instrumentos, cada uno con su ficha en lenguaje simple (dónde está, qué hace, cómo se usa, errores comunes) y un "Probalo" para moverlo. Se tocan y se mueven en 3D.
+- **Lecciones:** el *Recorrido guiado* (un paseo control por control, como el primer día con el instructor) y 12 *Lecciones* (las 4 fuerzas, los 3 ejes, la pérdida, los flaps, el compensador, el motor…) con el avión visto desde afuera.
+- **Practicar:** *Checklists* (se tildan solas cuando ponés cada mando bien), *Misiones y situaciones* (un simulador sencillo con 8 misiones y situaciones anormales para resolver) y un *Quiz* (tocando la cabina y de opción múltiple).
+- **Aire:** el laboratorio del aire en 3D: flujo alrededor del ala, las cuatro fuerzas, la pérdida y un túnel de viento.
+
+Ayudas en todas partes:
+
+- **Buscador** (Ctrl K, `/` o la lupa): controles, palabras, lecciones, checklists, situaciones y experimentos.
+- **Palabras explicadas:** los términos técnicos aparecen subrayados; tocalos y te los explica (con el nombre en inglés y "Verlo en 3D").
+- **Tu avance** se guarda en el navegador (nada sale de tu dispositivo) y la barra "Siguiente paso" propone qué hacer después.
+- **Tutorial** de bienvenida la primera vez (Ayuda, "Ver el tutorial" para repetirlo), tema claro y oscuro, movimiento reducido, teclado completo ("Saltar al contenido", Esc, flechas) y, en el celular, un panel deslizable (mínimo, medio, completo) sobre el 3D.
 
 > Basado en un Cessna 150M 1976. El avión de tu escuela puede tener diferencias: siempre manda el manual (POH) de ese avión y tu instructor. Esta app es para aprender, no reemplaza la instrucción de vuelo.
 
@@ -59,7 +67,16 @@ node tests/validate-controls-b.js
 node tests/validate-learning.js
 node tests/check-consistency.js
 node tests/playthrough.js
+node tests/validate-glossary.js
+node tests/validate-search.js
+node tests/validate-progress.js
+node tests/validate-lab.js
+node tests/validate-situations.js
+node tests/airflow.test.js
+node tests/exterior.test.js
 ```
+
+Páginas de prueba en el navegador (servilas con `python -m http.server`): `tests/ui-harness.html` (la interfaz con un Core de mentira), `tests/styleguide.html` (guía de estilo viva, claro/oscuro) y las `*-preview.html` de cada módulo 3D.
 
 ## Publicar en Vercel
 

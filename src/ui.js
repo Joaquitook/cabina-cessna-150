@@ -35,6 +35,30 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
  *    Narrow views (< 560 px) move the scenario button and the layout switch to the bottom row; 'Las dos' side by side moves the status
  *    and tools to the bottom of the cockpit half so they never cover the windshield.
  *
+ *  Contract v4, wave U4 — Aprender y Practicar (Lecciones · Recorrido · Checklists · Misiones y situaciones · Quiz · AIRE):
+ *  - Shared pieces (before the Lecciones section): diffDots(n) (3 dots + word), metaItem(icon, text), stepBar(n, cur, seen, onGo?) (one segment per
+ *    step; without onGo it is a static progress strip), celebrateEl() (calm CSS burst, off with reduced motion), sgCard({icon,title,text,primary,onClick})
+ *    and doneCard({id,kicker,title,text,icon,suggestions[],actions[]}) = completion screen with "Seguí con…"; pgBar(frac, text), isDone(kind,id),
+ *    firstUndone(list, kind, skipId), callK(variant,title,text) (Kit.callout), glossText(root, selector) (glossary only in reading text).
+ *  - Lecciones: cards (number/check, title, summary, minutes = steps × 1.5, steps, difficulty dots from LESSON_LEVEL, "Empezá por acá / Siguiente");
+ *    player = back + "Lección n de 12", step bar, title 32 px, text 19 px, "Probá el movimiento" with big pill buttons, "Que lo haga solo"
+ *    (Automático + Repetir sin parar) grouped, "Ver el aire", "Ahora" caption, "Qué mirar" callout; completion = doneCard with the next
+ *    lesson / "Probalo en el Aire" (LESSON_LAB) / checklist / quiz. Recorrido: same player shape + doneCard.
+ *  - Checklists: cards + "¿Por qué los pilotos usan checklists?"; a run is a STEPPER: header with static stepBar, the last 3 ticked rows (older ones in
+ *    an accordion), the CURRENT item large (name, "Dejalo en" pill with the value, "Mostrámelo en 3D", Hecho for manual items, "¿Por qué importa?"
+ *    accordion, Probalo, the live "✓ Bien — soltá" status .cl-ok), "Lo que sigue" accordion, doneCard with the next checklist / mission / quiz.
+ *    Evaluation rules (0.8 s stable + hands off) are untouched.
+ *  - Misiones y situaciones (mode 'volar'): segmented "Misiones | Situaciones", "Mostrar el aire" card (default on on computers, off on phones;
+ *    on a phone portrait with the flight pad the air explanation is shown in #panel-live, the fixed sheet header, not over the 3D), numbered
+ *    sections (Misiones as cards with progress ring + difficulty · Dónde está el avión · Instrumentos on dark glass with units and "¿Qué mide
+ *    cada número?" · Mandos); a running mission shows the mission bar, steps accordion, tip callout and a doneCard when achieved.
+ *    situations.js gets the same helpers through sitApi() (kic, callK, acc, sectHead, diffDots, pgBar, sgCard, go).
+ *  - Quiz: start card, one question per card with progress and score, big options, friendly feedback (+ "La correcta: …"), result with score ring,
+ *    "Temas para repasar" (QZ_TOPICS → lesson), the wrong ones in an accordion and "Seguí con…".
+ *  - "Siguiente paso" bar (#nextbar, NX): one suggestion from Progress + the open tab (nxPick), hidden while an activity runs or a completion
+ *    screen is up (nxBusy), dismissible per tab for the session (sessionStorage 'c150.nx'), sticky at the panel bottom (above the nav on phones).
+ *  - Subtitle on phones: positionCaption() measures the bottom row (capBottom) so it never covers Escenario / layout / Vistas; ≥ 16 px, up to 5 lines.
+ *
  * Decisions where the contract leaves room (other agents: please read):
  *  - Every Core call goes through cc(): a missing core.js, a missing method or a failed WebGL start never
  *    throws. Without Core the panels still work and a tiny local loop steps C150.Sim so Probalo, the HUD,
@@ -834,6 +858,13 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         sibs[j].focus();
       });
     });
+    var skip = $('skip-link');          // "Saltar al contenido": no cambia el hash (lo usa el ruteo), sólo mueve el foco al panel activo
+    if (skip) skip.addEventListener('click', function (e) {
+      e.preventDefault();
+      var cur = doc.querySelector('.mode:not([hidden])');
+      sheetEnsure('half');
+      if (cur) cur.focus();
+    });
     var brand = $('brand');
     if (brand) brand.addEventListener('click', function () { setMode('inicio'); sheetEnsure('half'); });
     var ring = $('btn-progress');
@@ -894,6 +925,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     panel.setAttribute('data-snap', snap);
     setAttr($('sheet-grip'), 'aria-expanded', snap === 'peek' ? 'false' : 'true');
     if (remember && mode) { SH.mem[mode] = snap; store.set('sheet', SH.mem); }
+    positionCaption();
     kick();
   }
   function sheetOnMode() { if (SH.active && mode) sheetApply(SH.mem[mode] || 'half', false); }
@@ -1424,14 +1456,31 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     positionCaption();
   }
   var captionText = '';
+  /** Bottom offset (px) that keeps a subtitle above the controls of the bottom row of the 3D view (Escenario, layout switch,
+   *  Vistas): measured, because on phones those rows stack (2 rows when a demonstration shows "Volver al escenario"). */
+  function capBottom() {
+    var vp = $('viewport');
+    if (!vp) return 62;
+    var H = vp.clientHeight, vr = vp.getBoundingClientRect(), top = H;
+    ['vp-tools', 'vp-cams', 'vp-scenario', 'vp-scenario-back'].forEach(function (id) {
+      var el = $(id);
+      if (!el || !el.offsetHeight) return;
+      var t = el.getBoundingClientRect().top - vr.top;
+      if (t > H * 0.45 && t < top) top = t;
+    });
+    var lay = doc.querySelector('.vp-layout');
+    if (lay && lay.offsetHeight) { var tl = lay.getBoundingClientRect().top - vr.top; if (tl > H * 0.45 && tl < top) top = tl; }
+    return top < H ? Math.max(62, Math.round(H - top + 8)) : 62;
+  }
   function positionCaption() {
     var cap = $('inset-caption');
     if (!cap) return;
     var dos = layoutMode === 'dos';
     if (!captionText || (!dos && !insetRect && mainView !== 'exterior')) { cap.hidden = true; return; }
+    if (airInPanel()) { cap.hidden = true; return; }              // phones in Volar: the 3D view is full, the explanation goes in the panel
     cap.hidden = false;
     var st = cap.style;
-    toggleClass(cap, 'is-big', dos || mainView === 'exterior' || mirroring());
+    toggleClass(cap, 'is-big', dos || mainView === 'exterior' || mirroring() || !insetRect || insetRect.w < 240);   // a subtitle (not a caption under a wide inset)
     if (dos) {                                     // 'Las dos': subtitle at the bottom of the exterior pane
       var R = dosRects(), r = R.exterior, vp = $('viewport'), H = vp ? vp.clientHeight : 0;
       st.left = Math.round(r.x + 12) + 'px'; st.right = 'auto'; st.top = 'auto';
@@ -1447,7 +1496,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       // left+right+fit-content+auto margins: centred, and it may use the whole width (left:50% would halve it);
       // phones get 8 px gutters so a long lesson line needs fewer lines
       var vpw = $('viewport') ? $('viewport').clientWidth : 0, gut = vpw && vpw < 560 ? 8 : 12;
-      st.left = gut + 'px'; st.right = gut + 'px'; st.top = 'auto'; st.bottom = (flypadShown() ? VO.overlay.offsetHeight + 74 : 62) + 'px';
+      st.left = gut + 'px'; st.right = gut + 'px'; st.top = 'auto'; st.bottom = (flypadShown() ? VO.overlay.offsetHeight + 74 : capBottom()) + 'px';
       st.width = 'fit-content'; st.marginLeft = st.marginRight = 'auto';
       st.maxWidth = 'min(560px, calc(100% - ' + (2 * gut) + 'px))'; st.transform = 'none'; st.textAlign = 'center';
     } else {
@@ -1459,6 +1508,21 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   function updateCaption() {
     var t = getCaption();
     if (t !== captionText) { captionText = t; setText($('inset-caption'), t); positionCaption(); }
+    updateAirLive();
+  }
+  /** Phones in Volar with the flight pad over the 3D view and the sheet open: the air explanation is shown in the panel
+   *  (card "Mostrar el aire"), because over the 3D view it would cover the status chips, the inset and the pad. */
+  function airInPanel() {
+    if (mode !== 'volar' || !flypadShown() || !voAirOn()) return false;
+    var pn = $('panel');
+    return !!pn && pn.getAttribute('data-snap') !== 'peek';
+  }
+  function updateAirLive() {
+    var el = $('panel-live');
+    if (!el) return;
+    var on = airInPanel() && !!captionText;
+    if (on) setText(el, captionText);
+    if (el.hidden === on) el.hidden = !on;
   }
 
   /* ---------------------------------------------------------------- 3D callouts (contract v3)
@@ -1596,8 +1660,10 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     demoOn = on;
     if (back) back.hidden = !on;
     if (box) toggleClass(box, 'is-demo', on);
+    toggleClass($('app'), 'is-demonstrating', on);
     syncScenarioBtn();
     positionPaneLabels();
+    positionCaption();
   }
   /** Ends the demonstration (pose / animation) wherever it came from; a lesson step keeps its buttons in sync. */
   function endDemo() {
@@ -1715,9 +1781,10 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     var e = s.engine || {}, a = s.air || {};
     syncDemo();
     // during a demonstration the chips show the airplane of the demonstration (the mirrored state), labelled as such
-    status.demo.el.hidden = !demoOn;
+    if (status.demo.el.hidden === demoOn) status.demo.el.hidden = !demoOn;           // only touch the DOM when it changes
     if (demoOn) setChip(status.demo, '', demoLabel(), '');
-    status.paused.el.hidden = !s.paused || demoOn;
+    var pausedHidden = !s.paused || demoOn;
+    if (status.paused.el.hidden !== pausedHidden) status.paused.el.hidden = pausedHidden;
     if (e.running) setChip(status.engine, 'Motor', 'en marcha', 'is-on', Math.round(num(e.rpm, 0) / 10) * 10 + ' RPM');
     else if (e.cranking) setChip(status.engine, 'Motor', 'arrancando…', 'is-warn');
     else setChip(status.engine, 'Motor', 'apagado', '');
@@ -1866,7 +1933,10 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     if (!el || !app) return;
     var shown = !el.hidden;
     toggleClass(app, 'has-coach', shown);
-    if (shown) { var hgt = el.offsetHeight; if (hgt) app.style.setProperty('--coach-h', hgt + 'px'); }
+    if (shown) {                                       // only write the custom property when the height changed (it restyles the whole app)
+      var hgt = el.offsetHeight;
+      if (hgt && hgt !== COACH.h) { COACH.h = hgt; app.style.setProperty('--coach-h', hgt + 'px'); }
+    }
   }
   function coachDismiss() {
     if (!COACH.tip) return;
@@ -1909,7 +1979,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     COACH.tip = tip;
     setText(COACH.txt, text);
     var act = tip.action;
-    COACH.act.hidden = !act;
+    if (COACH.act.hidden === !!act) COACH.act.hidden = !act;
     if (act) setText(COACH.act, act[0]);
     if (COACH.shownId !== tip.id) {
       COACH.shownId = tip.id;
@@ -2962,16 +3032,80 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
 
   /* Panel header (same family as the AIRE lab): numbered mono kicker (the tab's place in the order) + big display title
    * + short lead, closed by a hairline. */
-  var MODE_KICKER = { 'Lo básico': '02 · Lecciones', Recorrido: '03 · Paseo guiado', Checklists: '04 · Listas del manual',
-    Volar: '05 · Simulador', Quiz: '07 · Repaso' };
+  var MODE_KICKER = { 'Lo básico': '02 · Lecciones', Lecciones: '02 · Lecciones', Recorrido: '02 · Lecciones · Recorrido guiado',
+    'Recorrido guiado': '02 · Lecciones · Recorrido guiado', Checklists: '03 · Practicar · Checklists',
+    Volar: '03 · Practicar · Misiones', 'Misiones y situaciones': '03 · Practicar · Misiones', Quiz: '03 · Practicar · Quiz' };
   function modeKicker(text) {
     return h('p', { class: 'mode-kicker' }, h('span', { class: 'mode-kicker-dot', 'aria-hidden': 'true' }), text);
   }
-  function modeHead(title, sub) {
+  function modeHead(title, sub, extra) {
     return h('div', { class: 'mode-head' }, MODE_KICKER[title] ? modeKicker(MODE_KICKER[title]) : null,
-      h('h2', { class: 'placard mode-title', text: title }), sub ? h('p', { class: 'mode-sub', text: sub }) : null);
+      h('h2', { class: 'placard mode-title', text: title }), sub ? h('p', { class: 'mode-sub', text: sub }) : null, extra || null);
   }
   function emptyState(text) { return h('p', { class: 'empty', text: text }); }
+
+  /* ---- Contract v4, wave U4 — shared pieces of Lecciones and Practicar (styles: "v4 · U4" block of styles.css) ---- */
+  var DIFF_TXT = ['', 'Fácil', 'Intermedio', 'Más difícil'];
+  /** Three dots, n filled: difficulty (the words are for everybody, not only a colour or a count). */
+  function diffDots(n) {
+    n = clamp(Math.round(num(n, 1)), 1, 3);
+    var w = h('span', { class: 'diff', role: 'img', 'aria-label': 'Dificultad: ' + DIFF_TXT[n].toLowerCase() });
+    for (var i = 1; i <= 3; i++) w.appendChild(h('i', { class: i <= n ? 'on' : null, 'aria-hidden': 'true' }));
+    w.appendChild(h('span', { class: 'diff-t', 'aria-hidden': 'true', text: DIFF_TXT[n] }));
+    return w;
+  }
+  function metaItem(iconName, text) { return h('span', { class: 'meta-i' }, kic(iconName), h('span', { text: text })); }
+  /** One segment per step; the current one is orange, the ones already seen are filled. */
+  function stepBar(n, cur, seen, onGo, label) {
+    var w = h('div', { class: 'stepbar', role: 'group', 'aria-label': label || 'Pasos' });
+    for (var k = 0; k < n; k++) {
+      (function (k) {
+        var on = k === cur, st = seen && seen[k];
+        var cls = 'stepbar-seg' + (on ? ' is-cur' : (st === 'skip' ? ' is-skip' : (st ? ' is-seen' : '')));
+        if (!isFn(onGo)) { w.appendChild(h('span', { class: cls + ' is-static', 'aria-hidden': 'true' })); return; }   // not clickable (checklists go in order)
+        w.appendChild(h('button', {
+          type: 'button', class: cls, 'aria-label': 'Ir al paso ' + (k + 1), 'aria-current': on ? 'step' : null, onclick: function () { onGo(k); }
+        }));
+      })(k);
+    }
+    return w;
+  }
+  /** A calm burst of small dots (CSS only; static with reduced motion). */
+  function celebrateEl() {
+    var w = h('div', { class: 'celebrate', 'aria-hidden': 'true' });
+    for (var i = 0; i < 16; i++) {
+      w.appendChild(h('i', { style: { '--x': ((i * 41 + 7) % 100) + '%', '--dx': (((i * 29) % 60) - 30) + 'px', '--dl': ((i % 8) * 0.07).toFixed(2) + 's', '--c': String(i % 4) } }));
+    }
+    return w;
+  }
+  /** "Seguí con…" suggestion: icon, title, one line, chevron. */
+  function sgCard(s) {
+    return h('button', { type: 'button', class: 'sg' + (s.primary ? ' is-primary' : ''), onclick: s.onClick },
+      h('span', { class: 'sg-ico', 'aria-hidden': 'true' }, kic(s.icon || 'chevron-right')),
+      h('span', { class: 'sg-main' }, h('strong', { text: s.title }), s.text ? h('span', { text: s.text }) : null),
+      h('span', { class: 'sg-go', 'aria-hidden': 'true' }, kic('chevron-right')));
+  }
+  /** Completion screen: medal, title, one sentence, "Seguí con…" suggestions and secondary actions. */
+  function doneCard(o) {
+    var sg = arr(o.suggestions).filter(Boolean);
+    return h('article', { class: 'card done-card done-card--u4', 'aria-labelledby': o.id || null },
+      celebrateEl(),
+      h('span', { class: 'done-medal', 'aria-hidden': 'true' }, kic(o.icon || 'trophy')),
+      h('p', { class: 'done-k', text: o.kicker || '¡Muy bien!' }),
+      h('h3', { class: 'done-t', id: o.id || null, tabindex: o.id ? '-1' : null, text: o.title }),
+      o.text ? h('p', { class: 'done-p', text: o.text }) : null,
+      sg.length ? h('div', { class: 'sg-wrap' }, h('p', { class: 'sg-k', text: 'Seguí con…' }), h('div', { class: 'sg-list' }, sg.map(sgCard))) : null,
+      o.actions ? h('div', { class: 'btn-row done-actions' }, o.actions) : null);
+  }
+  function pgBar(frac, text, ok) {
+    return h('div', { class: 'pg-line' }, progressBar(frac, ok), h('span', { class: 'pg-t', text: text }));
+  }
+  /** Not yet done by the student? (Progress when present, else false.) */
+  function isDone(kind, id) { var p = PG(); return !!(p && safe(function () { return p.get(kind, id); }, 'progress.get')); }
+  function firstUndone(list, kind, skipId) {
+    for (var i = 0; i < list.length; i++) if (list[i] && list[i].id !== skipId && !isDone(kind, list[i].id)) return i;
+    return -1;
+  }
 
   function glossaryBlock() {
     if (!GLOSSARY.length) return null;
@@ -2990,29 +3124,47 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     }
     input.addEventListener('input', fill);
     fill();
-    return h('details', { class: 'fold' },
-      h('summary', null, 'Glosario · ' + GLOSSARY.length + ' palabras'),
-      h('div', { class: 'search', style: { 'margin-top': '0' } }, icon('search'), input), dl);
+    return acc('Glosario · ' + GLOSSARY.length + ' palabras', h('div', null,
+      h('p', { class: 'soft small', text: 'Todas las palabras técnicas que aparecen en la app, explicadas en simple.' }),
+      h('div', { class: 'search', style: { 'margin-top': '0' } }, icon('search'), input), dl), { icon: 'book' });
   }
+
+  /* ---- Lecciones: lista de tarjetas (duración, dificultad, hecha) ---- */
+  var LESSON_LEVEL = { 'cuatro-fuerzas': 1, 'tres-ejes': 1, flaps: 1, motor: 1, 'en-tierra': 1, 'primera-clase': 1,
+    'ala-angulo-ataque': 2, perdida: 2, coordinacion: 2, compensador: 2, instrumentos: 2, 'actitud-potencia': 3 };
+  /** Lesson → the AIRE experiment that shows the same idea (data/lab.js ids), for "Probalo en el Aire". */
+  var LESSON_LAB = { 'cuatro-fuerzas': 'fuerzas', 'tres-ejes': 'alerones', 'ala-angulo-ataque': 'perdida', perdida: 'perdida',
+    coordinacion: 'timon', flaps: 'flaps', compensador: 'profundidad', motor: 'acelerador', 'actitud-potencia': 'acelerador' };
+  function lessonMin(l) { return Math.max(3, Math.round(arr(l.pasos).length * 1.5)); }
+  function lessonLevel(l) { return LESSON_LEVEL[l.id] || 2; }
 
   function lbRenderList() {
     var v = LB.listView;
     clear(v);
-    v.appendChild(modeHead('Lo básico', 'Lecciones cortas para entender cómo vuela el avión y qué hace cada mando, con animaciones del avión visto desde afuera.'));
+    var doneN = LESSONS.filter(function (l) { return LB.done.indexOf(l.id) >= 0; }).length;
+    v.appendChild(modeHead('Lecciones', 'Cada lección explica una idea de cómo vuela el avión, con animaciones y botones para probarla vos. Van de lo más simple a lo más fino: conviene hacerlas en orden.'));
     if (!LESSONS.length) { v.appendChild(emptyState('Las lecciones todavía no están cargadas.')); }
     else {
-      var ul = h('ul', { class: 'rows', 'aria-label': 'Lecciones' });
+      var nextIdx = -1;
+      for (var q = 0; q < LESSONS.length; q++) if (LB.done.indexOf(LESSONS[q].id) < 0) { nextIdx = q; break; }
+      v.appendChild(h('div', { class: 'lc-prog' }, pgBar(LESSONS.length ? doneN / LESSONS.length : 0, doneN + ' de ' + LESSONS.length + ' hechas', doneN === LESSONS.length)));
+      var ul = h('ul', { class: 'lc-list', 'aria-label': 'Lecciones' });
       LESSONS.forEach(function (l, i) {
-        var done = LB.done.indexOf(l.id) >= 0;
-        ul.appendChild(h('li', null, h('button', { type: 'button', class: 'row', onclick: function () { lbOpen(i); } },
-          h('span', { class: 'row-num', text: ('0' + (i + 1)).slice(-2) }),
-          h('span', { class: 'row-main' }, h('span', { class: 'row-name', text: l.titulo || 'Lección' }), l.resumen ? h('span', { class: 'row-sub', text: l.resumen }) : null),
-          h('span', { class: 'row-end' }, done ? h('span', { class: 'row-done' }, 'Hecha', h('span', { class: 'sr-only', text: ' (lección completada)' })) : arr(l.pasos).length + ' pasos'))));
+        var done = LB.done.indexOf(l.id) >= 0, isNext = i === nextIdx, n = arr(l.pasos).length;
+        ul.appendChild(h('li', null, h('button', { type: 'button', class: 'lcard' + (done ? ' is-done' : '') + (isNext ? ' is-next' : ''), onclick: function () { lbOpen(i); } },
+          h('span', { class: 'lcard-n', 'aria-hidden': 'true' }, done ? kic('check') : ('0' + (i + 1)).slice(-2)),
+          h('span', { class: 'lcard-main' },
+            isNext ? h('span', { class: 'lcard-flag', text: LB.done.length ? 'Siguiente' : 'Empezá por acá' }) : null,
+            h('span', { class: 'lcard-t', text: l.titulo || 'Lección' }),
+            l.resumen ? h('span', { class: 'lcard-d', text: l.resumen }) : null,
+            h('span', { class: 'lcard-meta' }, metaItem('clock', lessonMin(l) + ' min'), metaItem('list', n + (n === 1 ? ' paso' : ' pasos')), diffDots(lessonLevel(l)),
+              done ? h('span', { class: 'lcard-ok' }, kic('check'), 'Hecha') : null)),
+          h('span', { class: 'lcard-go', 'aria-hidden': 'true' }, kic('chevron-right')))));
       });
       v.appendChild(ul);
     }
     var g = glossaryBlock();
-    if (g) v.appendChild(g);
+    if (g) v.appendChild(h('div', { class: 'lc-gloss' }, g));
   }
 
   function lbOpen(idx) {
@@ -3159,9 +3311,16 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     syncMainView();
   }
 
+  /** Kit callout (icon + title + text) with a plain fallback. */
+  function callK(variant, title, text) {
+    var K = C150.Kit;
+    if (K && isFn(K.callout)) return K.callout({ variant: variant, title: title, text: text });
+    return h('aside', { class: 'callout callout--' + variant }, h('h3', { class: 'placard', text: title }), h('p', { text: text }));
+  }
+
   function lbActions(p) {
     var acts = arr(p.acciones).filter(function (a) { return a && a.pose && a.etiqueta; });
-    LB.actBtns = []; LB.autoBtn = null; LB.loopBtn = null;
+    LB.actBtns = []; LB.autoBtn = null; LB.loopBtn = null; LB.airBtn = null;
     if (!acts.length && !p.anim) return null;
     var grid = h('div', { class: 'lb-act-grid', role: 'group', 'aria-label': 'Movimientos del avión' });
     acts.forEach(function (a) {
@@ -3169,28 +3328,52 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       LB.actBtns.push({ b: b, pose: a.pose });
       grid.appendChild(b);
     });
-    var row = null;
+    var play = null;
     if (p.anim) {
-      LB.autoBtn = h('button', { type: 'button', class: 'btn lb-auto', 'aria-pressed': 'false', onclick: function () { lbAuto(p); } }, icon('play'), 'Automático');
+      LB.autoBtn = h('button', { type: 'button', class: 'btn lb-auto', 'aria-pressed': 'false', onclick: function () { lbAuto(p); } }, kic('play'), 'Automático');
       LB.loopBtn = h('button', {
         type: 'button', class: 'lb-loop', role: 'switch', 'aria-checked': 'false',
         onclick: function () { LB.loop = !LB.loop; store.set('lessonLoop', LB.loop); if (LB.auto) lbAuto(p); else lbSyncActions(); }
       }, h('span', { class: 'lb-loop-track', 'aria-hidden': 'true' }), 'Repetir sin parar');
-      row = h('div', { class: 'lb-auto-row' }, LB.autoBtn, LB.loopBtn);
+      play = h('div', { class: 'lb-play', role: 'group', 'aria-label': 'Animación automática' },
+        h('span', { class: 'lb-play-k', text: 'Que lo haga solo' }), h('div', { class: 'lb-play-row' }, LB.autoBtn, LB.loopBtn));
     }
+    var air = null;
     if (p.aire && has('setAirflow')) {
       LB.airBtn = h('button', {
         type: 'button', class: 'lb-loop lb-air', role: 'switch', 'aria-checked': LB.air ? 'true' : 'false',
         title: 'Muestra el aire alrededor del avión: líneas de flujo, fuerzas y giros',
         onclick: function () { LB.air = !LB.air; store.set('lessonAir', LB.air); lbAir(p); lbSyncActions(); }
       }, h('span', { class: 'lb-loop-track', 'aria-hidden': 'true' }), 'Ver el aire');
-      if (row) row.appendChild(LB.airBtn);
-      else row = h('div', { class: 'lb-auto-row' }, LB.airBtn);
+      air = h('div', { class: 'lb-airrow' }, LB.airBtn, h('span', { class: 'lb-air-d', text: 'Dibuja el aire que pasa por el avión.' }));
     }
     return h('section', { class: 'lb-actions', 'aria-label': 'Probá el movimiento' },
       h('p', { class: 'lb-actions-title' }, h('span', { text: 'Probá el movimiento' }),
         acts.length ? h('small', { text: 'Tocá un botón: el avión lo hace y se queda así, para que lo mires con calma.' }) : null),
-      acts.length ? grid : null, row);
+      acts.length ? grid : null, play, air);
+  }
+
+  function lbLabTitle(id) {
+    var xs = arr(DATA.labExperiments);
+    for (var i = 0; i < xs.length; i++) if (xs[i] && xs[i].id === id) return xs[i].titulo || id;
+    return null;
+  }
+  /** "Seguí con…" after a lesson: the next one not done yet, the matching AIRE experiment, then the next area of the path. */
+  function lbSuggestions(L) {
+    var out = [], ni = -1, k;
+    for (k = LB.idx + 1; k < LESSONS.length; k++) if (LB.done.indexOf(LESSONS[k].id) < 0) { ni = k; break; }
+    if (ni < 0) for (k = 0; k < LESSONS.length; k++) if (k !== LB.idx && LB.done.indexOf(LESSONS[k].id) < 0) { ni = k; break; }
+    if (ni >= 0) {
+      out.push({ primary: true, icon: 'book', title: 'Lección: ' + (LESSONS[ni].titulo || ''), text: lessonMin(LESSONS[ni]) + ' min · ' + DIFF_TXT[lessonLevel(LESSONS[ni])].toLowerCase(),
+        onClick: function () { lbOpen(ni); } });
+    }
+    var exp = LESSON_LAB[L && L.id], et = exp && labOk() ? lbLabTitle(exp) : null;
+    if (et) out.push({ icon: 'wind', title: 'Probalo en el Aire', text: 'Experimento: ' + et, onClick: function () { UI.openLab(exp); sheetEnsure('half'); } });
+    if (ni < 0) {
+      out.push({ primary: true, icon: 'checklist', title: 'Checklist “Antes de arrancar”', text: 'Practicá los pasos de verdad, en la cabina 3D', onClick: function () { openChecklist('antes-arrancar'); } });
+      out.push({ icon: 'quiz', title: 'Quiz rápido', text: 'Probá lo que aprendiste', onClick: function () { setMode('quiz'); scrollPanelTop(); } });
+    }
+    return out;
   }
 
   function lbRenderStep(run) {
@@ -3199,18 +3382,17 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     LB.actBtns = []; LB.autoBtn = null; LB.loopBtn = null; LB.nowEl = null;
     if (!L) return;
     var pasos = arr(L.pasos), n = pasos.length;
-    v.appendChild(h('div', { class: 'detail-top' },
-      h('button', { type: 'button', class: 'btn btn--ghost btn--small back-btn', onclick: lbBack }, icon('back'), 'Lecciones')));
+    v.appendChild(h('div', { class: 'detail-top lp-top' },
+      h('button', { type: 'button', class: 'btn btn--ghost btn--small back-btn', onclick: lbBack }, icon('back'), 'Lecciones'),
+      h('span', { class: 'lp-count', text: 'Lección ' + (LB.idx + 1) + ' de ' + LESSONS.length })));
     if (LB.finished) {
-      var next = LESSONS[LB.idx + 1];
-      v.appendChild(h('div', { class: 'card done-card' },
-        h('h3', { class: 'placard', text: '¡Lección terminada!' }),
-        h('p', { text: 'Completaste “' + (L.titulo || 'la lección') + '”. Si querés, repetila: las animaciones se entienden mejor la segunda vez.' }),
-        h('div', { class: 'btn-row' },
-          next ? h('button', { type: 'button', class: 'btn btn--primary', onclick: function () { lbOpen(LB.idx + 1); } }, 'Siguiente: ' + (next.titulo || 'lección'), icon('next'))
-            : h('button', { type: 'button', class: 'btn btn--primary', onclick: function () { openChecklist('antes-arrancar'); } }, 'Seguí con las checklists', icon('next')),
-          h('button', { type: 'button', class: 'btn', onclick: function () { lbOpen(LB.idx); } }, icon('retry'), 'Repetir'),
-          h('button', { type: 'button', class: 'btn btn--ghost', onclick: lbBack }, 'Todas las lecciones'))));
+      v.appendChild(doneCard({
+        id: 'lb-done-title', kicker: 'Lección terminada', title: L.titulo || '¡Lección terminada!',
+        text: 'Muy bien: completaste ' + n + (n === 1 ? ' paso.' : ' pasos.') + ' Si querés, repetila: las animaciones se entienden mejor la segunda vez.',
+        suggestions: lbSuggestions(L),
+        actions: [h('button', { type: 'button', class: 'btn', onclick: function () { lbOpen(LB.idx); } }, icon('retry'), 'Repetir'),
+          h('button', { type: 'button', class: 'btn btn--ghost', onclick: lbBack }, 'Todas las lecciones')]
+      }));
       return;
     }
     var p = pasos[LB.i] || {};
@@ -3222,35 +3404,27 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         : 'Ves el avión desde afuera; el cuadrito muestra cómo se ve desde adentro: volante, horizonte e instrumentos.')
       : '';
     if (foco) hint += (hint ? ' ' : '') + 'En la cabina, lo que titila es ' + ctrlName(foco) + '.';
-    var dots = h('div', { class: 'dots', role: 'group', 'aria-label': 'Pasos de la lección' });
-    pasos.forEach(function (q, k) {
-      dots.appendChild(h('button', {
-        type: 'button', class: LB.seen[k] ? 'is-seen' : null, 'aria-label': 'Paso ' + (k + 1) + ': ' + (q.titulo || ''),
-        'aria-current': k === LB.i ? 'step' : null, onclick: function () { lbGo(k); }
-      }));
-    });
     var last = LB.i >= n - 1;
     var titleId = 'lb-step-title';
     LB.nowEl = h('p', { class: 'lb-now', hidden: true }, h('span', { class: 'lb-now-k', text: 'Ahora' }), h('span', { class: 'lb-now-t' }));
-    v.appendChild(h('article', { class: 'card step-card', 'aria-labelledby': titleId },
-      h('p', { class: 'kicker', text: 'Lección ' + (LB.idx + 1) + ' · ' + (L.titulo || '') }),
-      h('p', { class: 'step-n', text: 'Paso ' + (LB.i + 1) + ' de ' + n }),
+    v.appendChild(h('article', { class: 'card step-card lp-card', 'aria-labelledby': titleId },
+      h('p', { class: 'kicker', text: L.titulo || '' }),
+      h('div', { class: 'lp-prog' }, stepBar(n, LB.i, LB.seen, lbGo, 'Pasos de la lección'), h('span', { class: 'step-n', text: 'Paso ' + (LB.i + 1) + ' de ' + n })),
       h('h2', { class: 'placard', id: titleId, tabindex: '-1', text: p.titulo || '' }),
       p.texto ? h('p', { class: 'step-text', text: p.texto }) : null,
       lbActions(p),
       LB.nowEl,
-      hint ? h('p', { class: 'step-hint', text: hint }) : null,
+      hint ? callK('dato', 'Qué mirar', hint) : null,
       foco ? h('div', { class: 'btn-row' },
-        h('button', { type: 'button', class: 'btn btn--small', onclick: function () { UI.showControl(foco); } }, 'Ficha: ' + ctrlName(foco))) : null,
-      h('div', { class: 'btn-row btn-row--split' },
+        h('button', { type: 'button', class: 'btn btn--small', onclick: function () { UI.showControl(foco); } }, kic('target'), 'Ver la ficha: ' + ctrlName(foco))) : null,
+      h('div', { class: 'btn-row btn-row--split lp-nav' },
         h('button', { type: 'button', class: 'btn', disabled: LB.i === 0, onclick: function () { lbGo(LB.i - 1); } }, icon('back'), 'Anterior'),
         last
-          ? h('button', { type: 'button', class: 'btn btn--primary', onclick: lbFinish }, 'Terminar', icon('check'))
-          : h('button', { type: 'button', class: 'btn btn--primary', onclick: function () { lbGo(LB.i + 1); } }, 'Siguiente', icon('next'))),
-      dots));
+          ? h('button', { type: 'button', class: 'btn btn--primary', onclick: lbFinish }, 'Terminar la lección', icon('check'))
+          : h('button', { type: 'button', class: 'btn btn--primary', onclick: function () { lbGo(LB.i + 1); } }, 'Siguiente', icon('next')))));
     if (run) lbRun(p);
     else lbSyncActions();
-    gloss(v);
+    glossText(v, '.step-text, .callout-body, .lb-actions-title small');
   }
   function lbGo(k) {
     var L = LESSONS[LB.idx];
@@ -3268,6 +3442,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     lbLeave();
     lbRenderStep(false);
     scrollPanelTop();
+    var dt = $('lb-done-title');
+    if (dt) safe(function () { dt.focus({ preventScroll: true }); });
   }
   function lbBack() {
     lbLeave();
@@ -3326,37 +3502,41 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   function trRender() {
     var v = TR.view;
     clear(v);
-    v.appendChild(modeHead('Recorrido', 'Tu primer día en la cabina: un paseo guiado, control por control, en el orden en que los vas a usar.'));
+    v.appendChild(modeHead('Recorrido guiado', 'Tu primer día en la cabina: un paseo control por control, en el orden en que los vas a usar. En cada paso el control titila en el 3D.'));
     if (!TOUR.length) { v.appendChild(emptyState('El recorrido todavía no está cargado.')); return; }
     var n = TOUR.length;
     if (TR.finished) {
-      v.appendChild(h('div', { class: 'card done-card' },
-        h('h3', { class: 'placard', text: '¡Recorrido completo!' }),
-        h('p', { text: 'Ya pasaste por los ' + n + ' puntos de la cabina. El próximo paso: las lecciones de Lo básico (cómo vuela el avión). Después, las checklists.' }),
-        h('div', { class: 'btn-row' },
-          h('button', { type: 'button', class: 'btn btn--primary', onclick: function () { setMode('basico'); scrollPanelTop(); } }, 'Lo básico', icon('next')),
-          h('button', { type: 'button', class: 'btn', onclick: function () { setMode('checklists'); } }, 'Checklists'),
-          h('button', { type: 'button', class: 'btn btn--ghost', onclick: function () { trGo(0); } }, icon('retry'), 'Empezar de nuevo'))));
+      var nl = firstUndone(LESSONS, 'leccion');
+      v.appendChild(doneCard({
+        id: 'tr-done-title', kicker: 'Recorrido completo', title: '¡Ya conocés la cabina!',
+        text: 'Pasaste por los ' + n + ' puntos de la cabina. Ahora toca entender por qué vuela el avión, y después practicar los pasos.',
+        suggestions: [
+          { primary: true, icon: 'book', title: nl >= 0 ? 'Lección: ' + (LESSONS[nl].titulo || '') : 'Lecciones', text: 'Cómo vuela un avión, paso a paso', onClick: function () { setMode('basico'); scrollPanelTop(); if (nl >= 0) lbOpen(nl); } },
+          { icon: 'checklist', title: 'Checklist “Antes de arrancar”', text: 'Los primeros pasos antes de prender el motor', onClick: function () { openChecklist('antes-arrancar'); } }
+        ],
+        actions: [h('button', { type: 'button', class: 'btn btn--ghost', onclick: function () { trGo(0); } }, icon('retry'), 'Empezar de nuevo')]
+      }));
+      var tt = $('tr-done-title');
+      if (tt && mode === 'recorrido') safe(function () { tt.focus({ preventScroll: true }); });
       return;
     }
     var st = TOUR[TR.i], c = CTRL[st.control];
     var last = TR.i >= n - 1;
-    v.appendChild(h('div', { class: 'cl-progress', style: { margin: '0 0 12px' } }, progressBar((TR.i + 1) / n), h('span', { class: 'pct', text: (TR.i + 1) + '/' + n })));
-    v.appendChild(h('article', { class: 'card step-card', 'aria-labelledby': 'tr-title' },
-      h('p', { class: 'step-n', text: 'Paso ' + (TR.i + 1) + ' de ' + n }),
+    v.appendChild(h('article', { class: 'card step-card lp-card', 'aria-labelledby': 'tr-title' },
+      h('p', { class: 'kicker' }, c ? dot(catColor(c)) : null, c ? c.nombre : 'Control'),
+      h('div', { class: 'lp-prog' }, progressBar((TR.i + 1) / n), h('span', { class: 'step-n', text: 'Paso ' + (TR.i + 1) + ' de ' + n })),
       h('h2', { class: 'placard', id: 'tr-title', tabindex: '-1', text: st.titulo || (c ? c.nombre : '') }),
-      c ? h('p', { class: 'kicker' }, dot(catColor(c)), c.nombre) : null,
       st.texto ? h('p', { class: 'step-text', text: st.texto }) : null,
       c ? h('div', { class: 'btn-row' },
-        h('button', { type: 'button', class: 'btn btn--small', onclick: trFocus }, icon('target'), 'Mostrámelo de nuevo'),
+        h('button', { type: 'button', class: 'btn btn--small', onclick: trFocus }, kic('target'), 'Mostrámelo de nuevo'),
         h('button', { type: 'button', class: 'btn btn--small', onclick: function () { UI.showControl(st.control); } }, 'Más detalles', icon('next'))) : null,
-      h('div', { class: 'btn-row btn-row--split' },
+      callK('tip', 'Si lo perdés de vista', 'El control de cada paso titila en la cabina. Tocá “Mostrámelo de nuevo” y la cámara va hacia él.'),
+      h('div', { class: 'btn-row btn-row--split lp-nav' },
         h('button', { type: 'button', class: 'btn', disabled: TR.i === 0, onclick: function () { trGo(TR.i - 1); } }, icon('back'), 'Anterior'),
         last
-          ? h('button', { type: 'button', class: 'btn btn--primary', onclick: function () { TR.finished = true; progMark('recorrido', 'tour'); store.set('tourStep', 0); trRender(); trFocus(); } }, 'Terminar', icon('check'))
+          ? h('button', { type: 'button', class: 'btn btn--primary', onclick: function () { TR.finished = true; progMark('recorrido', 'tour'); store.set('tourStep', 0); trRender(); trFocus(); } }, 'Terminar el recorrido', icon('check'))
           : h('button', { type: 'button', class: 'btn btn--primary', onclick: function () { trGo(TR.i + 1); } }, 'Siguiente', icon('next')))));
-    v.appendChild(h('p', { class: 'aviso', text: 'El control de cada paso titila en la cabina. Si lo perdés de vista, tocá “Mostrámelo de nuevo”.' }));
-    gloss(v, { control: st.control });
+    glossText(v, '.step-text, .callout-body', { control: st.control });
   }
 
   modeImpl.recorrido = {
@@ -3376,21 +3556,35 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     return m.length >= 2 ? [m[0], m.slice(1).join(' — ')] : [t, ''];
   }
 
+  function clMin(cl) { return Math.max(2, Math.round(arr(cl.items).length * 0.5)); }
   function clRenderList() {
     var v = CL.listView;
     clear(v);
-    v.appendChild(modeHead('Checklists', 'Las listas del manual, paso a paso. Cada ítem se tilda solo cuando hacés lo que pide, en la cabina 3D o con el “Probalo”.'));
+    v.appendChild(modeHead('Checklists', 'Una checklist es la lista de pasos que el piloto repite siempre, en el mismo orden, para no olvidarse de nada. Acá la hacés de verdad en la cabina 3D: cada paso se tilda solo cuando lo hacés bien.'));
     if (!CHECKLISTS.length) { v.appendChild(emptyState('Las checklists todavía no están cargadas.')); return; }
-    var ul = h('ul', { class: 'rows', 'aria-label': 'Checklists' });
+    var doneN = CHECKLISTS.filter(function (c) { return CL.doneIds.indexOf(c.id) >= 0; }).length;
+    var nextIdx = -1;
+    for (var q = 0; q < CHECKLISTS.length; q++) if (CL.doneIds.indexOf(CHECKLISTS[q].id) < 0) { nextIdx = q; break; }
+    v.appendChild(h('div', { class: 'lc-prog' }, pgBar(doneN / CHECKLISTS.length, doneN + ' de ' + CHECKLISTS.length + ' hechas', doneN === CHECKLISTS.length)));
+    var ul = h('ul', { class: 'lc-list', 'aria-label': 'Checklists' });
     CHECKLISTS.forEach(function (cl, i) {
-      var done = CL.doneIds.indexOf(cl.id) >= 0;
-      ul.appendChild(h('li', null, h('button', { type: 'button', class: 'row', onclick: function () { clOpen(i); } },
-        h('span', { class: 'row-num', text: ('0' + (i + 1)).slice(-2) }),
-        h('span', { class: 'row-main' }, h('span', { class: 'row-name', text: cl.titulo || cl.id }), cl.descripcion ? h('span', { class: 'row-sub', text: cl.descripcion }) : null),
-        h('span', { class: 'row-end' }, done ? h('span', { class: 'row-done' }, 'Hecha', h('span', { class: 'sr-only', text: ' (completada)' })) : arr(cl.items).length + ' ítems'))));
+      var done = CL.doneIds.indexOf(cl.id) >= 0, isNext = i === nextIdx, n = arr(cl.items).length;
+      ul.appendChild(h('li', null, h('button', { type: 'button', class: 'lcard' + (done ? ' is-done' : '') + (isNext ? ' is-next' : ''), onclick: function () { clOpen(i); } },
+        h('span', { class: 'lcard-n', 'aria-hidden': 'true' }, done ? kic('check') : ('0' + (i + 1)).slice(-2)),
+        h('span', { class: 'lcard-main' },
+          isNext ? h('span', { class: 'lcard-flag', text: CL.doneIds.length ? 'Siguiente' : 'Empezá por acá' }) : null,
+          h('span', { class: 'lcard-t', text: cl.titulo || cl.id }),
+          cl.descripcion ? h('span', { class: 'lcard-d', text: cl.descripcion }) : null,
+          h('span', { class: 'lcard-meta' }, metaItem('clock', clMin(cl) + ' min'), metaItem('checklist', n + (n === 1 ? ' paso' : ' pasos')),
+            done ? h('span', { class: 'lcard-ok' }, kic('check'), 'Hecha') : null)),
+        h('span', { class: 'lcard-go', 'aria-hidden': 'true' }, kic('chevron-right')))));
     });
     v.appendChild(ul);
-    v.appendChild(h('p', { class: 'aviso', text: 'Siguen el POH del 150M y son para practicar. En el avión manda la checklist de tu escuela.' }));
+    v.appendChild(acc('¿Por qué los pilotos usan checklists?', h('div', null,
+      h('p', { text: 'Porque la memoria falla, incluso con mucha experiencia. Una lista escrita asegura que cada vuelo empiece igual y que no se salte nada importante, como sacar la traba de comandos o abrir la válvula de nafta.' }),
+      h('p', { text: 'Se lee un ítem, se hace, se verifica, y recién entonces se pasa al siguiente. Eso es justo lo que practicás acá.' })), { icon: 'bulb' }));
+    v.appendChild(callK('cuidado', 'Para practicar', 'Estas listas siguen el manual del avión (POH del 150M). En el avión de verdad manda siempre la checklist de tu escuela y tu instructor.'));
+    glossText(v, '.mode-sub, .acc-body, .callout-body');
   }
 
   function clOpen(idx, forceFresh) {
@@ -3436,35 +3630,52 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     }, 'clFocus');
   }
 
-  function clItem(it, k, cur) {
+  /** A finished (or skipped) item as a quiet row: tick, name, what it asked for. */
+  function clDoneRow(it, k, cur) {
+    var parts = splitItem(it.texto), skip = cur.done[k] === 'skip';
+    return h('li', { class: 'stp-row' + (skip ? ' is-skip' : '') + (k === cur.justDone ? ' is-just-done' : '') },
+      h('span', { class: 'stp-tick', 'aria-hidden': 'true' }, skip ? kic('minus') : kic('check')),
+      h('span', { class: 'stp-row-l', text: parts[0] }),
+      parts[1] ? h('span', { class: 'stp-row-r', text: parts[1] }) : null,
+      h('span', { class: 'sr-only', text: skip ? ' (salteado)' : ' (hecho)' }));
+  }
+  function clTodoRow(it, k) {
     var parts = splitItem(it.texto);
-    var isDone = !!cur.done[k], isCur = !cur.finished && k === cur.i;
-    var li = h('li', { class: 'cl-item' + (isDone ? ' is-done' : '') + (isCur ? ' is-current' : '') + (isDone && k === cur.justDone ? ' is-just-done' : ''), 'aria-current': isCur ? 'step' : null });
-    var row = h('div', { class: 'cl-row' },
-      h('span', { class: 'cl-mark', 'aria-hidden': 'true' }, icon('check')),
-      h('div', { class: 'cl-line' },
-        h('span', { class: 'cl-left', text: parts[0] }),
-        parts[1] ? h('span', { class: 'cl-leader', 'aria-hidden': 'true' }) : null,
-        parts[1] ? h('span', { class: 'cl-right', text: parts[1] }) : null,
-        h('span', { class: 'sr-only', text: isDone ? (cur.done[k] === 'skip' ? ' (salteado)' : ' (hecho)') : (isCur ? ' (ahora)' : '') })));
-    if (isCur) {
-      if (it.detalle) row.appendChild(h('p', { class: 'cl-detail', text: it.detalle }));
-      var c = CTRL[it.control];
-      var actions = h('div', { class: 'cl-actions' });
-      if (c) actions.appendChild(h('button', { type: 'button', class: 'btn btn--small', onclick: clFocusCurrent }, icon('target'), 'Mostrámelo'));
-      if (!isFn(it.check)) actions.appendChild(h('button', { type: 'button', class: 'btn btn--small btn--primary cl-confirm', onclick: function () { clTick(false); } }, icon('check'), 'Hecho'));
-      else actions.appendChild(h('span', { class: 'soft small', style: { 'align-self': 'center' }, text: 'Se tilda solo cuando lo hacés y soltás.' }));
-      row.appendChild(actions);
-      // live "✓ Bien — soltá" / "✓ Bien" status while the value is right (filled by clEvaluate, no re-render)
-      CL.okEl = isFn(it.check) ? h('p', { class: 'cl-ok', hidden: true, role: 'status' }, icon('check'), h('span', { class: 'cl-ok-text' })) : null;
-      if (CL.okEl) row.appendChild(CL.okEl);
-      var pb = c ? buildProbalo(c, CL.live, true) : null;
-      if (pb) row.appendChild(h('div', { class: 'cl-probalo' }, pb));
-      if (isFn(it.check)) row.appendChild(h('div', { class: 'cl-actions' },
-        h('button', { type: 'button', class: 'btn btn--small btn--ghost', onclick: function () { clTick(true); } }, 'No me sale: saltear este ítem')));
-    }
-    li.appendChild(row);
-    return li;
+    return h('li', { class: 'stp-row is-todo' },
+      h('span', { class: 'stp-tick stp-tick--n', 'aria-hidden': 'true', text: String(k + 1) }),
+      h('span', { class: 'stp-row-l', text: parts[0] }),
+      parts[1] ? h('span', { class: 'stp-row-r', text: parts[1] }) : null);
+  }
+
+  /** The current item, large: what to do, what to leave it at, where it is, why it matters, and the control to try. */
+  function clCurrent(cur) {
+    var it = cur.cl.items[cur.i] || {}, parts = splitItem(it.texto), c = CTRL[it.control], n = arr(cur.cl.items).length;
+    var auto = isFn(it.check);
+    var okEl = auto ? h('p', { class: 'cl-ok', hidden: true, role: 'status' }, icon('check'), h('span', { class: 'cl-ok-text' })) : null;
+    CL.okEl = okEl;
+    var actions = h('div', { class: 'stp-actions' });
+    if (c) actions.appendChild(h('button', { type: 'button', class: 'btn', onclick: clFocusCurrent }, kic('target'), 'Mostrámelo en 3D'));
+    if (!auto) actions.appendChild(h('button', { type: 'button', class: 'btn btn--primary cl-confirm', onclick: function () { clTick(false); } }, kic('check'), 'Hecho'));
+    var pb = c ? buildProbalo(c, CL.live, true) : null;
+    return h('section', { class: 'stp-cur', 'aria-label': 'Ítem actual', 'aria-current': 'step' },
+      h('p', { class: 'stp-k' }, h('span', { class: 'stp-now', text: 'Ahora' }), h('span', { class: 'stp-of', text: 'Ítem ' + (cur.i + 1) + ' de ' + n }),
+        c ? h('span', { class: 'stp-ctl' }, dot(catColor(c)), c.nombre) : null),
+      h('h3', { class: 'stp-name', id: 'stp-name', tabindex: '-1', text: parts[0] }),
+      parts[1] ? h('p', { class: 'stp-val' }, h('span', { class: 'stp-val-k', text: 'Dejalo en' }), h('strong', { text: parts[1] })) : null,
+      okEl,
+      auto ? h('p', { class: 'stp-hint' }, kic('hand'), 'Hacelo en la cabina 3D (o con “Probalo”). Cuando esté bien y lo sueltes, se tilda solo.')
+        : h('p', { class: 'stp-hint' }, kic('eye'), 'Este paso no se puede comprobar en el simulador: hacelo mentalmente y tocá “Hecho”.'),
+      actions,
+      it.detalle ? acc('¿Por qué importa?', h('p', { text: it.detalle }), { icon: 'bulb', open: !cc('isMobile') }) : null,
+      pb ? h('div', { class: 'cl-probalo' }, pb) : null,
+      auto ? h('div', { class: 'stp-skip' }, h('button', { type: 'button', class: 'btn btn--small btn--ghost', onclick: function () { clTick(true); } }, 'No me sale: saltear este ítem')) : null);
+  }
+
+  function clNextChecklist(cur) {
+    var i, x = null;
+    for (i = 0; i < CHECKLISTS.length; i++) if (CHECKLISTS[i].continuaDe === cur.cl.id) { x = i; break; }
+    if (x === null) for (i = cur.idx + 1; i < CHECKLISTS.length; i++) if (CL.doneIds.indexOf(CHECKLISTS[i].id) < 0) { x = i; break; }
+    return x;
   }
 
   function clRenderRun() {
@@ -3477,39 +3688,65 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     if (!cur) return;
     var cl = cur.cl, items = arr(cl.items), n = items.length;
     var doneN = cur.done.filter(Boolean).length;
-    v.appendChild(h('div', { class: 'detail-top' },
-      h('button', { type: 'button', class: 'btn btn--ghost btn--small back-btn', onclick: clBack }, icon('back'), 'Checklists')));
-    var ol = h('ol', { class: 'cl', 'aria-label': 'Ítems de la checklist' });
-    items.forEach(function (it, k) { ol.appendChild(clItem(it || {}, k, cur)); });
-    var next = null;
-    if (cur.finished) CHECKLISTS.forEach(function (x, i) { if (!next && x.continuaDe === cl.id) next = { cl: x, i: i }; });
-    v.appendChild(h('article', { class: 'card', 'aria-labelledby': 'cl-title' },
+    v.appendChild(h('div', { class: 'detail-top lp-top' },
+      h('button', { type: 'button', class: 'btn btn--ghost btn--small back-btn', onclick: clBack }, icon('back'), 'Checklists'),
+      h('span', { class: 'lp-count', text: 'Checklist ' + (cur.idx + 1) + ' de ' + CHECKLISTS.length })));
+    var seen = {};
+    cur.done.forEach(function (d, k) { if (d) seen[k] = d === 'skip' ? 'skip' : true; });
+    v.appendChild(h('article', { class: 'card stp-head', 'aria-labelledby': 'cl-title' },
       h('p', { class: 'kicker', text: 'Checklist' }),
       h('h2', { class: 'placard detail-title', id: 'cl-title', tabindex: '-1', text: cl.titulo || '' }),
       cl.descripcion ? h('p', { class: 'soft', text: cl.descripcion }) : null,
-      cur.carried ? h('div', { class: 'note note--info' }, 'Seguís con el avión tal como quedó al terminar la checklist anterior. ',
-        h('button', { type: 'button', class: 'linklike', onclick: function () { clOpen(cur.idx, true); } }, 'Empezar de cero')) : null,
-      h('div', { class: 'cl-progress' }, progressBar(doneN / n, cur.finished), h('span', { class: 'pct', text: doneN + ' de ' + n })),
-      ol,
-      cur.finished ? h('div', { class: 'card done-card' },
-        h('h3', { class: 'placard', text: '¡Checklist completa!' }),
-        h('p', { text: 'Hiciste los ' + n + ' ítems en orden.' + (cur.skipped ? ' Salteaste ' + cur.skipped + (cur.skipped === 1 ? ' ítem: practicalo de nuevo.' : ' ítems: practicalos de nuevo.') : ' Así, siempre en el mismo orden, se vuelve automático.') }),
-        h('div', { class: 'btn-row' },
-          next ? h('button', { type: 'button', class: 'btn btn--primary', onclick: function () { clOpen(next.i); } }, 'Seguir con: ' + (next.cl.titulo || ''), icon('next')) : null,
-          h('button', { type: 'button', class: 'btn', onclick: function () { clOpen(cur.idx, true); } }, icon('retry'), 'Repetir'),
-          h('button', { type: 'button', class: 'btn btn--ghost', onclick: clBack }, 'Todas las checklists'))) : null,
-      cur.finished ? null : h('div', { class: 'btn-row' },
-        h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: function () { clOpen(cur.idx, true); } }, icon('retry'), 'Reiniciar'))));
-    gloss(v);
+      cur.carried ? callK('dato', 'Seguís con el mismo avión', 'Quedó tal como lo dejaste al terminar la checklist anterior.') : null,
+      cur.carried ? h('div', { class: 'btn-row' }, h('button', { type: 'button', class: 'btn btn--small', onclick: function () { clOpen(cur.idx, true); } }, 'Empezar de cero')) : null,
+      h('div', { class: 'lp-prog' }, stepBar(n, cur.finished ? -1 : cur.i, seen, null, 'Ítems de la checklist'),
+        h('span', { class: 'step-n', text: doneN + ' de ' + n }))));
+    // what was already done: the last three ticked, the rest folded
+    var past = [];
+    items.forEach(function (it, k) { if (cur.done[k]) past.push(k); });
+    if (past.length) {
+      var shown = cur.finished ? [] : past.slice(-3), older = cur.finished ? past : past.slice(0, -3);
+      if (shown.length) {
+        v.appendChild(h('ol', { class: 'stp-list stp-list--done', 'aria-label': 'Ítems ya hechos' }, shown.map(function (k) { return clDoneRow(items[k] || {}, k, cur); })));
+      }
+      if (older.length) {
+        v.appendChild(acc((cur.finished ? 'Lo que hiciste' : 'Ver los ' + older.length + ' anteriores') + ' (' + older.length + ')',
+          h('ol', { class: 'stp-list stp-list--done', 'aria-label': 'Ítems anteriores' }, older.map(function (k) { return clDoneRow(items[k] || {}, k, cur); })), { icon: 'check' }));
+      }
+    }
+    if (cur.finished) {
+      var nx = clNextChecklist(cur), nm = firstUndone(MISSIONS, 'mision');
+      var sg = [];
+      if (nx !== null) sg.push({ primary: true, icon: 'checklist', title: 'Checklist: ' + (CHECKLISTS[nx].titulo || ''), text: clMin(CHECKLISTS[nx]) + ' min · ' + arr(CHECKLISTS[nx].items).length + ' pasos', onClick: function () { clOpen(nx); } });
+      if (nm >= 0) sg.push({ primary: nx === null, icon: 'plane', title: 'Misión: ' + (MISSIONS[nm].titulo || ''), text: 'Ahora volalo vos', onClick: function () { startMission(MISSIONS[nm]); sheetEnsure('half'); } });
+      else sg.push({ icon: 'quiz', title: 'Quiz rápido', text: 'Probá lo que aprendiste', onClick: function () { setMode('quiz'); scrollPanelTop(); } });
+      v.appendChild(doneCard({
+        id: 'cl-done-title', kicker: 'Checklist completa', title: cl.titulo || '¡Checklist completa!',
+        text: 'Hiciste los ' + n + ' ítems en orden.' + (cur.skipped ? ' Salteaste ' + cur.skipped + (cur.skipped === 1 ? ' ítem: practicalo de nuevo.' : ' ítems: practicalos de nuevo.') : ' Así, siempre en el mismo orden, se vuelve automático.'),
+        suggestions: sg,
+        actions: [h('button', { type: 'button', class: 'btn', onclick: function () { clOpen(cur.idx, true); } }, icon('retry'), 'Repetir'),
+          h('button', { type: 'button', class: 'btn btn--ghost', onclick: clBack }, 'Todas las checklists')]
+      }));
+    } else {
+      v.appendChild(clCurrent(cur));
+      var todo = [];
+      items.forEach(function (it, k) { if (k > cur.i) todo.push(k); });
+      if (todo.length) {
+        v.appendChild(acc('Lo que sigue (' + todo.length + ')', h('ol', { class: 'stp-list', 'aria-label': 'Ítems que siguen' }, todo.map(function (k) { return clTodoRow(items[k] || {}, k); })), { icon: 'list' }));
+      }
+      v.appendChild(h('div', { class: 'btn-row stp-reset' },
+        h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: function () { clOpen(cur.idx, true); } }, icon('retry'), 'Reiniciar la checklist')));
+    }
+    glossText(v, '.stp-hint, .acc-body, .callout-body, .stp-head .soft');
     var s = S();
     if (s) runLive(CL.live, s);
     if (hadFocus) {
-      var target = v.querySelector('.cl-item.is-current button') || v.querySelector('.done-card button') || $('cl-title');
+      var target = v.querySelector('.stp-cur .btn') || v.querySelector('.done-card button') || $('cl-title');
       if (target) safe(function () { target.focus({ preventScroll: true }); });
     }
-    var curLi = v.querySelector('.cl-item.is-current');
-    if (curLi && mode === 'checklists' && curLi.scrollIntoView) {
-      safe(function () { curLi.scrollIntoView({ block: 'nearest', behavior: reducedMotion() ? 'auto' : 'smooth' }); });
+    var curEl = v.querySelector('.stp-cur');
+    if (curEl && mode === 'checklists' && curEl.scrollIntoView) {
+      safe(function () { curEl.scrollIntoView({ block: 'nearest', behavior: reducedMotion() ? 'auto' : 'smooth' }); });
     }
   }
 
@@ -3643,20 +3880,33 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     if (VO.m && !VO.starting) { VO.ctx = freshCtx(); VO.progress = 0; VO.achieved = false; voRender(); }
   });
 
-  function hudCell(label, unit, extraClass) {
+  /** One instrument cell: plain name, live number, unit (always with its unit; the long explanation lives in "¿Qué mide cada número?"). */
+  function hudCell(label, unit, extraClass, tip) {
     var v = h('span');
-    var cell = h('div', { class: 'hud-cell' + (extraClass ? ' ' + extraClass : '') },
+    var cell = h('div', { class: 'hud-cell' + (extraClass ? ' ' + extraClass : ''), title: tip || null },
       h('div', { class: 'hud-lbl', text: label }), h('div', { class: 'hud-val' }, v, unit ? h('small', { text: unit }) : null));
     cell.v = v;
     return cell;
   }
+  var HUD_EXPLAIN = [
+    ['Velocidad (nudos)', 'Qué tan rápido va el avión por el aire. Un nudo es una milla náutica por hora: casi 1,85 km/h. El Cessna 150 vuela cómodo a unos 85–90 nudos. Por debajo de unos 47 nudos (flaps arriba y sin motor) el ala deja de sustentar.'],
+    ['Altura (pies)', 'Qué tan arriba estás. Un pie son 30 centímetros: 1000 pies son unos 300 metros, y 3000 pies unos 900 metros.'],
+    ['Sube / baja (pies por minuto)', 'Si el avión está subiendo (+) o bajando (−) y a qué ritmo. Un ascenso tranquilo es de unos 500 pies por minuto.'],
+    ['Motor (RPM)', 'Vueltas por minuto de la hélice. En crucero ronda las 2300–2500; con el motor al ralentí, unas 600–1000.'],
+    ['Rumbo (grados)', 'Hacia dónde apunta la nariz: 000° es el norte, 090° el este, 180° el sur y 270° el oeste.'],
+    ['Inclinación (grados)', 'Cuánto está inclinado el avión hacia un costado (alabeo). 0° es con las alas niveladas.'],
+    ['Bolita (coordinación)', 'Un tubito con una bolita: si el avión vuela “derecho”, la bolita queda al medio. Si se va a un costado, el avión derrapa: apretá el pedal de ese lado.'],
+    ['Flaps (grados)', 'Los flaps son las tapas que bajan del ala para volar lento y aterrizar. 0° es todo arriba; 40° es todo abajo.']
+  ];
   function buildHud(live) {
-    var ias = hudCell('Velocidad', 'kt'), alt = hudCell('Altímetro', 'ft'), vs = hudCell('Variómetro', 'ft/min');
-    var rpm = hudCell('Motor', 'RPM'), hdg = hudCell('Rumbo', '°'), bank = hudCell('Inclinación', '');
+    var ias = hudCell('Velocidad', 'nudos', null, 'Nudos: millas náuticas por hora'), alt = hudCell('Altura', 'pies', null, 'Pies sobre el nivel del mar (1 pie = 30 cm)'),
+      vs = hudCell('Sube / baja', 'pies/min', null, 'Pies por minuto: positivo sube, negativo baja');
+    var rpm = hudCell('Motor', 'RPM', null, 'Vueltas por minuto de la hélice'), hdg = hudCell('Rumbo', '°', null, 'Hacia dónde apunta la nariz, en grados'),
+      bank = hudCell('Inclinación', '', null, 'Cuánto está inclinado hacia un costado');
     var ball = h('span', { class: 'ball' });
-    var ballCell = h('div', { class: 'hud-cell', style: { 'grid-column': 'span 2' } },
+    var ballCell = h('div', { class: 'hud-cell hud-cell--ball', title: 'Si la bolita está al medio, el avión vuela coordinado' },
       h('div', { class: 'hud-lbl', text: 'Bolita (coordinación)' }), h('div', { class: 'ball-tube', 'aria-hidden': 'true' }, ball));
-    var flaps = hudCell('Flaps', '°');
+    var flaps = hudCell('Flaps', '°', null, 'Posición de los flaps en grados');
     var sr = h('p', { class: 'sr-only', 'aria-live': 'off' });
     live.push(function (s) {
       var a = s.air || {}, e = s.engine || {};
@@ -3675,8 +3925,11 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       setText(flaps.v, Math.round(num(s.flaps, 0)));
       setText(sr, 'Velocidad ' + Math.round(v) + ' nudos, altura ' + Math.round(num(a.indicatedAlt, 0)) + ' pies.');
     });
+    var dl = h('dl', { class: 'hud-explain' });
+    HUD_EXPLAIN.forEach(function (x) { dl.appendChild(h('dt', { text: x[0] })); dl.appendChild(h('dd', { text: x[1] })); });
     return h('div', { role: 'group', 'aria-label': 'Instrumentos principales' },
-      h('div', { class: 'hud' }, ias, alt, vs, rpm, hdg, bank, ballCell, flaps), sr);
+      h('div', { class: 'hud' }, ias, alt, vs, rpm, hdg, bank, ballCell, flaps), sr,
+      acc('¿Qué mide cada número?', dl, { icon: 'gauge' }));
   }
 
   /** Vertical knob slider (throttle / mixture): up = pushed in. */
@@ -3745,13 +3998,13 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     var carb = h('button', {
       type: 'button', class: 'btn btn--stack', 'aria-pressed': 'false',
       onclick: function () { setInput('carbHeat', num(getInput('carbHeat'), 0) > 0.5 ? 0 : 1); }
-    }, stackLabel('Calef. carb', 'COLD'));
+    }, stackLabel('Calef. carburador', 'fría'));
     var flapUp = h('button', {
       type: 'button', class: 'btn btn--stack', 'aria-pressed': 'false',
       onclick: function () { setFlapSwitch(getInput('flapSwitch') === 'UP' ? 'OFF' : 'UP'); }
-    }, stackLabel('Flaps UP', 'R'));
+    }, stackLabel('Subir flaps', 'R'));
     var flapDnSmall = h('small', { text: 'F' });
-    var flapDn = holdButton([h('span', { text: 'Flaps DOWN' }), flapDnSmall],
+    var flapDn = holdButton([h('span', { text: 'Bajar flaps' }), flapDnSmall],
       function () { hold('flap-switch', null, true); }, function () { hold('flap-switch', null, false); }, 'btn--stack', 'Bajar flaps: mantené apretado');
     var view = h('button', {
       type: 'button', class: 'btn btn--stack span2',
@@ -3769,7 +4022,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     live.push(function (s) {
       var ch = num(s.carbHeat, 0) > 0.5;
       setAttr(carb, 'aria-pressed', ch ? 'true' : 'false');
-      setText(carb.querySelector('small'), ch ? 'HOT' : 'COLD');
+      setText(carb.querySelector('small'), ch ? 'caliente' : 'fría');
       setAttr(flapUp, 'aria-pressed', s.flapSwitch === 'UP' ? 'true' : 'false');
       setText(flapDnSmall, 'F · ' + Math.round(num(s.flaps, 0)) + '°');
       setText(view.querySelector('.vo-view-lbl'), mainView === 'exterior' ? 'Ver la cabina' : 'Ver desde afuera');
@@ -3787,8 +4040,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         holdButton(stackLabel('Pedal ▶', 'X'), function () { hold('rudder-pedals', 'right', true); }, function () { hold('rudder-pedals', 'right', false); }, 'btn--stack', 'Pedal derecho: mantené apretado'),
         carb,
         flapUp, flapDn,
-        holdButton(stackLabel('Trim ▼', 'nariz abajo · T'), function () { VO.trimDir = -1; }, function () { VO.trimDir = 0; }, 'btn--stack', 'Compensador nariz abajo: mantené apretado'),
-        holdButton(stackLabel('Trim ▲', 'nariz arriba · G'), function () { VO.trimDir = 1; }, function () { VO.trimDir = 0; }, 'btn--stack', 'Compensador nariz arriba: mantené apretado'),
+        holdButton(stackLabel('Compensador ▼', 'nariz abajo · T'), function () { VO.trimDir = -1; }, function () { VO.trimDir = 0; }, 'btn--stack', 'Compensador nariz abajo: mantené apretado'),
+        holdButton(stackLabel('Compensador ▲', 'nariz arriba · G'), function () { VO.trimDir = 1; }, function () { VO.trimDir = 0; }, 'btn--stack', 'Compensador nariz arriba: mantené apretado'),
         view, pause));
   }
 
@@ -3844,6 +4097,20 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   /** True when the overlay pad is really on screen (CSS hides it on wide or landscape screens). */
   function flypadShown() { return !!(VO && VO.overlay && !VO.overlay.hidden && VO.overlay.offsetHeight > 0); }
 
+  var MISSION_LEVEL = { arrancar: 1, carreteo: 1, despegue: 2, 'recto-nivelado': 2, ascenso: 2, viraje: 3, perdida: 3, aproximacion: 3 };
+  function missionLevel(m) { return MISSION_LEVEL[m.id] || 2; }
+  /** "01 ── Título ───" (Kit) with a plain fallback. */
+  function sectHead(n, title, meta) {
+    var K = C150.Kit;
+    if (K && isFn(K.sectionHeader)) return K.sectionHeader(n, title, meta);
+    return h('h3', { class: 'placard placard--small block-title', text: title });
+  }
+  function ringOf(frac, ok, size) {
+    var K = C150.Kit;
+    if (K && isFn(K.progressRing)) return K.progressRing(frac, { size: size || 56, ok: !!ok, text: Math.round(clamp(frac, 0, 1) * 100) + '%', ariaLabel: 'Mejor intento' });
+    return h('span', { class: 'pct', text: Math.round(clamp(frac, 0, 1) * 100) + ' %' });
+  }
+
   function missionPanel(live) {
     var m = VO.m;
     var bar = progressBar(VO.progress, VO.achieved);
@@ -3855,23 +4122,47 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     var pasos = arr(m.pasos);
     var ol = null;
     if (pasos.length) { ol = h('ol', { class: 'steps' }); pasos.forEach(function (p) { ol.appendChild(h('li', { text: typeof p === 'string' ? p : (p && p.texto) || '' })); }); }
-    return [
+    var nm = firstUndone(MISSIONS, 'mision', m.id);
+    var out = [
       h('div', { class: 'mission-bar', role: 'status' },
         h('div', { class: 'mission-bar-top' }, h('span', { class: 'mission-bar-title', text: 'Misión: ' + (m.titulo || '') }), pctEl),
         bar),
-      h('article', { class: 'card', 'aria-labelledby': 'vo-mission-title' },
-        h('p', { class: 'kicker', text: 'Misión' }),
+      h('article', { class: 'card vo-mission', 'aria-labelledby': 'vo-mission-title' },
+        h('p', { class: 'kicker' }, 'Misión ', diffDots(missionLevel(m))),
         h('h2', { class: 'placard detail-title', id: 'vo-mission-title', tabindex: '-1', text: m.titulo || '' }),
         m.objetivo ? h('p', { class: 'lead', text: m.objetivo }) : null,
-        VO.achieved ? h('div', { class: 'card done-card' },
-          h('h3', { class: 'placard', text: '¡Misión cumplida!' }),
-          h('p', { text: 'Lo lograste. Probá la siguiente o repetila para hacerlo más prolijo.' })) : null,
-        ol ? sec('Paso a paso', ol) : null,
-        m.consejo ? callout('Consejo', m.consejo) : null,
+        ol ? acc('Paso a paso', ol, { open: true, icon: 'list' }) : null,
+        m.consejo ? callK('tip', 'Consejo', m.consejo) : null,
         h('div', { class: 'btn-row' },
           h('button', { type: 'button', class: 'btn btn--primary', onclick: function () { startMission(m); } }, icon('retry'), VO.achieved ? 'Otra vez' : 'Reintentar'),
           h('button', { type: 'button', class: 'btn btn--ghost', onclick: stopMission }, 'Terminar misión')))
     ];
+    if (VO.achieved) {
+      var sg = [];
+      if (nm >= 0) sg.push({ primary: true, icon: 'plane', title: 'Misión: ' + (MISSIONS[nm].titulo || ''), text: DIFF_TXT[missionLevel(MISSIONS[nm])], onClick: function () { startMission(MISSIONS[nm]); } });
+      if (sitOk() && arr(C150.Situations.list).length) sg.push({ primary: nm < 0, icon: 'flag', title: 'Situaciones: ¿qué harías?', text: 'Cosas que pasan en un vuelo, en el simulador', onClick: function () { stopMission(); voSetTab('situaciones'); scrollPanelTop(); } });
+      sg.push({ icon: 'quiz', title: 'Quiz rápido', text: 'Probá lo que sabés', onClick: function () { setMode('quiz'); scrollPanelTop(); } });
+      out.splice(2, 0, doneCard({ id: 'vo-done-title', kicker: 'Misión cumplida', title: m.titulo || '¡Misión cumplida!', text: 'Lo lograste. Probá la siguiente o repetila para hacerlo más prolijo.', suggestions: sg }));
+    }
+    return out;
+  }
+
+  /** A mission as a card: progress ring (best attempt), title, what to do, difficulty. */
+  function missionCard(m, nextId) {
+    var best = clamp(num(VO.best[m.id], 0), 0, 1), active = VO.m === m, isNext = nextId === m.id;
+    return h('li', null, h('button', {
+      type: 'button', class: 'lcard mcard' + (best >= 1 ? ' is-done' : '') + (isNext ? ' is-next' : '') + (active ? ' is-active' : ''),
+      'aria-current': active ? 'true' : null, onclick: function () { startMission(m); }
+    },
+      ringOf(best, best >= 1),
+      h('span', { class: 'lcard-main' },
+        isNext ? h('span', { class: 'lcard-flag', text: Object.keys(VO.best).length ? 'Siguiente' : 'Empezá por acá' }) : null,
+        h('span', { class: 'lcard-t', text: m.titulo || m.id }),
+        m.objetivo ? h('span', { class: 'lcard-d mcard-d', text: m.objetivo }) : null,
+        h('span', { class: 'lcard-meta' }, diffDots(missionLevel(m)),
+          best >= 1 ? h('span', { class: 'lcard-ok' }, kic('check'), 'Lograda')
+            : (best > 0 ? metaItem('target', 'Mejor intento: ' + Math.round(best * 100) + ' %') : (active ? metaItem('play', 'En curso') : metaItem('play', 'Sin intentar'))))),
+      h('span', { class: 'lcard-go', 'aria-hidden': 'true' }, kic('chevron-right'))));
   }
 
   function voRender() {
@@ -3882,6 +4173,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     VO.trimDir = 0;
     VO.live = [];
     clear(v);
+    if (!(VO.m && VO.tab === 'practicar')) v.appendChild(modeHead('Misiones y situaciones', 'Pasá de mirar a volar: elegí una misión con un objetivo claro, o una situación real (“¿qué harías?”). Los instrumentos y los mandos están acá abajo.'));
     v.appendChild(voTabs());
     var airRow = voAirToggle();
     if (airRow) v.appendChild(airRow);
@@ -3891,78 +4183,78 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       return;
     }
     if (VO.m) add(v, missionPanel(VO.live));
-    else v.appendChild(modeHead('Volar', 'Elegí dónde está el avión, practicá con los mandos y mirá cómo responden los instrumentos.'));
 
-    v.appendChild(h('div', { class: 'block', style: VO.m ? null : { 'margin-top': '4px' } },
-      h('h3', { class: 'placard placard--small block-title', text: 'Instrumentos' }), buildHud(VO.live)));
-    v.appendChild(h('div', { class: 'block' },
-      h('h3', { class: 'placard placard--small block-title', text: 'Mandos' }), flightPad(VO.live)));
+    // order of the sections: while a mission runs, the instruments and the pad come right after it; otherwise the missions go first
+    var order = VO.m ? ['inst', 'pad', 'scen', 'mis'] : ['mis', 'scen', 'inst', 'pad'];
+    function N(k) { return ('0' + (order.indexOf(k) + 1)).slice(-2); }
+    var inst = h('section', { class: 'vo-sec' }, sectHead(N('inst'), 'Instrumentos', 'en vivo'), buildHud(VO.live));
+    var pad = h('section', { class: 'vo-sec' }, sectHead(N('pad'), 'Mandos', 'para volar'), flightPad(VO.live));
 
+    // scenarios: where and how the airplane is
     var P = (C150.Sim && C150.Sim.PRESETS) || {};
     var scen = h('div', { class: 'scen-grid' });
     var scenBtns = [];
     SCENARIOS.forEach(function (sc) {
       var label = (P[sc[0]] && P[sc[0]].label) || sc[1];
       var b = h('button', {
-        type: 'button', class: 'btn', 'aria-pressed': 'false', title: (P[sc[0]] && P[sc[0]].description) || null,
+        type: 'button', class: 'btn scen-btn', 'aria-pressed': 'false', title: (P[sc[0]] && P[sc[0]].description) || null,
         onclick: function () { applyPreset(sc[0]); }
       }, label);
       scenBtns.push([sc[0], b]);
       scen.appendChild(b);
     });
     VO.live.push(function () { scenBtns.forEach(function (x) { setAttr(x[1], 'aria-pressed', currentPreset === x[0] ? 'true' : 'false'); }); });
-    v.appendChild(h('div', { class: 'block' },
-      h('h3', { class: 'placard placard--small block-title', text: 'Escenarios' }), scen,
-      h('p', { class: 'soft small', style: { 'margin-top': '6px' }, text: 'Cambiar de escenario reinicia el avión: motor, palancas y posición.' })));
+    var scenSec = h('section', { class: 'vo-sec' }, sectHead(N('scen'), 'Dónde está el avión', 'escenario'), scen,
+      h('p', { class: 'soft small vo-note', text: 'Cambiar de escenario reinicia el avión: motor, palancas y posición.' }));
 
-    var ml = h('ul', { class: 'rows', 'aria-label': 'Misiones' });
+    // missions as cards
+    var nextId = null;
+    for (var q = 0; q < MISSIONS.length; q++) if (num(VO.best[MISSIONS[q].id], 0) < 1) { nextId = MISSIONS[q].id; break; }
+    var ml = h('ul', { class: 'lc-list', 'aria-label': 'Misiones' });
     if (!MISSIONS.length) ml.appendChild(h('li', { class: 'empty', text: 'Las misiones todavía no están cargadas.' }));
-    MISSIONS.forEach(function (m, i) {
-      var best = clamp(num(VO.best[m.id], 0), 0, 1);
-      var active = VO.m === m;
-      ml.appendChild(h('li', null, h('button', {
-        type: 'button', class: 'row', 'aria-current': active ? 'true' : null, onclick: function () { startMission(m); }
-      },
-        h('span', { class: 'row-num', text: ('0' + (i + 1)).slice(-2) }),
-        h('span', { class: 'row-main' },
-          h('span', { class: 'row-name', text: m.titulo || m.id }),
-          m.objetivo ? h('span', { class: 'row-sub', text: m.objetivo }) : null,
-          best > 0 ? h('span', { class: 'mission-row-progress', 'aria-hidden': 'true' }, progressBar(best, best >= 1)) : null),
-        h('span', { class: 'row-end' }, best >= 1
-          ? h('span', { class: 'row-done' }, 'Lograda')
-          : (best > 0 ? h('span', { class: 'pct', text: 'mejor ' + Math.round(best * 100) + ' %' }) : (active ? 'en curso' : 'Empezar'))))));
-    });
-    v.appendChild(h('div', { class: 'block' }, h('h3', { class: 'placard placard--small block-title', text: 'Misiones' }), ml));
+    MISSIONS.forEach(function (m) { if (VO.m !== m) ml.appendChild(missionCard(m, nextId)); });
+    var doneM = MISSIONS.filter(function (m) { return num(VO.best[m.id], 0) >= 1; }).length;
+    var misSec = h('section', { class: 'vo-sec' }, sectHead(N('mis'), VO.m ? 'Otras misiones' : 'Misiones', doneM + ' de ' + MISSIONS.length),
+      VO.m ? null : h('p', { class: 'soft vo-note', text: 'Cada misión tiene un objetivo y te va mostrando tu avance. Podés repetirlas las veces que quieras.' }), ml);
 
-    v.appendChild(h('details', { class: 'fold' }, h('summary', null, 'Teclado'), keysTable()));
+    var byKey = { inst: inst, pad: pad, scen: scenSec, mis: misSec };
+    order.forEach(function (k) { v.appendChild(byKey[k]); });
+
+    v.appendChild(acc('Atajos del teclado', keysTable(), { icon: 'keyboard' }));
     var s = S();
     if (s) runLive(VO.live, s);
-    if (hadFocus) { var t = $('vo-mission-title') || v.querySelector('button'); if (t) safe(function () { t.focus({ preventScroll: true }); }); }
+    if (hadFocus) { var t = $('vo-done-title') || $('vo-mission-title') || v.querySelector('button'); if (t) safe(function () { t.focus({ preventScroll: true }); }); }
   }
 
-  /** "Mostrar el aire" switch (both VOLAR sections). */
+  /** "Mostrar el aire": the flow around the airplane in the exterior view while flying, and a short explanation when a control
+   *  is moved on purpose (core.js "el aire en VOLAR"). Both sections of the tab. */
   function voAirToggle() {
     if (!coreReady || !has('setAirPeek')) return null;
+    var on = voAirOn();
+    var state = h('span', { class: 'vo-air-s', text: on ? 'Activado' : 'Desactivado' });
     var b = h('button', {
-      type: 'button', class: 'lb-loop vo-air', role: 'switch', 'aria-checked': voAirOn() ? 'true' : 'false',
+      type: 'button', class: 'lb-loop vo-air', role: 'switch', 'aria-checked': on ? 'true' : 'false',
       title: 'Líneas de aire alrededor del avión en la vista de afuera y una explicación corta cuando movés un mando a propósito',
       onclick: function () {
         volarAir = !voAirOn();
         store.set('volarAir', volarAir);
         setAttr(b, 'aria-checked', volarAir ? 'true' : 'false');
+        setText(state, volarAir ? 'Activado' : 'Desactivado');
         syncAirPeek();
         kick();
       }
     }, h('span', { class: 'lb-loop-track', 'aria-hidden': 'true' }), 'Mostrar el aire');
-    return h('div', { class: 'vo-air-row' }, b,
-      h('span', { class: 'vo-air-hint', text: 'Mientras volás, en la vista de afuera. Te explico cuando movés un mando a propósito.' }));
+    return h('div', { class: 'vo-air-row' },
+      h('span', { class: 'vo-air-ico', 'aria-hidden': 'true' }, kic('wind')),
+      h('div', { class: 'vo-air-body' }, h('div', { class: 'vo-air-top' }, b, state),
+        h('span', { class: 'vo-air-hint', text: 'Mientras volás, en la vista de afuera se dibuja el aire que pasa por el avión. Cuando movés un mando a propósito, te explico qué le hace al aire.' })));
   }
 
-  /* --- VOLAR sections: "Practicar" (free flight + missions) · "Situaciones" (situations.js, contract v3) --- */
+  /* --- sections of the tab: "Misiones" (free flight + missions) · "Situaciones" (situations.js, contract v3) --- */
   function sitOk() { var Si = C150.Situations; return !!(Si && isFn(Si.mount) && isFn(Si.frame)); }
   function voTabs() {
-    var wrap = h('div', { class: 'vo-tabs', role: 'tablist', 'aria-label': 'Secciones de Volar' });
-    [['practicar', 'Practicar'], ['situaciones', 'Situaciones']].forEach(function (t) {
+    var wrap = h('div', { class: 'vo-tabs', role: 'tablist', 'aria-label': 'Secciones de Misiones y situaciones' });
+    [['practicar', 'Misiones'], ['situaciones', 'Situaciones']].forEach(function (t) {
       if (t[0] === 'situaciones' && !sitOk()) return;
       var on = VO.tab === t[0];
       wrap.appendChild(h('button', {
@@ -3985,6 +4277,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   function sitApi() {
     return {
       annotate: gloss, h: h, icon: icon, setText: setText, setAttr: setAttr, toggleClass: toggleClass, safe: safe, store: store,
+      kic: kic, callK: callK, acc: acc, sectHead: sectHead, diffDots: diffDots, pgBar: pgBar, sgCard: sgCard, go: function (p) { return UI.go(p); },
       cc: cc, has: has, S: S, applyPreset: applyPreset, kick: kick, showToast: showToast, now: now,
       buildHud: buildHud, flightPad: flightPad, CTRL: CTRL, progressBar: progressBar, reducedMotion: reducedMotion,
       scrollPanelTop: scrollPanelTop, releaseAllHolds: releaseAllHolds,
@@ -4021,6 +4314,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     enter: function () { showFlightOverlay(true); },
     exit: function () { VO.trimDir = 0; showFlightOverlay(false); },
     slow: function (s) {
+      toggleClass(VO.view, 'is-sit-detail', sitDetail());
       if (VO.tab === 'situaciones' && sitOk()) C150.Situations.slow(s);
       else runLive(VO.live, s);
       if (VO.overlay && !VO.overlay.hidden) runLive(VO.ovLive, s);
@@ -4123,9 +4417,43 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     var ok = k === q.correcta;
     if (ok) QZ.score++;
     QZ.results.push({ q: q, ok: ok });
-    QZ.fb = { ok: ok, title: ok ? '¡Correcto!' : 'No era esa', text: q.explicacion || '' };
+    QZ.fb = { ok: ok, title: ok ? '¡Correcto!' : 'No era esa, pero así se aprende', text: q.explicacion || '', answer: ok ? null : arr(q.opciones)[q.correcta] };
     qzRender(false);
   }
+
+  /** Topic of a question, for "temas para repasar": the control's category ("¿Dónde está?") or a keyword guess for the options ones.
+   *  `lesson` = the lesson that explains it (opened from the result screen). */
+  var QZ_TOPICS = [
+    { re: /pérdida|bocina|ángulo de ataque|angulo de ataque/i, label: 'Pérdida y ángulo de ataque', lesson: 'perdida' },
+    { re: /flap/i, label: 'Flaps', lesson: 'flaps' },
+    { re: /compensador|trim/i, label: 'Compensador', lesson: 'compensador' },
+    { re: /alerón|alabeo|timón de profundidad|timón de dirección|pedal|volante|cabeceo|guiñada|eje/i, label: 'Mandos de vuelo y ejes', lesson: 'tres-ejes' },
+    { re: /viraje|coordina|bolita|derrap/i, label: 'Viraje y coordinación', lesson: 'coordinacion' },
+    { re: /sustentación|resistencia|empuje|peso\b|fuerza/i, label: 'Las 4 fuerzas', lesson: 'cuatro-fuerzas' },
+    { re: /motor|mezcla|carburador|aceite|rpm|magneto|combustible|nafta|cebador|hélice/i, label: 'Motor y combustible', lesson: 'motor' },
+    { re: /altímetro|velocímetro|horizonte|variómetro|pitot|instrumento|nudos|qnh|presión estática/i, label: 'Instrumentos', lesson: 'instrumentos' },
+    { re: /carreteo|freno|estacionamiento|tierra|viento/i, label: 'En tierra', lesson: 'en-tierra' }
+  ];
+  function qzTopic(q) {
+    if (q.tipo === 'donde') {
+      var c = CTRL[q.control], k = c && CAT[c.categoria];
+      return { label: k ? 'Dónde está: ' + k.nombre : 'Dónde está cada control', lesson: null, control: q.control };
+    }
+    var t = q.pregunta + ' ' + arr(q.opciones).join(' ') + ' ' + (q.explicacion || '');
+    for (var i = 0; i < QZ_TOPICS.length; i++) if (QZ_TOPICS[i].re.test(t)) return { label: QZ_TOPICS[i].label, lesson: QZ_TOPICS[i].lesson };
+    return { label: 'Repaso general', lesson: 'primera-clase' };
+  }
+  /** Wrong answers grouped by topic, the most frequent first. */
+  function qzWeak(wrong) {
+    var by = {}, order = [];
+    wrong.forEach(function (x) {
+      var t = qzTopic(x.q);
+      if (!by[t.label]) { by[t.label] = { t: t, n: 0 }; order.push(t.label); }
+      by[t.label].n++;
+    });
+    return order.map(function (k) { return by[k]; }).sort(function (a, b) { return b.n - a.n; });
+  }
+  function lessonIndexById(id) { for (var i = 0; i < LESSONS.length; i++) if (LESSONS[i].id === id) return i; return -1; }
 
   function qzRender(focusTitle) {
     var v = QZ.view;
@@ -4134,49 +4462,84 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     var n = QZ.qs.length;
     if (QZ.phase === 'start') {
       var b = qzBest();
-      v.appendChild(modeHead('Quiz', 'Ponete a prueba antes de la clase.'));
+      v.appendChild(modeHead('Quiz', 'Un repaso corto para ver qué quedó. No hay nota ni apuro: cada respuesta viene con su explicación.'));
       if (!QUIZ.length) { v.appendChild(emptyState('Las preguntas todavía no están cargadas.')); return; }
       var canPick = coreReady && has('pickMode');
-      v.appendChild(h('div', { class: 'card' },
-        h('h3', { class: 'placard', style: { 'font-size': '22px' }, text: Math.min(QUIZ_LEN, QUIZ.length) + ' preguntas al azar' }),
-        h('ul', { class: 'bullets', style: { margin: '8px 0 0' } },
-          canPick ? h('li', null, h('strong', { text: '¿Dónde está?' }), ': respondés tocando el control en la cabina 3D. Tenés dos intentos.') : null,
-          h('li', null, h('strong', { text: 'Opciones' }), ': elegís una y te explico por qué.'),
-          h('li', { text: 'Cada vez salen preguntas distintas.' })),
-        !canPick ? h('p', { class: 'note note--info', text: 'Sin la cabina 3D, el quiz usa sólo preguntas de opciones.' }) : null,
-        b ? h('p', { class: 'soft', style: { margin: '10px 0 0' } }, 'Tu mejor resultado: ', h('strong', { class: 'mono', text: b.score + '/' + b.total })) : null,
-        h('div', { class: 'btn-row' }, h('button', { type: 'button', class: 'btn btn--primary', id: 'qz-start', onclick: qzStart }, 'Empezar', icon('next')))));
+      var hows = h('ul', { class: 'qz-how' },
+        canPick ? h('li', null, h('span', { class: 'qz-how-ico', 'aria-hidden': 'true' }, kic('hand')),
+          h('span', null, h('strong', { text: '¿Dónde está?' }), 'Respondés tocando el control en la cabina 3D. Tenés dos intentos.')) : null,
+        h('li', null, h('span', { class: 'qz-how-ico', 'aria-hidden': 'true' }, kic('list')),
+          h('span', null, h('strong', { text: 'Opciones' }), 'Elegís una respuesta y te explico por qué.')),
+        h('li', null, h('span', { class: 'qz-how-ico', 'aria-hidden': 'true' }, kic('swap')),
+          h('span', null, h('strong', { text: 'Cada vez distinto' }), 'Las preguntas salen al azar: podés repetirlo cuando quieras.')));
+      v.appendChild(h('article', { class: 'card qz-start' },
+        h('p', { class: 'kicker', text: 'Listo para empezar' }),
+        h('h3', { class: 'qz-start-t', text: Math.min(QUIZ_LEN, QUIZ.length) + ' preguntas al azar' }),
+        hows,
+        !canPick ? callK('dato', 'Sin la cabina 3D', 'El quiz usa sólo preguntas de opciones.') : null,
+        b ? h('div', { class: 'qz-best' }, ringOf(b.total ? b.score / b.total : 0, b.total && b.score / b.total >= 0.7, 64),
+          h('span', null, h('strong', { text: 'Tu mejor resultado' }), h('span', { class: 'mono', text: b.score + ' de ' + b.total + ' correctas' }))) : null,
+        h('div', { class: 'btn-row' }, h('button', { type: 'button', class: 'btn btn--primary btn--large qz-go', id: 'qz-start', onclick: qzStart }, 'Empezar el quiz', icon('next')))));
       return;
     }
     if (QZ.phase === 'end') {
-      var r = n ? QZ.score / n : 0;
+      var r = n ? QZ.score / n : 0, pass = r >= 0.7;
       var msg = r >= 0.9 ? '¡Excelente! Ya conocés la cabina como para tu primera clase.'
-        : (r >= 0.6 ? 'Muy bien. Repasá las que te costaron y volvé a probar.'
-          : (r >= 0.35 ? 'Vas bien. Repasá en Explorar y en Lo básico, y probá otra vez.'
-            : 'Es normal al principio. Hacé el Recorrido y las lecciones de Lo básico, y volvé a probar.'));
+        : (r >= 0.7 ? 'Muy bien: aprobaste. Repasá las que te costaron y volvé a probar para afianzar.'
+          : (r >= 0.35 ? 'Vas bien, pero todavía falta. Repasá los temas de abajo y probá otra vez.'
+            : 'Es normal al principio. Hacé el recorrido y las lecciones, y volvé a probar.'));
       var wrong = QZ.results.filter(function (x) { return !x.ok; });
-      var list = null;
-      if (wrong.length) {
-        list = h('ul', { class: 'rows' });
-        wrong.forEach(function (x) {
-          var q = x.q, ans = q.tipo === 'donde' ? ctrlName(q.control) : arr(q.opciones)[q.correcta];
-          list.appendChild(h('li', { style: { padding: '10px 4px' } },
-            h('p', { style: { margin: '0 0 2px' }, text: q.pregunta }),
-            h('p', { class: 'small', style: { margin: '0' } }, h('span', { class: 'soft', text: 'Respuesta: ' }), h('strong', { text: ans || '' })),
-            q.tipo === 'donde' ? h('div', { style: { 'margin-top': '6px' } }, controlChip(q.control)) : null));
-        });
-      }
+      var weak = qzWeak(wrong);
       var best = qzBest();
       v.appendChild(modeHead('Quiz', null));
-      v.appendChild(h('article', { class: 'card', 'aria-labelledby': 'qz-title' },
-        h('h2', { class: 'placard', id: 'qz-title', tabindex: '-1', style: { 'font-size': '22px' }, text: 'Resultado' }),
-        h('p', { class: 'score' }, String(QZ.score), h('small', { text: '/' + n })),
-        h('p', { class: 'lead', text: msg }),
-        best ? h('p', { class: 'soft small', text: QZ.newBest ? '¡Es tu mejor resultado hasta ahora!' : 'Tu mejor resultado: ' + best.score + '/' + best.total }) : null,
-        h('div', { class: 'btn-row' },
-          h('button', { type: 'button', class: 'btn btn--primary', onclick: qzStart }, icon('retry'), 'Otra vez'),
-          h('button', { type: 'button', class: 'btn', onclick: function () { setMode('explorar'); } }, 'Ir a Explorar')),
-        list ? sec('Para repasar', list) : null));
+      var ring = ringOf(r, pass, 132);
+      if (ring.set) ring.set(r, QZ.score + '/' + n);
+      var card = h('article', { class: 'card qz-result', 'aria-labelledby': 'qz-title' },
+        celebrateEl(),
+        h('div', { class: 'qz-result-top' }, ring,
+          h('div', { class: 'qz-result-main' },
+            h('p', { class: 'done-k' + (pass ? '' : ' is-neutral'), text: pass ? 'Aprobado (70 % o más)' : 'Resultado' }),
+            h('h2', { class: 'placard qz-result-t', id: 'qz-title', tabindex: '-1', text: QZ.score + ' de ' + n + ' correctas' }),
+            best ? h('p', { class: 'soft small', text: QZ.newBest ? '¡Es tu mejor resultado hasta ahora!' : 'Tu mejor resultado: ' + best.score + ' de ' + best.total }) : null)),
+        h('p', { class: 'lead', text: msg }));
+      v.appendChild(card);
+      if (weak.length) {
+        var wl = h('ul', { class: 'qz-weak' });
+        weak.slice(0, 4).forEach(function (w) {
+          var li = lessonIndexById(w.t.lesson);
+          wl.appendChild(h('li', null,
+            h('span', { class: 'qz-weak-n', text: String(w.n) }),
+            h('span', { class: 'qz-weak-t' }, h('strong', { text: w.t.label }), h('span', { class: 'soft small', text: w.n + (w.n === 1 ? ' respuesta para repasar' : ' respuestas para repasar') })),
+            li >= 0 ? h('button', { type: 'button', class: 'btn btn--small', onclick: function () { setMode('basico'); lbOpen(li); sheetEnsure('half'); } }, kic('book'), 'Repasar')
+              : (w.t.control ? h('button', { type: 'button', class: 'btn btn--small', onclick: function () { UI.showControl(w.t.control); } }, kic('cabin'), 'Ver') : null)));
+        });
+        v.appendChild(h('section', { class: 'qz-sec' }, sectHead('01', 'Temas para repasar'), wl));
+      }
+      if (wrong.length) {
+        var list = h('ul', { class: 'rows' });
+        wrong.forEach(function (x) {
+          var q = x.q, ans = q.tipo === 'donde' ? ctrlName(q.control) : arr(q.opciones)[q.correcta];
+          list.appendChild(h('li', { class: 'qz-wrong' },
+            h('p', { class: 'qz-wrong-q', text: q.pregunta }),
+            h('p', { class: 'small qz-wrong-a' }, h('span', { class: 'soft', text: 'Respuesta: ' }), h('strong', { text: ans || '' })),
+            q.explicacion ? h('p', { class: 'small soft', text: q.explicacion }) : null,
+            q.tipo === 'donde' ? h('div', { style: { 'margin-top': '6px' } }, controlChip(q.control)) : null));
+        });
+        v.appendChild(h('div', { class: 'qz-sec' }, acc('Las que fallaste (' + wrong.length + ')', list, { icon: 'list' })));
+      }
+      var sg = [];
+      if (!pass) {
+        var wl0 = weak.length ? lessonIndexById(weak[0].t.lesson) : -1;
+        if (wl0 >= 0) sg.push({ primary: true, icon: 'book', title: 'Lección: ' + (LESSONS[wl0].titulo || ''), text: 'Repasá “' + weak[0].t.label + '”', onClick: function () { setMode('basico'); lbOpen(wl0); sheetEnsure('half'); } });
+        else sg.push({ primary: true, icon: 'route', title: 'Recorrido guiado', text: 'Control por control, desde cero', onClick: function () { setMode('recorrido'); scrollPanelTop(); } });
+        sg.push({ icon: 'retry', title: 'Probar de nuevo', text: 'Otras preguntas al azar', onClick: qzStart });
+      } else {
+        var nk = firstUndone(CHECKLISTS, 'checklist');
+        if (nk >= 0) sg.push({ primary: true, icon: 'checklist', title: 'Checklist “' + (CHECKLISTS[nk].titulo || '') + '”', text: 'Seguí practicando los procedimientos', onClick: function () { clOpen(nk); setMode('checklists'); sheetEnsure('half'); } });
+        sg.push({ primary: nk < 0, icon: 'flag', title: 'Situaciones: ¿qué harías?', text: 'Cosas reales que pasan en un vuelo', onClick: function () { setMode('volar'); voSetTab('situaciones'); scrollPanelTop(); } });
+        sg.push({ icon: 'retry', title: 'Otra tanda de preguntas', text: 'Para afianzar', onClick: qzStart });
+      }
+      v.appendChild(h('div', { class: 'qz-sec sg-wrap' }, h('p', { class: 'sg-k', text: 'Seguí con…' }), h('div', { class: 'sg-list' }, sg.map(sgCard))));
       if (focusTitle) { var tt = $('qz-title'); if (tt) safe(function () { tt.focus({ preventScroll: true }); }); }
       return;
     }
@@ -4186,7 +4549,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     var body;
     if (q.tipo === 'donde') {
       body = h('div', null,
-        QZ.answered ? null : h('div', { class: 'pick-hint' }, icon('hand'),
+        QZ.answered ? null : h('div', { class: 'pick-hint' }, kic('hand'),
           h('span', { text: 'Tocá el control en la cabina 3D. Podés girar la vista o usar los botones de Vistas.' })),
         !QZ.answered ? h('div', { class: 'btn-row' }, h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: qzGiveUp }, 'No sé: mostrámelo')) : null);
     } else {
@@ -4196,23 +4559,27 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         if (QZ.answered && k === q.correcta) cls += ' is-correct';
         else if (QZ.answered && k === QZ.chosen) cls += ' is-wrong';
         body.appendChild(h('button', { type: 'button', class: cls, disabled: QZ.answered, onclick: function () { qzAnswer(k); } },
-          h('span', { class: 'opt-letter', 'aria-hidden': 'true', text: 'ABCDEFGH'.charAt(k) }), h('span', { text: o }),
+          h('span', { class: 'opt-letter', 'aria-hidden': 'true', text: 'ABCDEFGH'.charAt(k) }), h('span', { class: 'opt-t', text: o }),
+          QZ.answered && k === q.correcta ? h('span', { class: 'opt-flag', 'aria-hidden': 'true' }, kic('check')) : null,
           QZ.answered && k === q.correcta ? h('span', { class: 'sr-only', text: ' (correcta)' }) : null,
           QZ.answered && k === QZ.chosen && k !== q.correcta ? h('span', { class: 'sr-only', text: ' (tu respuesta)' }) : null));
       });
     }
-    var fb = QZ.fb ? h('div', { class: 'feedback ' + (QZ.fb.ok ? 'feedback--ok' : 'feedback--bad'), role: 'status' },
-      h('strong', { text: QZ.fb.title }), QZ.fb.text ? h('span', { text: QZ.fb.text }) : null) : null;
-    var nextBtn = QZ.answered ? h('button', { type: 'button', class: 'btn btn--primary', id: 'qz-next', onclick: qzNext },
-      QZ.i + 1 >= n ? 'Ver el resultado' : 'Siguiente', icon('next')) : null;
-    v.appendChild(h('div', { class: 'cl-progress', style: { margin: '0 0 12px' } },
-      progressBar((QZ.i + (QZ.answered ? 1 : 0)) / n), h('span', { class: 'pct', text: (QZ.i + 1) + '/' + n })));
-    v.appendChild(h('article', { class: 'card', 'aria-labelledby': 'qz-q' },
-      h('p', { class: 'kicker' }, 'Pregunta ' + (QZ.i + 1) + ' de ' + n, h('span', { class: 'soft', text: ' · ' + (q.tipo === 'donde' ? '¿Dónde está?' : 'Opciones') })),
+    var fb = QZ.fb ? h('div', { class: 'feedback qz-fb ' + (QZ.fb.ok ? 'feedback--ok' : 'feedback--bad'), role: 'status' },
+      h('span', { class: 'qz-fb-ico', 'aria-hidden': 'true' }, kic(QZ.fb.ok ? 'check' : 'bulb')),
+      h('div', { class: 'qz-fb-b' }, h('strong', { text: QZ.fb.title }),
+        QZ.fb.answer ? h('span', { class: 'qz-fb-a' }, 'La correcta: ', h('b', { text: QZ.fb.answer })) : null,
+        QZ.fb.text ? h('span', { text: QZ.fb.text }) : null)) : null;
+    var nextBtn = QZ.answered ? h('button', { type: 'button', class: 'btn btn--primary btn--large', id: 'qz-next', onclick: qzNext },
+      QZ.i + 1 >= n ? 'Ver el resultado' : 'Siguiente pregunta', icon('next')) : null;
+    v.appendChild(h('div', { class: 'qz-prog' }, progressBar((QZ.i + (QZ.answered ? 1 : 0)) / n),
+      h('span', { class: 'pg-t', text: 'Pregunta ' + (QZ.i + 1) + ' de ' + n }),
+      h('span', { class: 'qz-score', title: 'Respuestas correctas hasta ahora' }, kic('check'), QZ.score)));
+    v.appendChild(h('article', { class: 'card qz-card', 'aria-labelledby': 'qz-q' },
+      h('p', { class: 'kicker' }, q.tipo === 'donde' ? '¿Dónde está?' : 'Elegí una opción'),
       h('h2', { class: 'quiz-q', id: 'qz-q', tabindex: '-1', text: q.pregunta }),
       body, fb,
-      nextBtn ? h('div', { class: 'btn-row' }, nextBtn) : null,
-      h('p', { class: 'soft small', style: { margin: '12px 0 0' }, text: 'Puntaje: ' + QZ.score + ' de ' + (QZ.i + (QZ.answered ? 1 : 0)) })));
+      nextBtn ? h('div', { class: 'btn-row qz-next' }, nextBtn) : null));
     if (focusTitle) { var qt = $('qz-q'); if (qt && mode === 'quiz') safe(function () { qt.focus({ preventScroll: true }); }); }
     else if (nextBtn && mode === 'quiz') safe(function () { nextBtn.focus({ preventScroll: true }); });
   }
@@ -4230,9 +4597,16 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     var Gl = C150.Glossary;
     if (el && Gl && isFn(Gl.annotate)) safe(function () { Gl.annotate(el, opts); }, 'Glossary.annotate');
   }
+  /** Glossary popovers only inside the reading text (not in kickers, titles or buttons): each match is annotated on its own. */
+  function glossText(root, sel, opts) {
+    if (!root) return;
+    var els = root.querySelectorAll(sel);
+    for (var i = 0; i < els.length; i++) gloss(els[i], opts);
+  }
   function labApi() {
     return {
       annotate: gloss, h: h, icon: icon, setText: setText, setAttr: setAttr, toggleClass: toggleClass, fmt: fmt, safe: safe, store: store,
+      kic: kic, acc: acc, callK: callK,
       cc: cc, has: has, core: Core, S: S, setInput: setInput, applyPreset: applyPreset, setFlapSwitch: setFlapSwitch,
       kick: kick, viewport: $('viewport'), panel: $('panel'), setMode: setMode, getMode: function () { return mode; },
       currentPreset: function () { return currentPreset; }, getMainView: function () { return mainView; },
@@ -4253,6 +4627,106 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     },
     slow: function (s) { if (labOk() && isFn(C150.Lab.slow)) C150.Lab.slow(s); }
   };
+
+  /* ================================================================== "SIGUIENTE PASO" (barra al pie del panel, contract v4 U4)
+   * One suggestion, from C150.Progress and the tab that is open: "Seguí con: Checklist «Antes de arrancar»" + a primary button.
+   * It does not show while the student is in the middle of something (a lesson, a checklist, a mission, a quiz question, the tour)
+   * nor on a completion screen (those already say "Seguí con…"), nor on Inicio (it has its own "Continuar"). The ✕ hides it for
+   * that tab during this session (sessionStorage 'c150.nx'); on phones it sits right above the bottom of the sheet and is
+   * hidden while the sheet is only peeking. */
+  var NX = { el: null, k: null, t: null, go: null, ver: 0, key: '', sug: null, hid: (function () {
+    try { var v = JSON.parse(root.sessionStorage.getItem('c150.nx')); return (v && typeof v === 'object') ? v : {}; } catch (e) { return {}; }
+  })() };
+  function nxSaveHidden() { try { root.sessionStorage.setItem('c150.nx', JSON.stringify(NX.hid)); } catch (e) { /* sin sessionStorage */ } }
+  /** True when a completion screen or an activity in progress already says what to do next. */
+  function nxBusy() {
+    switch (mode) {
+      case 'recorrido': return true;
+      case 'basico': return LB.idx >= 0;
+      case 'checklists': return !!CL.cur;
+      case 'volar': return !!VO.m || sitDetail();
+      case 'quiz': return QZ.phase !== 'start';
+      case 'inicio': case 'escuela': return true;
+    }
+    return false;
+  }
+  /** True while a situation's briefing, live run or debrief is on screen (not the list of cards). */
+  function sitDetail() { return !!(VO.tab === 'situaciones' && VO.sitView && VO.sitView.querySelector('.sit-brief, .sit-run, .sit-debrief')); }
+  function nxGeneric() {
+    var P = PG(), sm = P ? safe(function () { return P.summary(); }, 'progress.summary') : null, st = sm && sm.siguiente;
+    if (!st) return null;
+    var rq = null;
+    for (var i = 0; i < st.requisitos.length; i++) if (!st.requisitos[i].hecho) { rq = st.requisitos[i]; break; }
+    if (!rq) return null;
+    return { id: 'g:' + st.id, title: rq.texto, btn: 'Ir', icon: 'flag', fn: function () { UI.go(String(rq.ruta || '#inicio').replace(/^#/, '')); sheetEnsure('half'); } };
+  }
+  function nxPick() {
+    var i, g = null;
+    switch (mode) {
+      case 'explorar':
+        if (exSeen() < 10) {
+          var ids = essentialsNext(1);
+          if (ids.length) return { id: 'c:' + ids[0], title: 'Conocé: ' + ctrlName(ids[0]), btn: 'Verlo', icon: 'cabin', fn: function () { openControl(ids[0], 'list'); } };
+        }
+        if (!isDone('recorrido', 'tour') && TOUR.length) return { id: 'tour', title: 'El recorrido guiado', btn: 'Empezar', icon: 'route', fn: function () { setMode('recorrido'); sheetEnsure('half'); } };
+        break;
+      case 'basico':
+        i = firstUndone(LESSONS, 'leccion');
+        if (i >= 0) return { id: 'l:' + LESSONS[i].id, title: 'Lección: ' + (LESSONS[i].titulo || ''), btn: 'Empezar', icon: 'book', fn: function () { lbOpen(i); sheetEnsure('half'); } };
+        break;
+      case 'checklists':
+        i = firstUndone(CHECKLISTS, 'checklist');
+        if (i >= 0) return { id: 'k:' + CHECKLISTS[i].id, title: 'Checklist “' + (CHECKLISTS[i].titulo || '') + '”', btn: 'Empezar', icon: 'checklist', fn: function () { clOpen(i); sheetEnsure('half'); } };
+        break;
+      case 'volar':
+        var nMis = firstUndone(MISSIONS, 'mision'), sl = sitOk() ? arr(C150.Situations.list) : [], nSit = firstUndone(sl, 'situacion');
+        var sMis = nMis >= 0 ? { id: 'm:' + MISSIONS[nMis].id, title: 'Misión: ' + (MISSIONS[nMis].titulo || ''), btn: 'Probar', icon: 'plane', fn: function () { startMission(MISSIONS[nMis]); sheetEnsure('half'); } } : null;
+        var sSit = (nSit >= 0 && isFn(C150.Situations.open)) ? { id: 's:' + sl[nSit].id, title: 'Situación: ' + (sl[nSit].titulo || sl[nSit].nombre || ''), btn: 'Ver', icon: 'flag', fn: function () { voSetTab('situaciones'); safe(function () { C150.Situations.open(sl[nSit].id); }, 'Situations.open'); sheetEnsure('half'); } } : null;
+        g = (VO.tab === 'situaciones') ? (sSit || sMis) : (sMis || sSit);
+        if (g) return g;
+        break;
+      case 'quiz':
+        break;
+      case 'aire':
+        var xs = arr(DATA.labExperiments);
+        i = firstUndone(xs, 'aire');
+        if (i >= 0) return { id: 'a:' + xs[i].id, title: 'Experimento: ' + (xs[i].titulo || xs[i].id), btn: 'Probar', icon: 'wind', fn: function () { UI.openLab(xs[i].id); sheetEnsure('half'); } };
+        break;
+    }
+    g = nxGeneric();
+    if (g && mode === 'quiz' && g.id === 'g:quiz') return null;      // already in the quiz tab
+    return g;
+  }
+  function nxRender() {
+    var el = NX.el;
+    if (!el) return;
+    var s = (!nxBusy() && !NX.hid[mode]) ? NX.sug : null;
+    el.hidden = !s;
+    if (!s) return;
+    setText(NX.t, s.title);
+    setText($('nextbar-go'), s.btn);
+    var u = el.querySelector('.nextbar-ico use');
+    if (u) u.setAttribute('href', '#i-' + (s.icon || 'flag'));
+  }
+  function nxRefresh(force) {
+    if (!NX.el) return;
+    var busy = nxBusy();
+    var key = mode + '|' + NX.ver + '|' + (busy ? 1 : 0) + '|' + (NX.hid[mode] ? 1 : 0) + '|' + (mode === 'volar' ? VO.tab : '');
+    if (!force && key === NX.key) return;
+    NX.key = key;
+    NX.sug = busy ? null : safe(nxPick, 'nextStep');
+    nxRender();
+  }
+  function setupNextBar() {
+    NX.el = $('nextbar');
+    if (!NX.el) return;
+    NX.t = $('nextbar-t');
+    $('nextbar-go').addEventListener('click', function () { var s = NX.sug; if (s && isFn(s.fn)) safe(s.fn, 'nextStep.go'); });
+    $('nextbar-x').addEventListener('click', function () { NX.hid[mode] = true; nxSaveHidden(); nxRefresh(true); });
+    var P = PG();
+    if (P && isFn(P.onChange)) P.onChange(function () { NX.ver++; });
+    liveGlobal.push(function () { nxRefresh(false); });
+  }
 
   /* ================================================================== boot */
 
@@ -4337,6 +4811,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     safe(setupPeek, 'peek');
     safe(setupInteractionTracking, 'interaction');
     safe(setupProgress, 'progress');
+    safe(setupNextBar, 'nextbar');
     root.addEventListener('blur', releaseAllHolds);
     var ok = safe(function () { return startCore(state); }, 'startCore');
     if (!ok) { coreReady = false; if (state) startLocalLoop(); }
