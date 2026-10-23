@@ -23,6 +23,12 @@ Página estática en HTML y JavaScript, sin frameworks. El 3D usa [Three.js](htt
 src/
   index.html, styles.css   estructura y estilos de la app
   ui.js                    interfaz: modos, fichas, checklists, misiones, quiz
+  icons.js, kit.js         íconos (sprite SVG) y componentes del sistema de diseño v2 (C150.Kit)
+  progress.js              avance del alumno: "Tu camino" (C150.Progress, localStorage)
+  home.js                  pantalla de Inicio: continuar, "Tu camino", acciones rápidas, consejos
+  onboarding.js            bienvenida de la primera vez y tutorial de 5 pasos con foco
+  search.js                buscador (Ctrl K o /) con proveedores registrables (C150.Search.register)
+  glossary.js              palabras subrayadas con su definición (C150.Glossary.annotate)
   core.js                  motor 3D: render, luces, cámara, selección y arrastre de mandos
   cockpit.js               la cabina 3D
   exterior.js              el avión visto desde afuera y sus animaciones
@@ -30,7 +36,7 @@ src/
   gauges.js                los instrumentos dibujados
   sim.js                   simulador de motor, sistemas y vuelo
   data/                    contenido: fichas, lecciones, recorrido, checklists, misiones, quiz y glosario
-tests/                     pruebas (Node) y páginas de prueba
+tests/                     pruebas (Node) y páginas de prueba (styleguide.html = guía de estilo viva)
 build.js                   arma todo en un solo HTML
 ```
 

@@ -4,10 +4,36 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
  *
  *   C150.UI.init()            boots once (auto on DOMContentLoaded): theme, tabs, help, viewport overlays,
  *                             Core.init({container:#viewport, state}) and the six modes.
- *   C150.UI.setMode(name)     'explorar' | 'basico' | 'recorrido' | 'checklists' | 'volar' | 'quiz' | 'aire'
+ *   C150.UI.setMode(name)     'inicio' | 'explorar' | 'basico' | 'recorrido' | 'checklists' | 'volar' | 'quiz' | 'aire' | 'escuela'
+ *                             or a nav group: 'cabina' (= explorar) | 'lecciones' | 'practicar' (open the sub-tab used last).
+ *   C150.UI.go(path)          route string, like the URL hash: 'lecciones/basico', 'practicar', 'cabina/yoke', 'aire/<expId>',
+ *                             'escuela/AER-03-02' (reserved: handed to C150.Escuela.go(rest)). Returns false if unknown.
  *   C150.UI.showControl(id)   opens Explorar with that control's card.
- *   C150.UI.getMode()         current mode name.
+ *   C150.UI.getMode()         current mode name.   C150.UI.getGroup()   current nav group id.
  *   C150.UI.openLab(expId?)   opens the AIRE tab ("Laboratorio del aire", lab.js) and, if given, that experiment.
+ *   C150.UI.toast({text, kind}) small message over the 3D view (kind: info | warn | good).
+ *   C150.UI.syncNav()         re-reads nav state (shows the ESCUELA item once window.C150.Escuela exists).
+ *  Contract v4 (UI/UX redesign, wave U1 — shell):
+ *  - Navigation = groups: Inicio · Cabina · Lecciones (Recorrido guiado | Lecciones) · Practicar (Checklists | Misiones y situaciones | Quiz)
+ *    · Aire · [Escuela]. Hash routing: #inicio #cabina #lecciones #practicar #aire #escuela plus every old hash (#explorar #basico #recorrido
+ *    #checklists #volar #quiz) as aliases; no hash → Inicio. The sub-tab used last in a group is remembered (localStorage 'c150.sub.<group>').
+ *  - 'inicio' is rendered by C150.Home.render(sectionEl, api) when home.js exists, else by a small "Tu camino" placeholder (Progress.summary()).
+ *  - Phones (≤ 760 px portrait): bottom nav + the panel is a bottom sheet with 3 snap points (peek 88 px / half 50 % / full 90 %), drag handle,
+ *    swipe, tap/Enter to cycle, remembered per mode ('c150.sheet'). ui.js writes --sheet-* px vars on .main (styles.css reads them).
+ *  - Progress: C150.Progress.mark() from the existing activities (store.set hooks + explicit marks), see "progress bridge".
+ *
+ *  Contract v4, wave U3 — Cabina cards + 3D overlay:
+ *  - Cabina (explorar): header + progress ("Viste N de M controles", C150.Progress 'cabina'), "Empezá por acá" (next essentials), search
+ *    field (C150.Search.rank when present), category chips with icons, list grouped by category with the essentials first and a check on
+ *    what was already opened. The card: category / Esencial / Visto badges, summary, actions (Mostrámelo en 3D · Ver en el avión · Ver el
+ *    aire), "Probalo" (kit-styled widgets), then accordions: Dónde está + Qué hace (open), Cada parte, Qué pasa en el avión, Cómo se usa
+ *    (numbered), Cuándo se usa, Errores comunes, Truco, Dato curioso, Marcas de colores, En otros años y modelos; related chips; prev/next.
+ *  - Over the 3D: status strip (Motor · Corriente (master) · En tierra/En vuelo · Velocidad · Altura; each chip opens a popover with the
+ *    plain explanation and "Ver en 3D"), ONE "Escenario" button (popover with SCN_PLAIN + C150.Sim.PRESETS labels; shows "Demostración en
+ *    curso" + "Volver al escenario" during a demonstration), layout switch with icons, "Vistas" popover with cockpit pictograms (the active
+ *    camera marked), restyled hover callout, and the COACH bubble (COACH_TIPS; dismissals in localStorage 'c150.coach'; UI.resetTips()).
+ *    Narrow views (< 560 px) move the scenario button and the layout switch to the bottom row; 'Las dos' side by side moves the status
+ *    and tools to the bottom of the cockpit half so they never cover the windshield.
  *
  * Decisions where the contract leaves room (other agents: please read):
  *  - Every Core call goes through cc(): a missing core.js, a missing method or a failed WebGL start never
@@ -131,8 +157,41 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     },
     set: function (k, v) {
       try { root.localStorage.setItem('c150.' + k, JSON.stringify(v)); } catch (e) { /* almacenamiento bloqueado */ }
+      if (STORE_HOOKS && STORE_HOOKS[k]) safe(function () { STORE_HOOKS[k](v, false); }, 'progress hook ' + k);
     }
   };
+
+  /* ================================================================== progress bridge (C150.Progress, progress.js)
+     The existing activities already persist their own state through store.set(); the hooks below turn each of those
+     writes into a Progress.mark() (so lessons, checklists, missions, situations, AIRE experiments and the quiz
+     count towards "Tu camino" without touching their code). Recorrido and "controls opened" are marked explicitly. */
+  function PG() { var p = C150.Progress; return (p && typeof p.mark === 'function') ? p : null; }
+  function progMark(kind, id, data, silent) {
+    var p = PG();
+    if (!p) return;
+    safe(function () { if (silent) { if (!p.get(kind, id)) p.mark(kind, id, data, { silent: true }); } else p.mark(kind, id, data); }, 'progress.mark');
+  }
+  function progTouch(kind, id, data) { var p = PG(); if (p && typeof p.touch === 'function') safe(function () { p.touch(kind, id, data); }, 'progress.touch'); }
+  var STORE_HOOKS = {
+    // v = the value just stored; silent = importing what an earlier visit stored (does not count as "last activity")
+    lessonsDone: function (v, silent) { arr(v).forEach(function (id) { if (!silent && PG() && PG().get('leccion', id)) return; progMark('leccion', id, undefined, silent); }); },
+    checklistsDone: function (v, silent) { arr(v).forEach(function (id) { if (!silent && PG() && PG().get('checklist', id)) return; progMark('checklist', id, undefined, silent); }); },
+    labDone: function (v, silent) { arr(v).forEach(function (id) { if (!silent && PG() && PG().get('aire', id)) return; progMark('aire', id, undefined, silent); }); },
+    situationsDone: function (v, silent) {
+      Object.keys(v || {}).forEach(function (id) { if (!v[id]) return; if (!silent && PG() && PG().get('situacion', id)) return; progMark('situacion', id, undefined, silent); });
+    },
+    missionsBest: function (v, silent) {
+      Object.keys(v || {}).forEach(function (id) {
+        if (num(v[id], 0) < 1) return;
+        if (!silent && PG() && PG().get('mision', id)) return;
+        progMark('mision', id, { mejor: 1 }, silent);
+      });
+    },
+    quizBest: function (v, silent) { if (v && num(v.total, 0) > 0) progMark('quiz', 'best', { score: num(v.score, 0), total: v.total }, silent); }
+  };
+  function importLegacyProgress() {
+    Object.keys(STORE_HOOKS).forEach(function (k) { var v = store.get(k, null); if (v !== null) safe(function () { STORE_HOOKS[k](v, true); }, 'import ' + k); });
+  }
 
   function reducedMotion() {
     return !!(root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -155,7 +214,9 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     cabin: '<path d="M3 18c2-7 5-10 9-10s7 3 9 10"/><path d="M8 18v-3h8v3"/>',
     close: '<path d="M6 6l12 12M18 6L6 18"/>',
     eye: '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>',
-    wind: '<path d="M3 8.5h11a3 3 0 1 0-3-3M3 12.5h16a3 3 0 1 1-3 3M3 16.5h7"/>'
+    wind: '<path d="M3 8.5h11a3 3 0 1 0-3-3M3 12.5h16a3 3 0 1 1-3 3M3 16.5h7"/>',
+    split: '<rect x="3" y="5" width="18" height="14" rx="2.2"/><path d="M12 5v14"/>',
+    alt: '<path d="M12 20V5M7.5 9.5L12 5l4.5 4.5"/><path d="M5 20h14"/>'
   };
   function icon(name) {
     var s = doc.createElementNS(SVGNS, 'svg');
@@ -264,8 +325,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   /** A sim preset was applied (by the UI or by anyone calling Core.applyPreset): keep the selector and listeners in sync. */
   function presetApplied(name) {
     currentPreset = name;
-    var sel = $('vp-scenario-select');
-    if (sel && sel.value !== name && !demoOn) sel.value = name;
+    syncScenarioBtn();
     presetListeners.forEach(function (fn) { safe(function () { fn(name); }, 'preset listener'); });
     kick();
   }
@@ -400,15 +460,55 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
 
   /* ================================================================== modes framework */
 
-  var MODES = ['explorar', 'basico', 'recorrido', 'checklists', 'volar', 'quiz', 'aire'];
+  var MODES = ['inicio', 'explorar', 'basico', 'recorrido', 'checklists', 'volar', 'quiz', 'aire', 'escuela'];
   var modeImpl = {};          // name → { render(section), enter(), exit(), slow(state), frame(state, dt) }
   var rendered = {};
   var scrollMem = {};
   var mode = null;
 
+  /* ---- navigation groups (contract v4 §2). Modes are unchanged; groups only decide what the nav and the sub-tabs show. */
+  var GROUPS = [
+    { id: 'inicio', modes: ['inicio'] },
+    { id: 'cabina', modes: ['explorar'] },
+    { id: 'lecciones', modes: ['recorrido', 'basico'], first: 'recorrido' },
+    { id: 'practicar', modes: ['checklists', 'volar', 'quiz'], first: 'checklists' },
+    { id: 'aire', modes: ['aire'] },
+    { id: 'escuela', modes: ['escuela'] }
+  ];
+  var GROUP_OF = {};
+  GROUPS.forEach(function (g) { g.modes.forEach(function (m) { GROUP_OF[m] = g.id; }); });
+  var MODE_INFO = {                                        // title / one-line help / icon (bottom-sheet header, window title)
+    inicio: { title: 'Inicio', sub: 'Tu camino y qué hacer ahora', icon: 'home' },
+    explorar: { title: 'Cabina', sub: 'Tocá un mando o instrumento para conocerlo', icon: 'cabin' },
+    recorrido: { title: 'Recorrido guiado', sub: 'Control por control, como el primer día', icon: 'route' },
+    basico: { title: 'Lecciones', sub: 'Cómo vuela un avión, paso a paso', icon: 'book' },
+    checklists: { title: 'Checklists', sub: 'Los pasos antes de cada maniobra', icon: 'checklist' },
+    volar: { title: 'Misiones y situaciones', sub: 'Pasá de mirar a volar', icon: 'plane' },
+    quiz: { title: 'Quiz', sub: 'Probá lo que sabés', icon: 'quiz' },
+    aire: { title: 'Aire', sub: 'Mirá cómo se mueve el aire alrededor del avión', icon: 'wind' },
+    escuela: { title: 'Escuela', sub: 'Teoría para el examen', icon: 'cap' }
+  };
+  var ROUTE_ALIAS = { cabina: 'explorar' };
+  function escuelaOk() { return !!C150.Escuela; }
+  function groupOf(m) { return GROUP_OF[m] || 'inicio'; }
+  function groupDef(id) { for (var i = 0; i < GROUPS.length; i++) if (GROUPS[i].id === id) return GROUPS[i]; return null; }
+  function hashFor(m) { return m === 'explorar' ? 'cabina' : m; }
+  /** Mode name, group id ('lecciones', 'practicar', 'cabina') or old alias → a real mode, or null when unknown. */
+  function resolveMode(name) {
+    name = String(name || '').toLowerCase();
+    if (ROUTE_ALIAS[name]) name = ROUTE_ALIAS[name];
+    if (MODES.indexOf(name) >= 0) return (name === 'escuela' && !escuelaOk()) ? null : name;
+    var g = groupDef(name);
+    if (g && g.first) {
+      var sub = store.get('sub.' + g.id, g.first);
+      return g.modes.indexOf(sub) >= 0 ? sub : g.first;
+    }
+    return null;
+  }
+
   function setMode(name, opts) {
-    if (MODES.indexOf(name) < 0) name = 'explorar';
-    if (name === mode) return;
+    name = resolveMode(name) || 'inicio';
+    if (name === mode) { if (!(opts && opts.fromHash)) syncNav(); return; }
     var panel = $('panel');
     if (mode) {
       scrollMem[mode] = panel.scrollTop;
@@ -419,17 +519,12 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     }
     mode = name;
     var app = $('app');
-    if (app) app.setAttribute('data-mode', name);       // hook for per-mode CSS
-    MODES.forEach(function (m) { var el = $('panel-' + m); if (el) el.hidden = m !== name; });
-    var tabs = doc.querySelectorAll('.tab');
-    for (var i = 0; i < tabs.length; i++) {
-      var on = tabs[i].getAttribute('data-mode') === name;
-      tabs[i].setAttribute('aria-selected', on ? 'true' : 'false');
-      tabs[i].tabIndex = on ? 0 : -1;
-      if (on && tabs[i].scrollIntoView && !(opts && opts.noScrollTab)) {
-        safe(function () { tabs[i].scrollIntoView({ block: 'nearest', inline: 'nearest' }); });
-      }
+    if (app) {
+      app.setAttribute('data-mode', name);               // hook for per-mode CSS
+      app.setAttribute('data-group', groupOf(name));
     }
+    MODES.forEach(function (m) { var el = $('panel-' + m); if (el) el.hidden = m !== name; });
+    syncNav(opts);
     var sec = $('panel-' + name);
     sec.hidden = false;
     var impl = modeImpl[name];
@@ -438,10 +533,60 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     panel.scrollTop = scrollMem[name] || 0;
     hidePeek();
     syncAirPeek();
+    sheetOnMode();
+    var g = groupDef(groupOf(name));
+    if (g && g.first) store.set('sub.' + g.id, name);
+    store.set('lastMode', name);
     if (!(opts && opts.fromHash)) {
-      try { root.history.replaceState(null, '', '#' + name); } catch (e) { /* sin historial (sandbox) */ }
+      try { root.history.replaceState(null, '', '#' + hashFor(name)); } catch (e) { /* sin historial (sandbox) */ }
     }
     kick();
+  }
+
+  /** Route string (same as the URL hash, without '#'): 'cabina', 'lecciones/basico', 'cabina/yoke', 'aire/<expId>', 'escuela/<lessonId>'. */
+  function go(path, opts) {
+    path = String(path || '').replace(/^#\/?/, '');
+    var parts = path.split('/'), head = (parts[0] || '').toLowerCase(), rest = parts.slice(1).join('/');
+    var m = resolveMode(head);
+    if (!m) return false;
+    var g = groupDef(groupOf(m));
+    if (rest && g && g.modes.indexOf(rest) >= 0) m = rest;                       // 'lecciones/basico'
+    setMode(m, opts);
+    if (rest) {
+      if (m === 'explorar' && CTRL[rest]) openControl(rest, 'list');
+      else if (m === 'aire' && C150.Lab && isFn(C150.Lab.startExperiment)) safe(function () { C150.Lab.startExperiment(rest); }, 'Lab.startExperiment');
+      else if (m === 'escuela' && C150.Escuela && isFn(C150.Escuela.go)) safe(function () { C150.Escuela.go(rest); }, 'Escuela.go');
+    }
+    return true;
+  }
+
+  /** Nav buttons (aria-current), sub-tabs, bottom-sheet header, window title, ring: everything that mirrors "where am I". */
+  function syncNav() {
+    var gid = groupOf(mode), info = MODE_INFO[mode] || MODE_INFO.inicio;
+    var items = doc.querySelectorAll('.nav-item');
+    for (var i = 0; i < items.length; i++) {
+      var g = items[i].getAttribute('data-group');
+      if (g === 'escuela') items[i].hidden = !escuelaOk();
+      if (g === gid) items[i].setAttribute('aria-current', 'page'); else items[i].removeAttribute('aria-current');
+    }
+    var lists = doc.querySelectorAll('.subtabs'), anySub = false;
+    for (var j = 0; j < lists.length; j++) {
+      var mine = lists[j].getAttribute('data-group') === gid;
+      lists[j].hidden = !mine;
+      if (mine) anySub = true;
+      var tb = lists[j].querySelectorAll('.subtab');
+      for (var k = 0; k < tb.length; k++) {
+        var on = tb[k].getAttribute('data-mode') === mode;
+        tb[k].setAttribute('aria-selected', on ? 'true' : 'false');
+        tb[k].tabIndex = on ? 0 : -1;
+      }
+    }
+    toggleClass($('panel-head'), 'has-subtabs', anySub);
+    setText($('sheet-title'), info.title);
+    setText($('sheet-sub'), info.sub);
+    var use = $('sheet-ico-use');
+    if (use) use.setAttribute('href', '#i-' + info.icon);
+    try { doc.title = (mode === 'inicio' ? '' : info.title + ' · ') + 'Cabina Cessna 150'; } catch (e) { /* título fijo */ }
   }
 
   function scrollPanelTop() { var p = $('panel'); if (p) p.scrollTop = 0; }
@@ -551,6 +696,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     [['R'], 'Subir flaps'],
     [['T', 'G'], 'Compensador: nariz abajo / nariz arriba'],
     [['M'], 'Master (batería y alternador)'],
+    [['Ctrl K', '/'], 'Abrir el buscador (mandos, términos, lecciones)'],
+    [['?'], 'Abrir esta ayuda'],
     [['1', '8'], 'Posiciones de la cámara (del 1 al 8)'],
     [['C'], 'Cambiar la vista grande: cabina o avión desde afuera'],
     [['P'], 'Pausa'],
@@ -628,6 +775,16 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     $('help-keys').appendChild(keysTable());
     setText($('help-aviso'), AVISO);
     $('btn-help').addEventListener('click', openHelp);
+    var ht = $('help-tour'), hs = $('help-search');
+    if (ht) ht.addEventListener('click', function () {
+      closeHelp();
+      var Ob = C150.Onboarding;
+      if (Ob && isFn(Ob.start)) safe(function () { Ob.start({ force: true }); }, 'Onboarding.start');
+      else showToast({ text: 'El tutorial no está disponible en este momento.', kind: 'info' });
+    });
+    if (hs) hs.addEventListener('click', function () { closeHelp(); openSearch(); });
+    var hp = $('help-tips');
+    if (hp) hp.addEventListener('click', function () { coachReset(); closeHelp(); showToast({ text: 'Listo: los consejos del instructor vuelven a aparecer abajo en la vista 3D.', kind: 'good' }); });
     $('help').addEventListener('click', function (e) {
       var t = e.target;
       while (t && t !== this) { if (t.getAttribute && t.getAttribute('data-close')) { closeHelp(); return; } t = t.parentNode; }
@@ -642,27 +799,281 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     return tag === 'input' || tag === 'textarea' || tag === 'select' || t.isContentEditable;
   }
 
-  function setupTabs() {
-    var tabs = Array.prototype.slice.call(doc.querySelectorAll('.tab'));
-    tabs.forEach(function (t, i) {
-      t.addEventListener('click', function () { setMode(t.getAttribute('data-mode')); });
-      t.addEventListener('keydown', function (e) {
-        var j = -1;
-        if (e.key === 'ArrowRight') j = (i + 1) % tabs.length;
-        else if (e.key === 'ArrowLeft') j = (i - 1 + tabs.length) % tabs.length;
+  function setupNav() {
+    var items = Array.prototype.slice.call(doc.querySelectorAll('.nav-item'));
+    items.forEach(function (it) {
+      it.addEventListener('click', function () {
+        var g = it.getAttribute('data-group');
+        if (groupOf(mode) === g) { scrollPanelTop(); sheetEnsure('half'); syncNav(); return; }   // already here: back to the top / open the sheet
+        setMode(g);
+        sheetEnsure('half');
+      });
+      it.addEventListener('keydown', function (e) {
+        var vis = items.filter(function (x) { return !x.hidden; }), i = vis.indexOf(it), j = -1;
+        if (e.key === 'ArrowRight') j = (i + 1) % vis.length;
+        else if (e.key === 'ArrowLeft') j = (i - 1 + vis.length) % vis.length;
         else if (e.key === 'Home') j = 0;
-        else if (e.key === 'End') j = tabs.length - 1;
+        else if (e.key === 'End') j = vis.length - 1;
         if (j < 0) return;
         e.preventDefault(); e.stopPropagation();
-        setMode(tabs[j].getAttribute('data-mode'));
-        tabs[j].focus();
+        vis[j].focus();
       });
     });
+    var subs = Array.prototype.slice.call(doc.querySelectorAll('.subtab'));
+    subs.forEach(function (t) {
+      t.addEventListener('click', function () { setMode(t.getAttribute('data-mode')); });
+      t.addEventListener('keydown', function (e) {
+        var sibs = Array.prototype.slice.call(t.parentNode.querySelectorAll('.subtab')), i = sibs.indexOf(t), j = -1;
+        if (e.key === 'ArrowRight') j = (i + 1) % sibs.length;
+        else if (e.key === 'ArrowLeft') j = (i - 1 + sibs.length) % sibs.length;
+        else if (e.key === 'Home') j = 0;
+        else if (e.key === 'End') j = sibs.length - 1;
+        if (j < 0) return;
+        e.preventDefault(); e.stopPropagation();
+        setMode(sibs[j].getAttribute('data-mode'));
+        sibs[j].focus();
+      });
+    });
+    var brand = $('brand');
+    if (brand) brand.addEventListener('click', function () { setMode('inicio'); sheetEnsure('half'); });
+    var ring = $('btn-progress');
+    if (ring) ring.addEventListener('click', function () { setMode('inicio'); sheetEnsure('half'); });
+    var sb = $('btn-search');
+    if (sb) sb.addEventListener('click', function () { openSearch(); });
+    doc.addEventListener('keydown', function (e) {
+      if (isTyping(e.target)) return;
+      var k = e.key;
+      if ((k === 'k' || k === 'K') && (e.ctrlKey || e.metaKey) && searchOk()) { e.preventDefault(); openSearch(); }
+      else if (k === '/' && !e.ctrlKey && !e.metaKey && !e.altKey && searchOk()) { e.preventDefault(); openSearch(); }
+    });
     root.addEventListener('hashchange', function () {
-      var m = (root.location.hash || '').slice(1);
-      if (MODES.indexOf(m) >= 0) setMode(m, { fromHash: true });
+      var h2 = (root.location.hash || '').slice(1);
+      if (h2) go(h2, { fromHash: true });
+    });
+    syncSearchBtn();
+  }
+  /* search: C150.Search (search.js, wave U2). Until it exists the button explains that it is coming. */
+  function searchOk() { var S2 = C150.Search; return !!(S2 && isFn(S2.open)); }
+  function openSearch() {
+    if (searchOk()) { safe(function () { C150.Search.open(); }, 'Search.open'); return; }
+    showToast({ text: 'El buscador llega pronto: vas a poder buscar mandos, términos y lecciones.', kind: 'info' });
+  }
+  function syncSearchBtn() {
+    var sb = $('btn-search');
+    if (!sb) return;
+    var t = searchOk() ? 'Buscar (Ctrl+K o /)' : 'Buscar: próximamente';
+    sb.title = t;
+  }
+
+  /* ================================================================== bottom sheet (phones in portrait, ≤ 760 px)
+     The side panel becomes a sheet over the bottom of .main with three snap points. Layout is plain CSS driven by
+     four px variables written on .main: --sheet-full (panel height), --sheet-visible (how much of it shows),
+     --sheet-reserve (height taken from the 3D view: peek / half; "full" keeps the half size) and --sheet-pad. */
+  var SNAPS = ['peek', 'half', 'full'];
+  var SH = { mq: null, active: false, snap: 'half', mem: {}, drag: null, raf: 0 };
+  var PEEK_PX = 88;
+
+  function sheetMain() { return doc.querySelector('.main'); }
+  function sheetMetrics() {
+    var m = sheetMain(), H = m ? m.clientHeight : 0;
+    var half = Math.max(Math.round(H * 0.5), PEEK_PX + 48);
+    return { H: H, peek: PEEK_PX, half: half, full: Math.max(Math.round(H * 0.9), half + 48) };
+  }
+  function sheetVisible(snap, m) { return snap === 'full' ? m.full : (snap === 'half' ? m.half : m.peek); }
+  function sheetApply(snap, remember) {
+    if (!SH.active) return;
+    var m = sheetMetrics(), main = sheetMain(), panel = $('panel');
+    if (!main || !panel || !m.H) return;
+    if (SNAPS.indexOf(snap) < 0) snap = 'half';
+    SH.snap = snap;
+    var vis = sheetVisible(snap, m);
+    main.style.setProperty('--sheet-full', m.full + 'px');
+    main.style.setProperty('--sheet-visible', vis + 'px');
+    main.style.setProperty('--sheet-reserve', (snap === 'full' ? m.half : vis) + 'px');
+    main.style.setProperty('--sheet-pad', (m.full - vis) + 'px');
+    panel.setAttribute('data-snap', snap);
+    setAttr($('sheet-grip'), 'aria-expanded', snap === 'peek' ? 'false' : 'true');
+    if (remember && mode) { SH.mem[mode] = snap; store.set('sheet', SH.mem); }
+    kick();
+  }
+  function sheetOnMode() { if (SH.active && mode) sheetApply(SH.mem[mode] || 'half', false); }
+  /** Make sure at least `min` of the panel is showing (a control was tapped in 3D, a nav item chosen…). */
+  function sheetEnsure(min) {
+    if (SH.active && SNAPS.indexOf(SH.snap) < SNAPS.indexOf(min)) sheetApply(min, false);
+  }
+  function sheetCycle() { sheetApply(SH.snap === 'peek' ? 'half' : (SH.snap === 'half' ? 'full' : 'half'), true); }
+  function sheetRefresh() {
+    var was = SH.active, main = sheetMain(), panel = $('panel');
+    SH.active = !!(SH.mq && SH.mq.matches);
+    toggleClass($('panel-head'), 'is-sheet', SH.active);
+    if (SH.active) { sheetOnMode(); return; }
+    if (was && main && panel) {
+      ['--sheet-full', '--sheet-visible', '--sheet-reserve', '--sheet-pad'].forEach(function (p) { main.style.removeProperty(p); });
+      panel.removeAttribute('data-snap');
+      panel.style.transform = '';
+      panel.classList.remove('is-dragging');
+      kick();
+    }
+  }
+  function setupSheet() {
+    var grip = $('sheet-grip'), panel = $('panel');
+    if (!grip || !panel) return;
+    var saved = store.get('sheet', {});
+    SH.mem = (saved && typeof saved === 'object') ? saved : {};
+    SH.mq = root.matchMedia ? root.matchMedia('(max-width: 760px) and (orientation: portrait)') : null;
+    if (SH.mq) { if (SH.mq.addEventListener) SH.mq.addEventListener('change', sheetRefresh); else if (SH.mq.addListener) SH.mq.addListener(sheetRefresh); }
+    root.addEventListener('resize', function () {
+      if (!SH.active || SH.raf) return;
+      SH.raf = setTimeout(function () { SH.raf = 0; sheetApply(SH.snap, false); }, 60);
+    });
+    grip.addEventListener('pointerdown', function (e) {
+      if (!SH.active || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      var m = sheetMetrics(), v0 = sheetVisible(SH.snap, m);
+      SH.drag = { id: e.pointerId, y0: e.clientY, vis0: v0, vis: v0, m: m, moved: false, pts: [{ y: e.clientY, t: now() }] };
+      try { grip.setPointerCapture(e.pointerId); } catch (x) { /* sin captura */ }
+      panel.classList.add('is-dragging');
+    });
+    grip.addEventListener('pointermove', function (e) {
+      var d = SH.drag;
+      if (!d || e.pointerId !== d.id) return;
+      var dy = e.clientY - d.y0;
+      if (!d.moved && Math.abs(dy) > 5) d.moved = true;
+      if (!d.moved) return;
+      d.vis = clamp(d.vis0 - dy, d.m.peek, d.m.full);
+      panel.style.transform = 'translate3d(0,' + (d.m.full - d.vis) + 'px,0)';
+      d.pts.push({ y: e.clientY, t: now() });
+      if (d.pts.length > 6) d.pts.shift();
+      e.preventDefault();
+    });
+    function end(e, cancel) {
+      var d = SH.drag;
+      if (!d || (e && e.pointerId !== d.id)) return;
+      SH.drag = null;
+      panel.classList.remove('is-dragging');
+      panel.style.transform = '';
+      try { grip.releasePointerCapture(d.id); } catch (x) { /* ya liberado */ }
+      if (!d.moved) { if (!cancel) sheetCycle(); return; }
+      var a = d.pts[0], b = d.pts[d.pts.length - 1];
+      var v = b.t > a.t ? (b.y - a.y) / (b.t - a.t) : 0;            // px/ms, negative = going up
+      var proj = d.vis - v * 220, best = 'half', bd = Infinity;
+      SNAPS.forEach(function (s) { var dd = Math.abs(sheetVisible(s, d.m) - proj); if (dd < bd) { bd = dd; best = s; } });
+      sheetApply(best, true);
+    }
+    grip.addEventListener('pointerup', function (e) { end(e, false); });
+    grip.addEventListener('pointercancel', function (e) { end(e, true); });
+    grip.addEventListener('keydown', function (e) {
+      if (!SH.active) return;
+      var i = SNAPS.indexOf(SH.snap);
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); sheetCycle(); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); sheetApply(SNAPS[Math.min(2, i + 1)], true); }
+      else if (e.key === 'ArrowDown') { e.preventDefault(); sheetApply(SNAPS[Math.max(0, i - 1)], true); }
+    });
+    sheetRefresh();
+  }
+
+  /* ================================================================== progress ring (top bar) + Inicio */
+  var PRG = { done: null, off: null };
+  function updateRing(sum) {
+    var btn = $('btn-progress');
+    if (!btn) return;
+    var p = sum ? sum.porcentaje : 0;
+    var fill = btn.querySelector('.r-fill'), n = btn.querySelector('.ring-btn-n');
+    if (fill) fill.setAttribute('stroke-dashoffset', (94.25 * (1 - p / 100)).toFixed(2));
+    setText(n, String(p));
+    var t = 'Tu avance: ' + p + ' %' + (sum && sum.siguiente ? '. Siguiente: ' + sum.siguiente.titulo : '');
+    btn.setAttribute('aria-label', t + '. Ir al inicio');
+    btn.title = t;
+  }
+  function setupProgress() {
+    var P = PG();
+    if (!P) return;
+    safe(importLegacyProgress, 'importLegacy');
+    var sum = P.summary();
+    PRG.done = {};
+    sum.camino.forEach(function (s) { if (s.completa) PRG.done[s.id] = true; });
+    updateRing(sum);
+    P.onChange(function (ev) {
+      var s = ev.summary || P.summary();
+      updateRing(s);
+      s.camino.forEach(function (st) {                      // celebrate a finished stage once
+        if (st.completa && !PRG.done[st.id]) {
+          PRG.done[st.id] = true;
+          showToast({ text: '¡Etapa completa: ' + st.titulo + '!', kind: 'good' });
+        } else if (!st.completa) PRG.done[st.id] = false;
+      });
+      if (mode === 'inicio' && ev.kind === 'reset') inicioRender();
     });
   }
+  function progNow() { var P = PG(); return P ? P.summary() : null; }
+
+  /* Inicio: C150.Home.render(sectionEl, api) when home.js is present (wave U2); until then a small "Tu camino" built with the kit. */
+  var INI = { view: null };
+  function homeApi() {
+    var api = labApi();
+    api.go = go; api.progress = PG(); api.kit = C150.Kit; api.showControl = UI.showControl; api.openLab = UI.openLab;
+    api.groups = GROUPS; api.escuela = escuelaOk(); api.sheetEnsure = sheetEnsure;
+    return api;
+  }
+  function inicioRender() {
+    var v = INI.view;
+    if (!v) return;
+    clear(v);
+    v.className = '';
+    if (C150.Home && isFn(C150.Home.render)) { safe(function () { C150.Home.render(v, homeApi()); }, 'Home.render'); return; }
+    var K = C150.Kit, P = PG();
+    v.className = 'home-lite';
+    v.appendChild(h('div', { class: 'mode-head' },
+      h('p', { class: 'mode-kicker' }, h('span', { class: 'mode-kicker-dot', 'aria-hidden': 'true' }), 'Inicio'),
+      h('h2', { class: 'placard mode-title', text: 'Tu camino' }),
+      h('p', { class: 'mode-sub', text: 'Seis pasos para pasar de no saber nada de aviones a conocer tu cabina, entender cómo vuela y practicar. Seguilos en orden o salteá lo que ya sabés.' })));
+    if (!K || !P) { v.appendChild(h('p', { class: 'soft', text: 'Tu avance no está disponible en este momento.' })); return; }
+    var sum = P.summary(), next = sum.siguiente, last = P.last();
+    var ring = K.progressRing(sum.porcentaje / 100, { size: 84, label: 'avance', ok: sum.porcentaje >= 100 });
+    v.appendChild(h('div', { class: 'hl-ring' }, ring, h('div', null,
+      h('p', null, h('strong', { text: next ? 'Vas por el ' + sum.porcentaje + ' %' : '¡Terminaste el camino!' })),
+      h('p', { class: 'soft small', text: next ? 'Lo que sigue: ' + next.titulo + '.' : 'Ya recorriste todas las etapas. Volvé cuando quieras a repasar.' }),
+      next ? K.button({ label: sum.porcentaje ? 'Seguir' : 'Empezar', variant: 'primary', size: 'small', iconRight: 'arrow-right', onClick: function () { go(next.ruta); sheetEnsure('half'); } }) : null)));
+    if (last && !last.hecho) {
+      v.appendChild(K.card({
+        variant: 'flat', icon: 'play', title: 'Continuar donde dejaste', sub: last.titulo,
+        onClick: function () { go(last.ruta); sheetEnsure('half'); }
+      }));
+    }
+    var ul = h('ul', { class: 'stage-list', 'aria-label': 'Etapas de tu camino' });
+    sum.camino.forEach(function (st) {
+      var isNext = next && next.id === st.id;
+      var started = st.fraccion > 0;
+      var li = h('li', { class: 'stage' + (st.completa ? ' is-done' : '') + (isNext ? ' is-next' : '') },
+        h('span', { class: 'stage-n', 'aria-hidden': 'true' }, st.completa ? K.icon('check') : String(st.n)),
+        h('div', { style: { 'min-width': '0' } },
+          h('h3', { class: 'stage-t' }, st.titulo, st.completa ? h('span', { class: 'sr-only', text: ' (completa)' }) : null),
+          h('p', { class: 'stage-d', text: st.descripcion }),
+          h('div', { class: 'stage-p' }, K.progressBar(st.fraccion, { ok: st.completa, label: st.titulo }),
+            h('span', { class: 'count', text: st.hecho + '/' + st.total })),
+          K.button({
+            label: st.completa ? 'Repasar' : (started ? 'Continuar' : 'Empezar'), size: 'small', variant: isNext ? 'primary' : 'secondary',
+            iconRight: 'arrow-right', onClick: function () { go(st.ruta); sheetEnsure('half'); }
+          })));
+      ul.appendChild(li);
+    });
+    v.appendChild(ul);
+    v.appendChild(h('p', { class: 'aviso', text: AVISO }));
+  }
+  modeImpl.inicio = {
+    render: function (sec) { INI.view = h('div'); sec.appendChild(INI.view); inicioRender(); },
+    enter: function () { inicioRender(); },
+    exit: function () { var Hm = C150.Home; if (Hm && isFn(Hm.exit)) safe(function () { Hm.exit(); }, 'Home.exit'); }
+  };
+  modeImpl.escuela = {
+    render: function (sec) {
+      var E = C150.Escuela;
+      if (E && isFn(E.mount)) safe(function () { E.mount(sec, labApi()); }, 'Escuela.mount');
+      else sec.appendChild(h('div', { class: 'mode-head' }, h('h2', { class: 'placard mode-title', text: 'Escuela' }), h('p', { class: 'mode-sub', text: 'Esta parte llega pronto.' })));
+    },
+    enter: function () { var E = C150.Escuela; if (E && isFn(E.enter)) safe(function () { E.enter(); }, 'Escuela.enter'); },
+    exit: function () { var E = C150.Escuela; if (E && isFn(E.exit)) safe(function () { E.exit(); }, 'Escuela.exit'); },
+    slow: function (s) { var E = C150.Escuela; if (E && isFn(E.slow)) E.slow(s); }
+  };
 
   /* ================================================================== viewport overlays */
 
@@ -683,40 +1094,100 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   var extraCaption = '';
   var status = {};
 
-  function setupViewport() {
-    // camera presets
-    var list = $('vp-cams-list'), wrap = $('vp-cams'), toggle = $('vp-cams-toggle');
+  /* ---------------------------------------------------------------- "Vistas": cámaras como pictogramas en un popover (la activa marcada) */
+  var CAM_DESC = { pilot: 'Tus ojos, en el asiento del piloto', flight: 'Mirar afuera, como en vuelo', panel: 'Todo el tablero de frente',
+    left: 'Instrumentos de vuelo', center: 'Motor y radio', right: 'El lado derecho', floor: 'Pedales y combustible', overhead: 'Techo y parabrisas' };
+  // zone of the little cockpit sketch that each view looks at: [x, y, w, h] in a 64×40 box
+  var CAM_ZONE = { pilot: [3, 2, 58, 36], flight: [8, 7, 48, 11], panel: [8, 18, 48, 11], left: [8, 18, 21, 11], center: [28, 18, 12, 21],
+    right: [39, 18, 17, 11], floor: [6, 30, 52, 8], overhead: [9, 2, 46, 5] };
+  var currentCam = null;
+  function sv(tag, attrs) { var e = doc.createElementNS(SVGNS, tag); for (var k in attrs) e.setAttribute(k, attrs[k]); return e; }
+  /** A tiny cockpit sketch with the part this camera looks at lit up: a preview you can read at a glance. */
+  function camThumb(id) {
+    var s = sv('svg', { viewBox: '0 0 64 40', 'class': 'cam-thumb', 'aria-hidden': 'true', focusable: 'false' });
+    s.appendChild(sv('rect', { x: 2, y: 1, width: 60, height: 38, rx: 5, 'class': 'ct-frame' }));
+    s.appendChild(sv('path', { d: 'M10 8h44l-3 10H13z', 'class': 'ct-glass' }));
+    s.appendChild(sv('rect', { x: 8, y: 18, width: 48, height: 11, rx: 1.5, 'class': 'ct-panel' }));
+    [[13, 23.5], [21.5, 23.5], [45, 23.5], [52, 23.5]].forEach(function (p) { s.appendChild(sv('circle', { cx: p[0], cy: p[1], r: 3, 'class': 'ct-dial' })); });
+    s.appendChild(sv('rect', { x: 29.5, y: 20, width: 6, height: 7, rx: 1, 'class': 'ct-dial' }));
+    s.appendChild(sv('rect', { x: 28.5, y: 29.5, width: 7, height: 8, rx: 1, 'class': 'ct-dial' }));
+    s.appendChild(sv('rect', { x: 12, y: 33, width: 6, height: 4, rx: 1, 'class': 'ct-dial' }));
+    s.appendChild(sv('rect', { x: 44, y: 33, width: 6, height: 4, rx: 1, 'class': 'ct-dial' }));
+    var z = CAM_ZONE[id];
+    if (z) s.appendChild(sv('rect', { x: z[0], y: z[1], width: z[2], height: z[3], rx: 2.5, 'class': 'ct-zone' }));
+    return s;
+  }
+  function openCams(anchor) {
+    var K = C150.Kit;
+    if (!K || !isFn(K.popover)) return;
+    var pop = null;
+    var grid = h('div', { class: 'cam-grid', role: 'group', 'aria-label': 'Posiciones de la cámara' });
     CAMS.forEach(function (c) {
-      list.appendChild(h('button', {
-        type: 'button', class: 'cam-btn', 'data-cam': c[0],
-        onclick: function () { cc('focusPreset', c[0]); closeCams(); }
-      }, c[1]));
+      grid.appendChild(h('button', {
+        type: 'button', class: 'cam-btn', 'data-cam': c[0], 'aria-pressed': currentCam === c[0] ? 'true' : 'false',
+        onclick: function () { cc('focusPreset', c[0]); if (pop) pop.close(); }
+      }, camThumb(c[0]), h('span', { class: 'cam-name', text: c[1] }), h('span', { class: 'cam-sub', text: CAM_DESC[c[0]] || '' })));
     });
-    function closeCams() { wrap.classList.remove('is-open'); toggle.setAttribute('aria-expanded', 'false'); }
-    toggle.addEventListener('click', function () {
-      var open = !wrap.classList.contains('is-open');
-      wrap.classList.toggle('is-open', open);
-      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    pop = K.popover(anchor, {
+      title: 'Mirar desde…', label: 'Vistas de la cámara',
+      content: [h('p', { class: 'pop-sub', text: 'Elegí desde dónde mirar la cabina. También podés arrastrar con el mouse o el dedo, o usar las teclas 1 a 8.' }), grid]
     });
-    doc.addEventListener('pointerdown', function (e) { if (!wrap.contains(e.target)) closeCams(); });
-    wrap.addEventListener('keydown', function (e) { if (e.key === 'Escape' && wrap.classList.contains('is-open')) { e.stopPropagation(); closeCams(); toggle.focus(); } });
+    pop.el.classList.add('pop--cams');
+  }
 
-    // scenario switcher
-    var sel = $('vp-scenario-select');
+  /* ---------------------------------------------------------------- "Escenario": un botón con un popover (en lugar del <select>) */
+  var SCN_PLAIN = {
+    parked: 'Apagado en la plataforma, con todo frío. Ideal para conocer la cabina y practicar el arranque.',
+    runup: 'Motor en marcha, esperando en la cabecera. Para practicar la prueba de motor antes de despegar.',
+    runway: 'Alineado en la pista, listo para despegar: acelerador a fondo y a volar.',
+    cruise: 'Volando derecho y nivelado a 3000 pies. Si no tocás nada, el avión sigue solo.',
+    approach: 'En final, a punto de aterrizar: 65 nudos, flaps abajo y bajando de a poco.'
+  };
+  function openScenarios(anchor) {
+    var K = C150.Kit;
+    if (!K || !isFn(K.popover)) return;
     var P = (C150.Sim && C150.Sim.PRESETS) || {};
+    var pop = null;
+    var list = h('div', { class: 'scn-list', role: 'radiogroup', 'aria-label': 'Escenario' });
     SCENARIOS.forEach(function (sc) {
-      var desc = P[sc[0]] && (P[sc[0]].description || P[sc[0]].label);
-      sel.appendChild(h('option', { value: sc[0], title: desc || null }, sc[1]));
+      var id = sc[0], on = !demoOn && currentPreset === id, spec = P[id] || {};
+      list.appendChild(h('button', {
+        type: 'button', class: 'scn-opt' + (on ? ' is-on' : ''), role: 'radio', 'aria-checked': on ? 'true' : 'false',
+        onclick: function () { if (pop) pop.close(); if (demoOn) endDemo(); applyPreset(id); }
+      },
+        h('span', { class: 'scn-dot', 'aria-hidden': 'true' }, on ? kic('check') : null),
+        h('span', { class: 'scn-main' },
+          h('strong', { text: sc[1] }),
+          h('span', { class: 'scn-desc', text: SCN_PLAIN[id] || spec.description || '' }),
+          spec.label ? h('span', { class: 'scn-name', text: spec.label }) : null)));
     });
-    sel.value = currentPreset;
-    sel.addEventListener('change', function () {
-      if (sel.value === DEMO_VALUE) return;
-      var name = sel.value;
-      if (demoOn) endDemo();                    // another scenario during a demonstration: the demonstration ends first
-      applyPreset(name);
+    pop = K.popover(anchor, {
+      title: '¿Dónde está el avión?', label: 'Escenario',
+      content: [h('p', { class: 'pop-sub', text: demoOn ? 'Ahora hay una demostración en curso. Si elegís un escenario, la demostración termina.' : 'Elegí cómo empezar. Podés cambiarlo cuando quieras: el avión vuelve a ese punto.' }), list]
     });
+    pop.el.classList.add('pop--scn');
+  }
+  function syncScenarioBtn() {
+    var v = $('vp-scenario-v'), b = $('vp-scenario-btn');
+    if (v) setText(v, demoOn ? 'Demostración en curso' : scenarioName(currentPreset));
+    if (b) setAttr(b, 'aria-label', demoOn ? 'Escenario: ahora hay una demostración en curso. Tocá para elegir un escenario y terminarla'
+      : 'Escenario: ' + scenarioName(currentPreset) + '. Tocá para cambiarlo');
+  }
+
+  function setupViewport() {
+    var K = C150.Kit;
+    function popToggle(btn, open) {
+      if (!btn) return;
+      btn.addEventListener('click', function () {
+        if (btn.getAttribute('aria-expanded') === 'true') { if (K && isFn(K.closePopover)) K.closePopover(); return; }
+        open(btn);
+      });
+    }
+    popToggle($('vp-cams-toggle'), openCams);
+    popToggle($('vp-scenario-btn'), openScenarios);
     var back = $('vp-scenario-back');
     if (back) back.addEventListener('click', function () { endDemo(); });
+    syncScenarioBtn();
 
     // inset buttons
     $('inset-swap').addEventListener('click', function () {
@@ -733,15 +1204,14 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     safe(buildLayoutSwitch, 'layout switch');
     safe(buildPaneLabels, 'pane labels');
     safe(buildCallout, 'callout');
+    safe(coachBuild, 'coach');
 
-    // narrow viewport: scenario switcher moves to the bottom bar, next to "Vistas"
-    var vp = $('viewport'), scen = doc.querySelector('.vp-scenario'), top = doc.querySelector('.vp-top');
+    var vp = $('viewport');
+    var tools = $('vp-tools'), top = doc.querySelector('.vp-top'), cams = $('vp-cams');
     function place() {
-      var narrow = vp.clientWidth < 760;
-      var parent = narrow ? wrap : top;
-      if (scen.parentNode !== parent) parent.insertBefore(scen, parent === top ? (doc.querySelector('.vp-layout') || null) : null);
-      positionInset();
-      positionPaneLabels();
+      // narrow view (phones): the scenario button and the layout switch move to the bottom row, next to "Vistas"; the top keeps only the status
+      if (tools && top && cams) { var parent = vp.clientWidth < 560 ? cams : top; if (tools.parentNode !== parent) parent.appendChild(tools); }
+      positionInset(); positionPaneLabels(); coachPlace();
     }
     if (root.ResizeObserver) new ResizeObserver(place).observe(vp);
     else root.addEventListener('resize', place);
@@ -832,14 +1302,16 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     LB.userChose = LB.idx >= 0 && mode === 'basico';
     applyLayout(name);
   }
+  var LAYOUT_ICON = { cabina: 'cabin', dos: 'split', afuera: 'plane' };
   function buildLayoutSwitch() {
-    var top = doc.querySelector('.vp-top');
+    var top = doc.querySelector('.vp-tools') || doc.querySelector('.vp-top');
     if (!top) return;
     var seg = h('div', { class: 'vp-layout', role: 'group', 'aria-label': 'Qué ver en grande: la cabina, las dos vistas o el avión desde afuera' });
     LAYOUT_IDS.forEach(function (id) {
       var b = h('button', { type: 'button', class: 'vp-layout-btn', 'data-layout': id, 'aria-pressed': 'false',
-        title: id === 'dos' ? 'La cabina y el avión de afuera, lado a lado' : (id === 'cabina' ? 'La cabina en grande' : 'El avión desde afuera en grande'),
-        onclick: function () { chooseLayout(id); } }, LAYOUT_NAMES[id]);
+        'aria-label': LAYOUT_NAMES[id] + ': ' + (id === 'dos' ? 'la cabina y el avión de afuera, lado a lado' : (id === 'cabina' ? 'la cabina en grande' : 'el avión desde afuera en grande')),
+        title: id === 'dos' ? 'Las dos vistas: la cabina y el avión de afuera, lado a lado' : (id === 'cabina' ? 'La cabina en grande' : 'El avión desde afuera en grande'),
+        onclick: function () { chooseLayout(id); } }, kic(LAYOUT_ICON[id]), h('span', { class: 'vp-layout-lbl', text: LAYOUT_NAMES[id] }));
       layoutBtns[id] = b;
       seg.appendChild(b);
     });
@@ -900,7 +1372,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     });
     // the toolbar (.vp-top: status, scenario, layout switch) sits top-left: a label it would cover goes below it
     var vtop = doc.querySelector('.vp-top'), vp = $('viewport');
-    if (vtop && vp && vtop.children.length) {
+    if (vtop && vp && vtop.children.length && vtop.offsetTop < vp.clientHeight / 2) {      // (not when the toolbar sits at the bottom, 'Las dos' side by side)
       var vb = vp.getBoundingClientRect(), right = 0, bottom = 0;
       for (var i = 0; i < vtop.children.length; i++) {
         var cr = vtop.children[i].getBoundingClientRect();
@@ -1005,7 +1477,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     svg.appendChild(line); svg.appendChild(ring);
     CO.svg = svg; CO.line = line; CO.ring = ring;
     CO.box = h('div', { class: 'callout3d', 'aria-hidden': 'true' },
-      h('span', { class: 'callout3d-name' }), h('span', { class: 'callout3d-en' }), h('span', { class: 'callout3d-sum' }));
+      h('span', { class: 'callout3d-name' }), h('span', { class: 'callout3d-en' }), h('span', { class: 'callout3d-sum' }),
+      h('span', { class: 'callout3d-hint', text: 'Tocá para conocerlo' }));
     svg.style.display = 'none'; CO.box.style.display = 'none';
     vp.appendChild(svg); vp.appendChild(CO.box);
   }
@@ -1031,12 +1504,16 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     var p = cc('projectControl', id);
     if (!p || !p.visible || !isFinite(p.x) || !isFinite(p.y)) { hideCallout(); return; }
     var key = id + '|' + (sub || '');
-    if (key !== CO.key) {
+    var hov = !!CO.hoverId && CO.hoverId !== CO.selId;          // hovering something that is not the open card: invite to tap
+    if (key !== CO.key || hov !== CO.hov) {
+      CO.hov = hov;
+      toggleClass(CO.box, 'is-hover', hov);
       CO.key = key;
       var lb = ctrlLabel(c, sub);
       setText(CO.box.querySelector('.callout3d-name'), lb.name);
       setText(CO.box.querySelector('.callout3d-en'), lb.en);
       setText(CO.box.querySelector('.callout3d-sum'), c.resumen || '');
+      CO.box.style.setProperty('--cat', catColor(c));
       CO.box.style.display = ''; CO.box.style.visibility = 'hidden';
       CO.bw = CO.box.offsetWidth; CO.bh = CO.box.offsetHeight;
       CO.box.style.visibility = '';
@@ -1054,7 +1531,6 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     CO.line.setAttribute('x1', x.toFixed(1)); CO.line.setAttribute('y1', y.toFixed(1));
     CO.line.setAttribute('x2', tx.toFixed(1)); CO.line.setAttribute('y2', ty.toFixed(1));
     CO.ring.setAttribute('cx', x.toFixed(1)); CO.ring.setAttribute('cy', y.toFixed(1));
-    toggleClass(CO.box, 'is-hover', !!CO.hoverId);
     if (!CO.shown) {
       CO.shown = true;
       CO.svg.style.display = ''; CO.box.style.display = '';
@@ -1093,7 +1569,6 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
    * the selected scenario: the selector says "Demostración en curso" (a disabled option), a "Volver al escenario" button
    * ends the demonstration (the core then gives the scenario's airplane back), the status chips show the demonstration
    * airplane with a "Demostración" chip first. Picking another scenario ends the demonstration and applies it. */
-  var DEMO_VALUE = '__demo';
   var demoOn = false;
   function demoActive() {
     if (!coreReady) return false;
@@ -1115,22 +1590,13 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   }
   function syncDemo() {
     var on = demoActive();
-    var sel = $('vp-scenario-select'), back = $('vp-scenario-back'), box = doc.querySelector('.vp-scenario');
+    var back = $('vp-scenario-back'), box = $('vp-scenario') || doc.querySelector('.vp-scenario');
     if (back) setAttr(back, 'title', 'Termina la demostración y vuelve al escenario: ' + scenarioName(currentPreset));
-    if (on === demoOn || !sel) return;
+    if (on === demoOn) return;
     demoOn = on;
-    var opt = $('vp-scenario-demo');
-    if (on) {
-      if (!opt) { opt = h('option', { id: 'vp-scenario-demo', value: DEMO_VALUE, disabled: true }, 'Demostración en curso'); sel.insertBefore(opt, sel.firstChild); }
-      sel.value = DEMO_VALUE;
-    } else {
-      if (opt && opt.parentNode) opt.parentNode.removeChild(opt);
-      sel.value = currentPreset;
-    }
     if (back) back.hidden = !on;
     if (box) toggleClass(box, 'is-demo', on);
-    setAttr(sel, 'aria-label', on ? 'Escenario: ahora hay una demostración en curso; elegí uno para terminarla'
-      : 'Escenario: dónde y cómo está el avión');
+    syncScenarioBtn();
     positionPaneLabels();
   }
   /** Ends the demonstration (pose / animation) wherever it came from; a lesson step keeps its buttons in sync. */
@@ -1144,20 +1610,105 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     kick();
   }
 
+  /* ---------------------------------------------------------------- status strip: plain words, an icon and a popover each
+   * Motor · Corriente (master) · En tierra / En vuelo · Velocidad · Altura. Each chip is a button: it opens a short explanation
+   * of the term (and "Ver en 3D" when there is a control behind it). Updates only touch the DOM when the text changes. */
+  var STATUS_INFO = {
+    engine: function (s) {
+      var e = s.engine || {};
+      return {
+        title: 'Motor',
+        paras: [
+          e.running ? 'El motor está en marcha a ' + Math.round(num(e.rpm, 0) / 10) * 10 + ' RPM. Es lo que mueve la hélice y da la fuerza para rodar y volar.'
+            : (e.cranking ? 'El motor de arranque está girando la hélice para que el motor prenda. Se suelta la llave apenas arranca.'
+              : 'El motor está apagado: la hélice está quieta. Para arrancarlo hay una checklist paso a paso en Practicar.'),
+          'RPM son las vueltas por minuto de la hélice. En crucero, el Cessna 150 anda a unas 2400.'],
+        go: e.running ? ['tachometer', 'Ver el tacómetro en 3D'] : ['ignition', 'Ver la llave de arranque en 3D']
+      };
+    },
+    master: function (s) {
+      return {
+        title: 'Corriente (master)',
+        paras: [
+          s.masterBat ? (s.masterAlt ? 'La corriente eléctrica está encendida: andan la radio, las luces y los instrumentos eléctricos.'
+            : 'Sólo está la batería: el alternador, que recarga la batería en vuelo, está apagado.')
+            : 'La corriente está apagada: no anda nada eléctrico (radio, luces, indicadores).',
+          'El «master» es el interruptor general. Tiene dos mitades: BAT (la batería) y ALT (el alternador). El motor no necesita electricidad para andar: tiene su propio encendido.'],
+        go: ['master', 'Ver el master en 3D']
+      };
+    },
+    ground: function (s) {
+      var a = s.air || {};
+      return {
+        title: a.onGround === false ? 'En vuelo' : 'En tierra',
+        paras: [a.onGround === false ? 'El avión está en el aire: las ruedas no tocan el suelo y lo sostienen las alas. Ahora mandan el volante y la velocidad.'
+          : 'El avión está apoyado en el suelo. Rueda con las ruedas, se frena con los pedales y se dirige con los pedales y la rueda de nariz.',
+        'Para ver la actitud del avión mirá la vista de afuera.'],
+        extra: ['Ver el avión desde afuera', function () { chooseLayout(canDos() ? 'dos' : 'afuera'); }]
+      };
+    },
+    ias: function () {
+      return {
+        title: 'Velocidad (IAS)',
+        paras: ['Con qué velocidad pasa el aire por el avión, en nudos (1 nudo son unos 1,85 km/h). Es lo que marca el velocímetro.',
+          'IAS quiere decir velocidad indicada. El Cessna 150 despega a unos 50 nudos y vuela de crucero a unos 100.'],
+        go: ['asi', 'Ver el velocímetro en 3D']
+      };
+    },
+    alt: function () {
+      return {
+        title: 'Altura',
+        paras: ['A qué altura sobre el nivel del mar está el avión, en pies (1 pie son unos 30 cm). La marca el altímetro.',
+          'Parado en la pista marca la altura del aeródromo (unos 100 pies). Al subir, el número crece.'],
+        go: ['altimeter', 'Ver el altímetro en 3D']
+      };
+    }
+  };
+  function lookAt3D(id) {
+    if (mainView === 'exterior' && layoutMode !== 'dos') { cc('setMainView', 'cockpit'); syncMainView(); }
+    focusControl(id, true);
+  }
+  function openStatusInfo(key, anchor) {
+    var K = C150.Kit, s = S();
+    if (!K || !isFn(K.popover) || !s || !STATUS_INFO[key]) return;
+    var info = STATUS_INFO[key](s), pop = null, body = [];
+    info.paras.forEach(function (t) { body.push(h('p', { text: t })); });
+    var acts = [];
+    if (info.go && CTRL[info.go[0]]) acts.push(K.button({ label: info.go[1], icon: 'target', size: 'small', variant: 'primary', onClick: function () { if (pop) pop.close(); lookAt3D(info.go[0]); } }));
+    if (info.extra) acts.push(K.button({ label: info.extra[0], icon: 'plane', size: 'small', onClick: function () { if (pop) pop.close(); info.extra[1](); } }));
+    if (acts.length) body.push(h('div', { class: 'pop-actions' }, acts));
+    pop = K.popover(anchor, { title: info.title, content: body, label: info.title });
+  }
+
   function buildStatus() {
     var box = $('vp-status');
-    function chip(key) {
-      var t = h('span', { class: 'chip-st-text' });
-      var el = h('span', { class: 'chip-st' }, h('span', { class: 'dot', 'aria-hidden': 'true' }), t);
+    function chip(key, iconName, interactive, title) {
+      var k = h('span', { class: 'chip-st-k' }), v = h('span', { class: 'chip-st-v' }), x = h('span', { class: 'chip-st-x' });
+      var el = h(interactive ? 'button' : 'span', { class: 'chip-st', type: interactive ? 'button' : null, title: title || null,
+        'aria-haspopup': interactive ? 'dialog' : null }, kic(iconName), k, v, x);
+      if (interactive) el.addEventListener('click', function () {
+        if (el.getAttribute('aria-expanded') === 'true') { if (C150.Kit) C150.Kit.closePopover(); return; }
+        openStatusInfo(key, el);
+      });
       box.appendChild(el);
-      status[key] = { el: el, t: t };
+      status[key] = { el: el, k: k, v: v, x: x, cls: '', key: key };
     }
-    chip('demo'); chip('paused'); chip('engine'); chip('master'); chip('ground'); chip('ias'); chip('alt');
+    chip('demo', 'eye', false); chip('paused', 'pause', false);
+    chip('engine', 'engine', true, 'Motor: tocá para saber qué es');
+    chip('master', 'bolt', true, 'Corriente (master): tocá para saber qué es');
+    chip('ground', 'plane', true, 'En tierra o en vuelo: tocá para saber qué significa');
+    chip('ias', 'gauge', true, 'Velocidad (IAS): tocá para saber qué es');
+    chip('alt', 'alt', true, 'Altura: tocá para saber qué es');
     status.paused.el.classList.add('is-paused');
-    setText(status.paused.t, 'Pausa');
+    setText(status.paused.v, 'Pausa');
     status.paused.el.hidden = true;
     status.demo.el.classList.add('is-demo');
     status.demo.el.hidden = true;
+  }
+  function setChip(c, k, v, cls, x) {
+    setText(c.k, k); setText(c.v, v); setText(c.x, x || '');
+    cls = 'chip-st st-' + c.key + (cls ? ' ' + cls : '') + (c.el.classList.contains('is-paused') ? ' is-paused' : '') + (c.el.classList.contains('is-demo') ? ' is-demo' : '');
+    if (c.cls !== cls) { c.cls = cls; c.el.className = cls; }
   }
   function updateStatus(s) {
     if (!status.engine || !s) return;
@@ -1165,26 +1716,18 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     syncDemo();
     // during a demonstration the chips show the airplane of the demonstration (the mirrored state), labelled as such
     status.demo.el.hidden = !demoOn;
-    if (demoOn) setText(status.demo.t, demoLabel());
+    if (demoOn) setChip(status.demo, '', demoLabel(), '');
     status.paused.el.hidden = !s.paused || demoOn;
-    if (e.running) {
-      setText(status.engine.t, 'Motor en marcha · ' + Math.round(num(e.rpm, 0) / 10) * 10 + ' RPM');
-      status.engine.el.className = 'chip-st is-on';
-    } else if (e.cranking) {
-      setText(status.engine.t, 'Arrancando…');
-      status.engine.el.className = 'chip-st is-warn';
-    } else {
-      setText(status.engine.t, 'Motor apagado');
-      status.engine.el.className = 'chip-st';
-    }
-    var m = s.masterBat ? (s.masterAlt ? 'Master ON' : 'Master: sólo BAT') : 'Master OFF';
-    setText(status.master.t, m);
-    status.master.el.className = 'chip-st' + (s.masterBat ? (s.masterAlt ? ' is-on' : ' is-warn') : '');
+    if (e.running) setChip(status.engine, 'Motor', 'en marcha', 'is-on', Math.round(num(e.rpm, 0) / 10) * 10 + ' RPM');
+    else if (e.cranking) setChip(status.engine, 'Motor', 'arrancando…', 'is-warn');
+    else setChip(status.engine, 'Motor', 'apagado', '');
+    setChip(status.master, 'Corriente', s.masterBat ? (s.masterAlt ? 'encendida' : 'sólo batería') : 'apagada',
+      s.masterBat ? (s.masterAlt ? 'is-on' : 'is-warn') : '');
     var gs = num(a.groundSpeed, 0);
-    setText(status.ground.t, a.onGround === false ? 'En vuelo' : ('En tierra' + (gs >= 1 ? ' · ' + Math.round(gs) + ' kt' : '')));
-    status.ground.el.className = 'chip-st' + (a.onGround === false ? ' is-air' : '');
-    setText(status.ias.t, 'IAS ' + Math.round(Math.max(0, num(a.ias, 0))) + ' kt');
-    setText(status.alt.t, 'ALT ' + Math.round(num(a.indicatedAlt, num(a.altitude, 0)) / 10) * 10 + ' ft');
+    if (a.onGround === false) setChip(status.ground, '', 'En vuelo', 'is-air');
+    else setChip(status.ground, '', 'En tierra', '', gs >= 1 ? Math.round(gs) + ' nudos' : '');
+    setChip(status.ias, 'Velocidad', Math.round(Math.max(0, num(a.ias, 0))) + ' nudos', '');
+    setChip(status.alt, 'Altura', Math.round(num(a.indicatedAlt, num(a.altitude, 0)) / 10) * 10 + ' pies', '');
   }
 
   /* toasts from state.events (consumed and cleared here) */
@@ -1264,6 +1807,119 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     $('peek-close').addEventListener('click', hidePeek);
   }
 
+  /* ---------------------------------------------------------------- "Consejo": the instructor's bubble at the bottom of the 3D view
+   * One short suggestion for the next thing to do, chosen from the tab and the state of the airplane (first tip whose condition
+   * holds and that the student has not closed). Closing a tip is remembered (localStorage 'c150.coach'), so it never comes back.
+   * It steps aside for captions, the stall banner, the flight pad, AIRE, and on phones while the sheet is half / full. */
+  var COACH = { el: null, txt: null, act: null, tip: null, cand: null, candT: 0, last: 0, shownId: null, dismissed: store.get('coach', {}) || {} };
+
+  function coachSeenCount() { var n = 0; for (var k in EX.seen) if (Object.prototype.hasOwnProperty.call(EX.seen, k)) n++; return n; }
+  function coachNextEssential() { var ids = essentialsNext(1); return ids.length ? ids[0] : null; }
+  var COACH_TIPS = [
+    { id: 'inicio-mirar', when: function () { return mode === 'inicio'; },
+      text: function () { return 'Arrastrá con el mouse o el dedo sobre la cabina para mirar alrededor. Con la rueda del mouse (o pellizcando) te acercás.'; } },
+    { id: 'cab-acelerador', when: function () { return mode === 'explorar' && !EX.id && coachSeenCount() === 0 && !!CTRL.throttle; },
+      text: function () { return 'Tocá la perilla negra grande, abajo en el centro: es el acelerador.'; },
+      action: ['Mostrámelo', function () { openControl('throttle', 'list'); sheetEnsure('half'); }] },
+    { id: 'cab-siguiente', when: function () { return mode === 'explorar' && !EX.id && coachSeenCount() > 0 && !!coachNextEssential(); },
+      text: function () { return 'Seguí con «' + ctrlName(coachNextEssential()) + '»: es un control esencial que todavía no viste.'; },
+      action: ['Verlo', function () { var id = coachNextEssential(); if (id) { openControl(id, 'list'); sheetEnsure('half'); } }] },
+    { id: 'cab-probalo', when: function () { return mode === 'explorar' && !!EX.id && !!(CTRL[EX.id] && CTRL[EX.id].probar); },
+      text: function () { return 'Probá «' + ctrlName(EX.id) + '» en la sección Probalo de la ficha, o tocalo otra vez acá en la cabina. Mirá cómo reacciona el avión.'; } },
+    { id: 'cab-instrumento', when: function () { return mode === 'explorar' && !!EX.id && !(CTRL[EX.id] && CTRL[EX.id].probar); },
+      text: function () { return '«' + ctrlName(EX.id) + '» sólo se mira: cambia solo cuando el motor anda o el avión vuela. Probá volar en Practicar.'; },
+      action: ['Ir a volar', function () { go('practicar/volar'); sheetEnsure('half'); }] },
+    { id: 'rec-pasos', when: function () { return mode === 'recorrido'; },
+      text: function () { return 'Seguí los pasos del recorrido en el panel: te llevo por la cabina, control por control, como en la primera clase.'; } },
+    { id: 'lec-elegir', when: function () { return mode === 'basico' && LB.idx < 0; },
+      text: function () { return 'Elegí una lección en el panel: te la voy mostrando en el avión con animaciones.'; } },
+    { id: 'lec-acciones', when: function () { return mode === 'basico' && LB.idx >= 0 && !LB.finished; },
+      text: function () { return 'Usá los botones de la lección para mover los mandos del avión y mirá cómo reacciona.'; } },
+    { id: 'chk-elegir', when: function () { return mode === 'checklists' && !CL.cur; },
+      text: function () { return 'Elegí una checklist: son las listas de pasos del manual, en el orden en que se hacen en el avión.'; } },
+    { id: 'chk-correr', when: function () { return mode === 'checklists' && !!CL.cur; },
+      text: function () { return 'Hacé cada paso en la cabina 3D: el ítem se tilda solo cuando está bien hecho.'; } },
+    { id: 'vol-motor', when: function () { var s = S(); return mode === 'volar' && !!s && !(s.engine && (s.engine.running || s.engine.cranking)) && !(s.air && s.air.onGround === false); },
+      text: function () { return 'El motor está apagado. Para arrancarlo, seguí la checklist «Arranque»: te guía paso a paso.'; },
+      action: ['Abrir la checklist', function () { openChecklist('arranque'); sheetEnsure('half'); }] },
+    { id: 'vol-mandos', when: function () { return mode === 'volar'; },
+      text: function () { return cc('isMobile') ? 'Movés el volante y el acelerador con los controles de abajo. Probá de a poquito.' : 'Mové el volante con las flechas del teclado y los pedales con Z y X. Probá de a poquito.'; } },
+    { id: 'quiz-donde', when: function () { return mode === 'quiz'; },
+      text: function () { return 'Si la pregunta dice “¿dónde está…?”, tocá ese control directamente en la cabina 3D.'; } }
+  ];
+
+  function coachBuild() {
+    var vp = $('viewport');
+    if (!vp) return;
+    COACH.txt = h('p', { class: 'vp-coach-text' });
+    COACH.act = h('button', { type: 'button', class: 'btn btn--small btn--primary vp-coach-act', hidden: true,
+      onclick: function () { var t = COACH.tip; if (t && t.action) safe(t.action[1], 'coach action'); } });
+    var x = h('button', { type: 'button', class: 'vp-coach-x', 'aria-label': 'Cerrar este consejo', title: 'Cerrar este consejo', onclick: function () { coachDismiss(); } }, kic('close'));
+    COACH.el = h('div', { id: 'vp-coach', class: 'vp-coach', role: 'status', 'aria-live': 'polite', hidden: true },
+      h('span', { class: 'vp-coach-ico', 'aria-hidden': 'true' }, kic('bulb')),
+      h('div', { class: 'vp-coach-body' }, h('span', { class: 'vp-coach-k', text: 'Consejo' }), COACH.txt, COACH.act),
+      x);
+    vp.appendChild(COACH.el);
+  }
+  function coachPlace() {
+    var el = COACH.el, app = $('app');
+    if (!el || !app) return;
+    var shown = !el.hidden;
+    toggleClass(app, 'has-coach', shown);
+    if (shown) { var hgt = el.offsetHeight; if (hgt) app.style.setProperty('--coach-h', hgt + 'px'); }
+  }
+  function coachDismiss() {
+    if (!COACH.tip) return;
+    COACH.dismissed[COACH.tip.id] = 1;
+    store.set('coach', COACH.dismissed);
+    coachHide();
+  }
+  function coachHide() {
+    COACH.tip = null; COACH.shownId = null;
+    if (COACH.el && !COACH.el.hidden) { COACH.el.hidden = true; COACH.el.classList.remove('is-on'); coachPlace(); }
+  }
+  /** Reserved: the student wants the tips back (Ayuda). */
+  function coachReset() { COACH.dismissed = {}; store.set('coach', {}); COACH.cand = null; }
+  function coachBlocked() {
+    if (!coreReady || !overlayDone || mode === 'aire') return true;
+    if (stallOn || captionText || flypadShown()) return true;
+    if (SH.active && SH.snap !== 'peek') return true;           // phones: the sheet needs the room
+    return false;
+  }
+  function coachUpdate(ts) {
+    if (!COACH.el) return;
+    if (ts - COACH.last < 250) return;
+    COACH.last = ts;
+    var tip = null;
+    if (!coachBlocked()) {
+      for (var i = 0; i < COACH_TIPS.length; i++) {
+        var t = COACH_TIPS[i];
+        if (COACH.dismissed[t.id]) continue;
+        var ok = false;
+        try { ok = !!t.when(); } catch (e) { ok = false; }
+        if (ok) { tip = t; break; }
+      }
+    }
+    if (!tip) { COACH.cand = null; coachHide(); return; }
+    if (COACH.cand !== tip.id) { COACH.cand = tip.id; COACH.candT = ts; }
+    if (COACH.shownId !== tip.id && ts - COACH.candT < 1400) { if (COACH.shownId) coachHide(); return; }   // wait a moment: no flicker while the tab changes
+    var text = '';
+    try { text = tip.text(); } catch (e2) { text = ''; }
+    if (!text) { coachHide(); return; }
+    COACH.tip = tip;
+    setText(COACH.txt, text);
+    var act = tip.action;
+    COACH.act.hidden = !act;
+    if (act) setText(COACH.act, act[0]);
+    if (COACH.shownId !== tip.id) {
+      COACH.shownId = tip.id;
+      COACH.el.hidden = false;
+      void COACH.el.offsetWidth;
+      COACH.el.classList.add('is-on');
+    }
+    coachPlace();
+  }
+
   /* ================================================================== frame loop */
 
   var slowAcc = 0, kickFlag = true;
@@ -1294,6 +1950,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       slowAcc = 0; kickFlag = false;
       updateStatus(s);
       updateCaption();
+      coachUpdate(now());
       if (!insetRect && coreReady) { var r = cc('getInsetRect'); if (r) onLayout(r); }
       if (impl && impl.slow) { try { impl.slow(s); } catch (e3) { logError('slow ' + mode, e3); } }
       runLive(liveGlobal, s);
@@ -1352,6 +2009,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       var txt = o.format(v);
       setText(out, txt);
       setAttr(inp, 'aria-valuetext', txt);
+      var span = num(o.max, 1) - num(o.min, 0);
+      if (span > 0) inp.style.setProperty('--p', (clamp((parseFloat(inp.value) - num(o.min, 0)) / span, 0, 1) * 100).toFixed(1) + '%');
     }
     live.push(upd); upd();
     return h('div', { class: 'slider' }, out, inp,
@@ -1802,7 +2461,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     if (!body) return null;
     return h('div', { class: 'probalo', role: 'group', 'aria-label': 'Probalo: ' + c.nombre },
       h('div', { class: 'probalo-head' },
-        h('h3', { class: 'placard', text: 'Probalo' }),
+        h('h3', { class: 'placard' }, h('span', { class: 'probalo-ico', 'aria-hidden': 'true' }, kic('hand')), 'Probalo'),
         compact ? null : h('span', { class: 'probalo-hint', text: 'o tocalo en la cabina 3D' })),
       body);
   }
@@ -1913,58 +2572,152 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   var SUGGESTED = ['yoke', 'throttle', 'rudder-pedals', 'asi', 'attitude', 'altimeter', 'mixture', 'master',
     'ignition', 'toe-brakes', 'trim-wheel', 'flap-switch'];
 
-  var EX = { listView: null, detailView: null, ul: null, count: null, query: '', cat: '', id: null, live: [], visible: [], catBtns: [], listScroll: 0 };
-
-  function exFiltered() {
-    var q = norm(EX.query).trim(), words = q ? q.split(/\s+/) : [];
-    var catIndex = {};
-    CATEGORIES.forEach(function (k, i) { if (k) catIndex[k.id] = i; });
-    var list = CONTROLS.filter(function (c) {
-      if (EX.cat && c.categoria !== EX.cat) return false;
-      if (!words.length) return true;
-      var hay = norm([c.nombre, c.ingles, c.id, arr(c.otrosNombres).join(' '), c.resumen].join(' '));
-      return words.every(function (w) { return hay.indexOf(w) >= 0; });
-    });
-    if (!words.length && !EX.cat) {
-      list = list.map(function (c, i) { return { c: c, i: i }; }).sort(function (p, q2) {
-        var a = catIndex[p.c.categoria], b = catIndex[q2.c.categoria];
-        a = (a === undefined) ? 99 : a; b = (b === undefined) ? 99 : b;
-        return (a - b) || (p.i - q2.i);
-      }).map(function (o) { return o.c; });
-    }
-    return list;
+  /* ---- Cabina (contract v4 §3, wave U3): chips por categoría con ícono, buscador, lista agrupada con "esencial" primero y tilde
+   * en lo que ya abriste (C150.Progress 'cabina'), ficha con acciones claras y acordeones. Nada de esto toca los datos. */
+  var CAT_ICON = { mandos: 'hand', motor: 'engine', combustible: 'drop', electrico: 'bolt', vuelo: 'gauge', sistemas: 'settings', radio: 'compass', cabina: 'cabin' };
+  function catIcon(id) { return CAT_ICON[id] || 'dot'; }
+  /** Sprite icon (C150.Kit) when it has the name, else the small local set. */
+  function kic(name, size) {
+    var I = C150.Icons, K = C150.Kit;
+    if (I && isFn(I.has) && I.has(name) && K && isFn(K.icon)) return K.icon(name, size);
+    return icon(name);
+  }
+  function kbadge(text, variant, iconName) {
+    var K = C150.Kit;
+    if (K && isFn(K.badge)) return K.badge(text, variant, iconName);
+    return h('span', { class: 'badge' + (variant ? ' badge--' + variant : '') }, text);
+  }
+  /** Animated accordion (Kit) with a plain <details> fallback. */
+  function acc(title, content, o) {
+    var K = C150.Kit;
+    o = o || {};
+    if (K && isFn(K.accordion)) return K.accordion({ title: title, content: content, open: !!o.open, icon: o.icon });
+    var d = h('details', { class: 'acc' }, h('summary', { class: 'acc-sum' }, h('span', { text: title })), h('div', { class: 'acc-body' }, content));
+    if (o.open) d.open = true;
+    return d;
   }
 
-  function exRow(c) {
+  var EX = { listView: null, detailView: null, ul: null, count: null, query: '', cat: '', id: null, live: [], visible: [], catBtns: [], listScroll: 0,
+    seen: {}, prog: null, progText: null, start: null, catInfo: null, input: null, help: null };
+
+  function exSeen() {
+    var P = PG(), m = {}, n = 0;
+    CONTROLS.forEach(function (c) { if (P && safe(function () { return P.get('cabina', c.id); }, 'progress.get')) { m[c.id] = true; n++; } });
+    EX.seen = m;
+    return n;
+  }
+
+  /** Controls to show: ranked by C150.Search.rank when there is a query, else by category with the essentials first. */
+  function exFiltered() {
+    var q = EX.query.trim(), list;
+    if (q) {
+      var S2 = C150.Search, ranked = null;
+      if (S2 && isFn(S2.rank)) {
+        ranked = safe(function () {
+          return S2.rank(q, CONTROLS, function (c) {
+            return [[c.nombre, 12], [arr(c.otrosNombres).join(' '), 9], [c.ingles, 8], [c.id, 4], [c.resumen, 2]];
+          });
+        }, 'Search.rank');
+      }
+      if (ranked && ranked.length) list = ranked.map(function (r) { return r.x; });
+      else {
+        var words = norm(q).split(/\s+/);
+        list = CONTROLS.filter(function (c) {
+          var hay = norm([c.nombre, c.ingles, c.id, arr(c.otrosNombres).join(' '), c.resumen].join(' '));
+          return words.every(function (w) { return hay.indexOf(w) >= 0; });
+        });
+      }
+      if (EX.cat) list = list.filter(function (c) { return c.categoria === EX.cat; });
+      return list;
+    }
+    var catIndex = {};
+    CATEGORIES.forEach(function (k, i) { if (k) catIndex[k.id] = i; });
+    list = CONTROLS.filter(function (c) { return !EX.cat || c.categoria === EX.cat; });
+    return list.map(function (c, i) { return { c: c, i: i }; }).sort(function (p, q2) {
+      var a = catIndex[p.c.categoria], b = catIndex[q2.c.categoria];
+      a = (a === undefined) ? 99 : a; b = (b === undefined) ? 99 : b;
+      return (a - b) || ((p.c.prioridad === 1 ? 0 : 1) - (q2.c.prioridad === 1 ? 0 : 1)) || (p.i - q2.i);
+    }).map(function (o) { return o.c; });
+  }
+
+  function exRow(c, showCat) {
+    var seen = !!EX.seen[c.id], k = CAT[c.categoria];
     return h('button', {
-      type: 'button', class: 'row', 'data-id': c.id, 'aria-current': EX.id === c.id ? 'true' : null,
+      type: 'button', class: 'row row--ctl' + (seen ? ' is-seen' : ''), 'data-id': c.id, 'aria-current': EX.id === c.id ? 'true' : null,
       onclick: function () { openControl(c.id, 'list'); }
     },
-      dot(catColor(c)),
-      h('span', { class: 'row-main' }, h('span', { class: 'row-name', text: c.nombre }), c.ingles ? h('span', { class: 'row-sub', lang: 'en', text: c.ingles }) : null),
-      h('span', { class: 'row-end' }, c.prioridad === 1 ? h('span', { class: 'tag-esencial', text: 'esencial' }) : null));
+      h('span', { class: 'row-ico', style: { '--cat': catColor(c) }, 'aria-hidden': 'true' }, kic(catIcon(c.categoria))),
+      h('span', { class: 'row-main' },
+        h('span', { class: 'row-name', text: c.nombre }),
+        c.ingles ? h('span', { class: 'row-sub', lang: 'en', text: c.ingles }) : null,
+        showCat && k ? h('span', { class: 'row-cat', text: k.nombre }) : null),
+      h('span', { class: 'row-end' },
+        c.prioridad === 1 ? kbadge('Esencial', 'accent') : null,
+        seen ? h('span', { class: 'row-check', title: 'Ya lo viste' }, kic('check'), h('span', { class: 'sr-only', text: 'Ya lo viste' })) : null));
+  }
+
+  /** "Empezá por acá": the next essentials the student has not opened yet (hidden once they have them all). */
+  function essentialsNext(n) {
+    var out = [];
+    SUGGESTED.concat(CONTROLS.map(function (c) { return c.id; })).forEach(function (id) {
+      var c = CTRL[id];
+      if (out.length < n && c && c.prioridad === 1 && !EX.seen[id] && out.indexOf(id) < 0) out.push(id);
+    });
+    return out;
+  }
+  function renderExStart() {
+    var box = EX.start;
+    if (!box) return;
+    clear(box);
+    var ids = (EX.query.trim() || EX.cat) ? [] : essentialsNext(3);
+    box.hidden = !ids.length;
+    if (!ids.length) return;
+    var first = !Object.keys(EX.seen).length;
+    box.appendChild(h('p', { class: 'ex-start-t' }, kic('flag'), first ? 'Empezá por acá' : 'Seguí con los esenciales'));
+    ids.forEach(function (id) {
+      var c = CTRL[id];
+      box.appendChild(h('button', { type: 'button', class: 'ex-start-btn', onclick: function () { openControl(id, 'list'); } },
+        h('span', { class: 'row-ico', style: { '--cat': catColor(c) }, 'aria-hidden': 'true' }, kic(catIcon(c.categoria))),
+        h('span', { class: 'ex-start-main' }, h('strong', { text: c.nombre }), h('span', { text: c.resumen || '' })),
+        kic('chevron-right')));
+    });
   }
 
   function renderExList() {
     var ul = EX.ul;
     clear(ul);
+    var seenN = exSeen();
     var list = exFiltered();
     EX.visible = list.map(function (c) { return c.id; });
     setText(EX.count, list.length === 1 ? '1 control' : list.length + ' controles');
+    if (EX.prog) EX.prog.set(CONTROLS.length ? seenN / CONTROLS.length : 0);
+    setText(EX.progText, seenN ? 'Viste ' + seenN + ' de ' + CONTROLS.length + ' controles' : 'Todavía no abriste ninguno: son ' + CONTROLS.length);
+    renderExStart();
+    var k0 = CAT[EX.cat];
+    if (EX.catInfo) { setText(EX.catInfo, k0 && k0.descripcion ? k0.descripcion : ''); EX.catInfo.hidden = !(k0 && k0.descripcion); }
     if (!list.length) {
-      ul.appendChild(h('li', { class: 'empty' }, CONTROLS.length
-        ? 'No encontré nada con esa búsqueda. Probá con otra palabra, por ejemplo “nafta”, “luces” o “velocidad”.'
-        : 'Todavía no hay controles cargados.'));
+      var q = EX.query.trim();
+      ul.appendChild(h('li', { class: 'ex-empty' },
+        (C150.Kit && isFn(C150.Kit.emptyState))
+          ? C150.Kit.emptyState({ icon: 'search', title: 'No encontré ese control',
+            text: CONTROLS.length ? 'Probá con otra palabra, por ejemplo “nafta”, “luces” o “velocidad”.' : 'Todavía no hay controles cargados.',
+            action: (q && C150.Search && isFn(C150.Search.open)) ? { label: 'Buscar en toda la app', icon: 'search', variant: 'secondary', onClick: function () { C150.Search.open({ query: q }); } } : null })
+          : h('p', { class: 'empty', text: 'No encontré nada con esa búsqueda.' })));
       return;
     }
-    var grouped = !EX.query.trim() && !EX.cat, lastCat = null;
+    var q2 = EX.query.trim(), grouped = !q2, lastCat = null;
     list.forEach(function (c) {
       if (grouped && c.categoria !== lastCat) {
         lastCat = c.categoria;
         var k = CAT[lastCat];
-        ul.appendChild(h('li', { class: 'rows-group' }, h('h3', { class: 'placard placard--small', text: k ? k.nombre : lastCat })));
+        var inCat = list.filter(function (x) { return x.categoria === lastCat; });
+        var seenIn = inCat.filter(function (x) { return EX.seen[x.id]; }).length;
+        ul.appendChild(h('li', { class: 'rows-group rows-group--cat' },
+          h('span', { class: 'row-ico row-ico--sm', style: { '--cat': (k && k.color) || 'var(--fg-soft)' }, 'aria-hidden': 'true' }, kic(catIcon(lastCat))),
+          h('h3', { class: 'placard', text: k ? k.nombre : lastCat }),
+          h('span', { class: 'rows-group-n', text: seenIn + '/' + inCat.length })));
       }
-      ul.appendChild(h('li', null, exRow(c)));
+      ul.appendChild(h('li', null, exRow(c, !grouped)));
     });
   }
 
@@ -1974,51 +2727,22 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     for (var i = 0; i < CHECKLISTS.length; i++) { if (CHECKLISTS[i].id === id) { clOpen(i); return; } }
   }
 
-  /** Suggested order for a first visit: Recorrido → Lo básico → Checklists → Volar. */
-  function startPath() {
-    function go(m) { return function () { setMode(m); scrollPanelTop(); }; }
-    function step(title, text, buttons) {
-      return h('li', { class: 'path-step' },
-        h('div', { class: 'path-body' }, h('strong', { class: 'path-title', text: title }), h('span', { class: 'path-text', text: text })),
-        h('div', { class: 'path-btns' }, buttons));
-    }
-    var clBtns = [];
-    [['antes-arrancar', 'Antes de arrancar'], ['arranque', 'Arranque']].forEach(function (x) {
-      if (CHECKLISTS.some(function (c) { return c.id === x[0]; })) {
-        clBtns.push(h('button', { type: 'button', class: 'btn btn--small', onclick: function () { openChecklist(x[0]); } }, x[1]));
-      }
-    });
-    if (!clBtns.length) clBtns.push(h('button', { type: 'button', class: 'btn btn--small', onclick: go('checklists') }, 'Checklists'));
-    return h('ol', { class: 'path', 'aria-label': 'Por dónde empezar' },
-      step('Recorrido', 'Un paseo guiado por la cabina, control por control.',
-        h('button', { type: 'button', class: 'btn btn--small btn--primary', onclick: go('recorrido') }, 'Empezar el recorrido', icon('next'))),
-      step('Lo básico', 'Lecciones cortas: cómo vuela el avión, los 3 ejes, la pérdida, los flaps…',
-        h('button', { type: 'button', class: 'btn btn--small', onclick: go('basico') }, 'Ver las lecciones')),
-      step('Checklists', 'Prepará la cabina y arrancá el motor, paso a paso, como en la primera clase.', clBtns),
-      step('Volar', 'Mové el volante, los pedales y el acelerador, mirá los instrumentos y probá las misiones.',
-        h('button', { type: 'button', class: 'btn btn--small', onclick: go('volar') }, 'Ir a volar')));
-  }
-
-  function exWelcome() {
-    var sug = SUGGESTED.filter(function (id) { return CTRL[id] && CTRL[id].prioridad === 1; });
-    CONTROLS.forEach(function (c) { if (sug.length < 6 && c.prioridad === 1 && sug.indexOf(c.id) < 0) sug.push(c.id); });
-    sug = sug.slice(0, 6);
-    var chips = h('div', { class: 'chips' });
-    sug.forEach(function (id) { chips.appendChild(controlChip(id, function () { openControl(id, 'list'); })); });
-    return h('div', { class: 'card card--welcome' },
-      modeKicker('01 · Explorar'),
+  function exIntro() {
+    EX.prog = (C150.Kit && isFn(C150.Kit.progressBar)) ? C150.Kit.progressBar(0, { label: 'Controles que ya viste' }) : progressBar(0);
+    EX.progText = h('span', { class: 'ex-prog-t' });
+    EX.start = h('div', { class: 'ex-start' });
+    var how = h('ul', { class: 'bullets how-list' },
+      h('li', null, h('strong', { text: 'Tocá' }), ' cualquier cosa de la cabina, o elegila de la lista: acá aparece su ficha.'),
+      h('li', null, h('strong', { text: 'Tocala otra vez' }), ' para usarla, o ', h('strong', { text: 'arrastrá' }), ' las perillas, el volante y los pedales.'),
+      h('li', null, h('strong', { text: 'Arrastrá el fondo' }), ' para mirar alrededor; con la rueda del mouse o pellizcando te acercás.'),
+      h('li', null, 'Atajos de teclado en ', h('button', { type: 'button', class: 'linklike', onclick: openHelp }, 'la ayuda'), '.'));
+    return h('div', { class: 'ex-head' },
+      modeKicker('01 · Cabina'),
       h('h2', { class: 'placard mode-title', text: 'Conocé la cabina' }),
-      h('p', { class: 'lead', text: 'Una cabina de Cessna 150 en 3D para recorrer antes de tu primera clase: cada mando y cada instrumento, qué hace y qué le pasa al avión cuando lo usás.' }),
-      h('p', { class: 'aviso aviso--top', text: AVISO }),
-      h('div', { class: 'block' }, h('h3', { class: 'placard placard--small block-title', text: '¿Primera vez? Seguí este orden' }), startPath()),
-      h('div', { class: 'block' }, h('h3', { class: 'placard placard--small block-title', text: 'Cómo se usa la cabina 3D' }),
-        h('ul', { class: 'bullets' },
-          h('li', null, h('strong', { text: 'Tocá' }), ' cualquier cosa en la cabina, o elegila de la lista, y acá aparece su ficha.'),
-          h('li', null, h('strong', { text: 'Tocala otra vez' }), ' para usarla, o ', h('strong', { text: 'arrastrá' }), ' las perillas, el volante y los pedales.'),
-          h('li', null, h('strong', { text: 'Arrastrá el fondo' }), ' para mirar alrededor; con la rueda del mouse o pellizcando te acercás.'),
-          h('li', null, 'Con el teclado: flechas = volante, Z y X = pedales, + y − = acelerador. Todos los atajos en ',
-            h('button', { type: 'button', class: 'linklike', onclick: openHelp }, 'la ayuda'), '.'))),
-      sug.length ? h('div', { class: 'block' }, h('h3', { class: 'placard placard--small block-title', text: 'Los controles esenciales' }), chips) : null);
+      h('p', { class: 'mode-sub', text: 'Tocá cualquier mando o instrumento en el 3D, o elegilo de la lista: te cuento qué es, para qué sirve y cómo se usa.' }),
+      h('div', { class: 'ex-prog' }, EX.prog, EX.progText),
+      EX.start,
+      acc('Cómo se usa la cabina 3D', how, { icon: 'hand' }));
   }
 
   function toggleOnAirplane(c) {
@@ -2052,14 +2776,14 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     var showBtn = h('button', {
       type: 'button', class: 'btn btn--primary',
       onclick: function () { if (mainView === 'exterior') { cc('setMainView', 'cockpit'); syncMainView(); } focusControl(c.id, true); }
-    }, icon('target'), 'Mostrámelo');
+    }, kic('target'), h('span', { text: 'Mostrámelo en 3D' }));
     var extLbl = h('span', { text: 'Ver en el avión' });
-    var extBtn = parts.length ? h('button', { type: 'button', class: 'btn', onclick: function () { toggleOnAirplane(c); } }, icon('plane'), extLbl) : null;
+    var extBtn = parts.length ? h('button', { type: 'button', class: 'btn btn--secondary', onclick: function () { toggleOnAirplane(c); } }, kic('plane'), extLbl) : null;
     if (extBtn) EX.live.push(function () { setText(extLbl, mainView === 'exterior' ? 'Volver a la cabina' : 'Ver en el avión'); });
     var airExps = (C150.Lab && isFn(C150.Lab.experimentsFor)) ? arr(safe(function () { return C150.Lab.experimentsFor(c.id); })) : [];
     var airBtns = airExps.slice(0, 2).map(function (x) {
       return h('button', { type: 'button', class: 'btn btn--air', onclick: function () { UI.openLab(x.id); } },
-        icon('wind'), h('span', { text: airExps.length > 1 ? 'Ver el aire: ' + x.titulo.toLowerCase() : 'Ver el aire' }));
+        kic('wind'), h('span', { text: airExps.length > 1 ? 'Ver el aire: ' + x.titulo.toLowerCase() : 'Ver el aire' }));
     });
 
     var otros = arr(c.otrosNombres).filter(function (x) { return x && x !== c.nombre; });
@@ -2080,39 +2804,56 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     var errs = null;
     if (errores.length) { errs = h('ul', { class: 'bullets bullets--warn' }); errores.forEach(function (e) { errs.appendChild(h('li', { text: e })); }); }
     var relChips = null;
-    if (rel.length) { relChips = h('div', { class: 'chips' }); rel.forEach(function (id) { relChips.appendChild(controlChip(id, function () { openControl(id, 'list'); })); }); }
+    if (rel.length) {
+      relChips = h('div', { class: 'chips' });
+      rel.forEach(function (id) {
+        var K = C150.Kit, r = CTRL[id];
+        relChips.appendChild((K && isFn(K.chip)) ? K.chip({ label: r.nombre, color: catColor(r), onClick: function () { openControl(id, 'list'); } }) : controlChip(id, function () { openControl(id, 'list'); }));
+      });
+    }
 
     function navBtn(id, dir) {
       if (!id) return h('span', { style: { flex: '1' } });
       return h('button', {
-        type: 'button', class: 'btn btn--small', 'aria-label': (dir < 0 ? 'Anterior: ' : 'Siguiente: ') + ctrlName(id),
+        type: 'button', class: 'btn btn--small detail-nav-btn' + (dir > 0 ? ' is-next' : ''), 'aria-label': (dir < 0 ? 'Anterior: ' : 'Siguiente: ') + ctrlName(id),
         onclick: function () { openControl(id, 'list'); }
-      }, dir < 0 ? icon('back') : null, h('span', { text: ctrlName(id) }), dir > 0 ? icon('next') : null);
+      }, dir < 0 ? kic('chevron-left') : null,
+        h('span', { class: 'dn-text' }, h('span', { class: 'dn-k', text: dir < 0 ? 'Anterior' : 'Siguiente' }), h('span', { class: 'dn-n', text: ctrlName(id) })),
+        dir > 0 ? kic('chevron-right') : null);
     }
 
+    var accs = [];
+    function addAcc(title, ico, content, open) { if (content) accs.push(acc(title, content, { icon: ico, open: !!open })); }
+    addAcc('Dónde está', 'map', para(c.ubicacion), true);
+    addAcc('Qué hace', 'settings', para(c.queHace), true);
+    addAcc('Cada parte', 'layers', subList);
+    addAcc('Qué pasa en el avión', 'plane', para(c.enElAvion));
+    addAcc('Cómo se usa', 'list', steps);
+    addAcc('Cuándo se usa', 'clock', para(c.cuando));
+    addAcc('Errores comunes', 'warning', errs);
+    addAcc('Truco', 'bulb', para(c.truco));
+    addAcc('Dato curioso', 'star', para(c.dato));
+    addAcc('Marcas de colores', 'gauge', rangos.length ? rangesView(rangos) : null);
+    addAcc('En otros años y modelos', 'swap', para(c.otrosModelos));
+
     v.appendChild(h('div', { class: 'detail-top' },
-      h('button', { type: 'button', class: 'btn btn--ghost btn--small back-btn', onclick: closeDetail }, icon('back'), 'Todos los controles')));
-    v.appendChild(h('article', { class: 'card', 'aria-labelledby': titleId },
-      h('p', { class: 'kicker' }, dot(catColor(c)), k ? k.nombre : '', c.prioridad === 1 ? h('span', { class: 'tag-esencial', text: 'esencial' }) : null),
-      h('h2', { class: 'placard detail-title', id: titleId, tabindex: '-1', text: c.nombre }),
-      c.ingles ? h('p', { class: 'detail-en', lang: 'en', text: c.ingles }) : null,
-      otros.length ? h('p', { class: 'detail-also', text: 'También le dicen: ' + otros.join(' · ') }) : null,
-      c.resumen ? h('p', { class: 'lead', text: c.resumen }) : null,
-      h('div', { class: 'btn-row' }, showBtn, extBtn, airBtns),
-      c.ubicacion ? sec('Dónde está', para(c.ubicacion)) : null,
-      c.queHace ? sec('Qué hace', para(c.queHace)) : null,
-      subList ? sec('Cada parte', subList) : null,
-      c.enElAvion ? sec('Qué pasa en el avión', para(c.enElAvion)) : null,
+      h('button', { type: 'button', class: 'btn btn--ghost btn--small back-btn', onclick: closeDetail }, kic('back'), 'Todos los controles'),
+      i >= 0 ? h('span', { class: 'detail-pos', 'aria-label': 'Control ' + (i + 1) + ' de ' + order.length, text: (i + 1) + ' / ' + order.length }) : null));
+    v.appendChild(h('article', { class: 'card ctl-card', 'aria-labelledby': titleId, style: { '--cat': catColor(c) } },
+      h('header', { class: 'ctl-head' },
+        h('div', { class: 'ctl-badges' },
+          h('span', { class: 'ctl-cat' }, h('span', { class: 'row-ico row-ico--sm', 'aria-hidden': 'true' }, kic(catIcon(c.categoria))), k ? k.nombre : ''),
+          c.prioridad === 1 ? kbadge('Esencial', 'accent', 'star') : null,
+          EX.seen[c.id] ? kbadge('Visto', 'ok', 'check') : null),
+        h('h2', { class: 'placard detail-title', id: titleId, tabindex: '-1', text: c.nombre }),
+        c.ingles ? h('p', { class: 'detail-en', lang: 'en', text: c.ingles }) : null,
+        otros.length ? h('p', { class: 'detail-also', text: 'También le dicen: ' + otros.join(' · ') }) : null,
+        c.resumen ? h('p', { class: 'lead ctl-lead', text: c.resumen }) : null,
+        h('div', { class: 'ctl-actions' }, showBtn, extBtn, airBtns)),
       buildProbalo(c, EX.live, false),
-      steps ? sec('Cómo se usa', steps) : null,
-      c.cuando ? sec('Cuándo', para(c.cuando)) : null,
-      errs ? sec('Errores comunes', errs) : null,
-      c.truco ? callout('Truco', c.truco) : null,
-      c.dato ? callout('Dato', c.dato, 'dato') : null,
-      rangos.length ? sec('Marcas de colores', rangesView(rangos)) : null,
-      c.otrosModelos ? sec('En otros años y modelos', para(c.otrosModelos)) : null,
-      relChips ? sec('Relacionados', relChips) : null,
-      h('nav', { class: 'detail-nav', 'aria-label': 'Otros controles' }, navBtn(prevId, -1), navBtn(nextId, 1))));
+      accs.length ? h('div', { class: 'ctl-accs' }, accs) : null,
+      relChips ? h('div', { class: 'ctl-rel' }, h('h3', { class: 'placard placard--small', text: 'Relacionados' }), relChips) : null),
+      h('nav', { class: 'detail-nav', 'aria-label': 'Otros controles' }, navBtn(prevId, -1), navBtn(nextId, 1)));
     var s = S();
     if (s) runLive(EX.live, s);
   }
@@ -2123,7 +2864,10 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     if (!EX.listView) { setMode('explorar'); if (!EX.listView) return; }
     if (!EX.id) EX.listScroll = $('panel').scrollTop;
     EX.id = id;
+    exSeen();
+    progMark('cabina', id);
     renderDetail(c);
+    gloss(EX.detailView, { control: id });
     EX.listView.hidden = true;
     EX.detailView.hidden = false;
     scrollPanelTop();
@@ -2133,6 +2877,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       var t = EX.detailView.querySelector('.detail-title');
       if (t) safe(function () { t.focus({ preventScroll: true }); });
     }
+    kick();
   }
 
   function closeDetail() {
@@ -2152,44 +2897,53 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       var b = EX.ul.querySelector('[data-id="' + was + '"]');
       if (b) safe(function () { b.focus({ preventScroll: true }); });
     }
+    kick();
   }
 
   modeImpl.explorar = {
     render: function (sec) {
-      EX.ul = h('ul', { class: 'rows', 'aria-label': 'Controles de la cabina' });
+      EX.ul = h('ul', { class: 'rows rows--ctl', 'aria-label': 'Controles de la cabina' });
       EX.count = h('p', { class: 'count', 'aria-live': 'polite' });
       var input = h('input', {
         type: 'search', placeholder: 'Buscar: acelerador, flaps, nafta…', 'aria-label': 'Buscar un control',
         autocomplete: 'off', spellcheck: 'false', enterkeyhint: 'search'
       });
+      EX.input = input;
       input.addEventListener('input', function () { EX.query = input.value; renderExList(); });
-      var cats = h('div', { class: 'chips', role: 'group', 'aria-label': 'Filtrar por categoría' });
-      function catBtn(id, label, color) {
-        var b = h('button', {
-          type: 'button', class: 'chip', 'aria-pressed': EX.cat === id ? 'true' : 'false',
-          onclick: function () {
-            EX.cat = (EX.cat === id) ? '' : id;
-            EX.catBtns.forEach(function (x) { setAttr(x.b, 'aria-pressed', x.id === EX.cat ? 'true' : 'false'); });
-            renderExList();
-          }
-        }, color ? dot(color) : null, label);
+      var cats = h('div', { class: 'ex-cats', role: 'group', 'aria-label': 'Filtrar por categoría' });
+      function catBtn(id, label, color, iconName) {
+        var K = C150.Kit;
+        var onClick = function () {
+          EX.cat = (EX.cat === id) ? '' : id;
+          EX.catBtns.forEach(function (x) { setAttr(x.b, 'aria-pressed', x.id === EX.cat ? 'true' : 'false'); });
+          renderExList();
+        };
+        var b = (K && isFn(K.chip)) ? K.chip({ label: label, icon: iconName, selected: EX.cat === id, onClick: onClick })
+          : h('button', { type: 'button', class: 'chip', 'aria-pressed': EX.cat === id ? 'true' : 'false', onclick: onClick }, label);
         EX.catBtns.push({ id: id, b: b });
         cats.appendChild(b);
       }
-      catBtn('', 'Todas', null);
-      CATEGORIES.forEach(function (k) { if (k && k.id) catBtn(k.id, k.nombre || k.id, k.color || null); });
-      EX.listView = h('div', null, exWelcome(),
-        h('div', { class: 'block' },
-          h('h2', { class: 'placard block-title', text: 'Todos los controles' }),
-          h('div', { class: 'search' }, icon('search'), input),
-          cats, EX.count, EX.ul));
+      catBtn('', 'Todas', null, 'list');
+      CATEGORIES.forEach(function (k) { if (k && k.id) catBtn(k.id, k.nombre || k.id, k.color || null, catIcon(k.id)); });
+      EX.catInfo = h('p', { class: 'ex-cat-info', hidden: true });
+      var clearBtn = h('button', { type: 'button', class: 'search-clear', 'aria-label': 'Borrar la búsqueda', hidden: true, onclick: function () {
+        input.value = ''; EX.query = ''; renderExList(); clearBtn.hidden = true; input.focus();
+      } }, kic('close'));
+      input.addEventListener('input', function () { clearBtn.hidden = !input.value; });
+      EX.listView = h('div', null, exIntro(),
+        h('div', { class: 'block ex-list-block' },
+          h('div', { class: 'search ex-search' }, kic('search'), input, clearBtn),
+          cats, EX.catInfo, EX.count, EX.ul));
       EX.detailView = h('div', { hidden: true });
       sec.appendChild(EX.listView);
       sec.appendChild(EX.detailView);
       renderExList();
+      var P = PG();
+      if (P && isFn(P.onChange)) P.onChange(function (e) { if (e && e.kind === 'cabina' && !EX.id && EX.listView && !EX.listView.hidden) renderExList(); });
     },
     enter: function () {
       if (EX.id && CTRL[EX.id]) cc('setExteriorHighlight', arr(CTRL[EX.id].partesAvion));
+      else if (EX.listView && !EX.listView.hidden) renderExList();
     },
     exit: function () { },
     slow: function (s) { runLive(EX.live, s); }
@@ -2264,6 +3018,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   function lbOpen(idx) {
     if (!LESSONS[idx]) return;
     LB.idx = idx; LB.i = 0; LB.seen = { 0: true }; LB.finished = false;
+    progTouch('leccion', LESSONS[idx].id);
     LB.listView.hidden = true;
     LB.lessonView.hidden = false;
     lbRenderStep(true);
@@ -2495,6 +3250,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       dots));
     if (run) lbRun(p);
     else lbSyncActions();
+    gloss(v);
   }
   function lbGo(k) {
     var L = LESSONS[LB.idx];
@@ -2561,6 +3317,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     TR.i = clamp(i, 0, TOUR.length - 1);
     TR.finished = false;
     store.set('tourStep', TR.i);
+    progTouch('recorrido', 'tour', { paso: TR.i });
     trRender();
     trFocus();
     var t = $('tr-title');
@@ -2596,9 +3353,10 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       h('div', { class: 'btn-row btn-row--split' },
         h('button', { type: 'button', class: 'btn', disabled: TR.i === 0, onclick: function () { trGo(TR.i - 1); } }, icon('back'), 'Anterior'),
         last
-          ? h('button', { type: 'button', class: 'btn btn--primary', onclick: function () { TR.finished = true; store.set('tourStep', 0); trRender(); trFocus(); } }, 'Terminar', icon('check'))
+          ? h('button', { type: 'button', class: 'btn btn--primary', onclick: function () { TR.finished = true; progMark('recorrido', 'tour'); store.set('tourStep', 0); trRender(); trFocus(); } }, 'Terminar', icon('check'))
           : h('button', { type: 'button', class: 'btn btn--primary', onclick: function () { trGo(TR.i + 1); } }, 'Siguiente', icon('next')))));
     v.appendChild(h('p', { class: 'aviso', text: 'El control de cada paso titila en la cabina. Si lo perdés de vista, tocá “Mostrámelo de nuevo”.' }));
+    gloss(v, { control: st.control });
   }
 
   modeImpl.recorrido = {
@@ -2640,6 +3398,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     if (!cl) return;
     var carry = !forceFresh && !!cl.continuaDe && CL.lastDone === cl.continuaDe;
     if (!carry && cl.preset) applyPreset(cl.preset);
+    progTouch('checklist', cl.id);
     CL.cur = { cl: cl, idx: idx, done: arr(cl.items).map(function () { return false; }), i: 0, finished: false, carried: carry, skipped: 0 };
     CL.listView.hidden = true;
     CL.runView.hidden = false;
@@ -2741,6 +3500,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
           h('button', { type: 'button', class: 'btn btn--ghost', onclick: clBack }, 'Todas las checklists'))) : null,
       cur.finished ? null : h('div', { class: 'btn-row' },
         h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: function () { clOpen(cur.idx, true); } }, icon('retry'), 'Reiniciar'))));
+    gloss(v);
     var s = S();
     if (s) runLive(CL.live, s);
     if (hadFocus) {
@@ -2842,6 +3602,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   function startMission(m) {
     if (sitOk() && isFn(C150.Situations.stop)) safe(function () { C150.Situations.stop(); }, 'Situations.stop');
     VO.tab = 'practicar';
+    progTouch('mision', m.id);
     VO.starting = true;
     applyPreset(m.preset || 'parked');
     VO.starting = false;
@@ -3223,7 +3984,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   }
   function sitApi() {
     return {
-      h: h, icon: icon, setText: setText, setAttr: setAttr, toggleClass: toggleClass, safe: safe, store: store,
+      annotate: gloss, h: h, icon: icon, setText: setText, setAttr: setAttr, toggleClass: toggleClass, safe: safe, store: store,
       cc: cc, has: has, S: S, applyPreset: applyPreset, kick: kick, showToast: showToast, now: now,
       buildHud: buildHud, flightPad: flightPad, CTRL: CTRL, progressBar: progressBar, reducedMotion: reducedMotion,
       scrollPanelTop: scrollPanelTop, releaseAllHolds: releaseAllHolds,
@@ -3310,6 +4071,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     var b = qzBest(), total = QZ.qs.length;
     QZ.newBest = !b || (QZ.score / total) > (b.score / b.total);
     if (QZ.newBest) store.set('quizBest', { score: QZ.score, total: total });
+    progMark('quiz', 'best', { score: QZ.score, total: total });
     qzRender(true);
   }
   function qzReveal(q) {
@@ -3463,9 +4225,14 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
 
   /* ================================================================== AIRE (laboratorio del aire, lab.js) */
 
+  /** Wraps the known jargon in rootEl with glossary popovers (C150.Glossary, glossary.js). Cheap; safe without the module. */
+  function gloss(el, opts) {
+    var Gl = C150.Glossary;
+    if (el && Gl && isFn(Gl.annotate)) safe(function () { Gl.annotate(el, opts); }, 'Glossary.annotate');
+  }
   function labApi() {
     return {
-      h: h, icon: icon, setText: setText, setAttr: setAttr, toggleClass: toggleClass, fmt: fmt, safe: safe, store: store,
+      annotate: gloss, h: h, icon: icon, setText: setText, setAttr: setAttr, toggleClass: toggleClass, fmt: fmt, safe: safe, store: store,
       cc: cc, has: has, core: Core, S: S, setInput: setInput, applyPreset: applyPreset, setFlapSwitch: setFlapSwitch,
       kick: kick, viewport: $('viewport'), panel: $('panel'), setMode: setMode, getMode: function () { return mode; },
       currentPreset: function () { return currentPreset; }, getMainView: function () { return mainView; },
@@ -3494,7 +4261,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     CO.selId = id && CTRL[id] ? id : null;
     updateCallout();
     if (mode === 'explorar') {
-      if (id && CTRL[id]) { if (EX.id !== id) openControl(id, '3d'); }
+      if (id && CTRL[id]) { if (EX.id !== id) openControl(id, '3d'); sheetEnsure('half'); }
       else if (!id && EX.id && !isProgrammatic(null)) closeDetail();
       return;
     }
@@ -3537,6 +4304,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       Co.on('pause', function () { kick(); });
       Co.on('quality', function () { syncQuality(); });
       Co.on('preset', function (name) {         // mark the camera preset in use ("Vistas")
+        currentCam = name || null;
         var bs = doc.querySelectorAll('.cam-btn');
         for (var i = 0; i < bs.length; i++) bs[i].setAttribute('aria-pressed', bs[i].getAttribute('data-cam') === name ? 'true' : 'false');
       });
@@ -3563,27 +4331,58 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     safe(setupSound, 'sound');
     safe(setupHelp, 'help');
     safe(setupQuality, 'quality');
-    safe(setupTabs, 'tabs');
+    safe(setupNav, 'nav');
+    safe(setupSheet, 'sheet');
     safe(setupViewport, 'viewport');
     safe(setupPeek, 'peek');
     safe(setupInteractionTracking, 'interaction');
+    safe(setupProgress, 'progress');
     root.addEventListener('blur', releaseAllHolds);
     var ok = safe(function () { return startCore(state); }, 'startCore');
     if (!ok) { coreReady = false; if (state) startLocalLoop(); }
     var m = (root.location.hash || '').slice(1);
-    setMode(MODES.indexOf(m) >= 0 ? m : 'explorar', { fromHash: true, noScrollTab: true });
+    if (!m || !go(m, { fromHash: true })) setMode('inicio', { fromHash: true });
+    if (!m) { try { root.history.replaceState(null, '', '#inicio'); } catch (e) { /* sin historial (sandbox) */ } }
     if (!state) showToast({ text: 'No se pudo cargar la simulación: las fichas funcionan, pero los controles no se mueven.', kind: 'warn' });
+    var Ob = C150.Onboarding;
+    if (Ob && isFn(Ob.maybeStart)) safe(function () { Ob.maybeStart(); }, 'Onboarding.maybeStart');
   };
   UI.setMode = function (name) { setMode(name); };
   UI.getMode = function () { return mode; };
+  UI.getGroup = function () { return groupOf(mode); };
+  UI.go = function (path) { return go(path); };
+  UI.toast = function (e) { showToast(e); };
+  UI.syncNav = function () { syncNav(); syncSearchBtn(); };
+  UI.progressSummary = progNow;
+  UI.resetTips = function () { coachReset(); };
   UI.openLab = function (expId) {
     setMode('aire');
     if (expId && C150.Lab && isFn(C150.Lab.startExperiment)) safe(function () { C150.Lab.startExperiment(expId); }, 'Lab.startExperiment');
   };
+  /* deep links used by the search palette, Inicio and the onboarding (each opens its mode first) */
+  UI.openHelp = function () { openHelp(); };
+  UI.sheet = function (snap) { sheetEnsure(snap || 'half'); };
+  UI.openLesson = function (id) {
+    setMode('basico');
+    for (var i = 0; i < LESSONS.length; i++) if (LESSONS[i].id === id) { lbOpen(i); sheetEnsure('half'); return true; }
+    return false;
+  };
+  UI.openChecklist = function (id) { openChecklist(id); sheetEnsure('half'); };
+  UI.openMission = function (id) {
+    for (var i = 0; i < MISSIONS.length; i++) if (MISSIONS[i].id === id) { startMission(MISSIONS[i]); sheetEnsure('half'); return true; }
+    return false;
+  };
+  UI.openSituation = function (id) {
+    setMode('volar');
+    if (sitOk()) { voSetTab('situaciones'); if (isFn(C150.Situations.open)) safe(function () { C150.Situations.open(id); }, 'Situations.open'); }
+    sheetEnsure('half');
+  };
+  UI.startQuiz = function () { setMode('quiz'); qzStart(); sheetEnsure('half'); };
   UI.showControl = function (id) {
     if (!CTRL[id]) return;
     setMode('explorar');
     openControl(id, 'list');
+    sheetEnsure('half');
   };
 
   if (doc.readyState === 'loading') doc.addEventListener('DOMContentLoaded', function () { UI.init(); });

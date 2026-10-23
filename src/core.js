@@ -44,6 +44,11 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
  *     registered with *setInteracting(tag, bool)). Event *'interactionend' when the last one finishes. Camera fly-to
  *     (select(id,{focus}), focusPreset) never starts while interacting or while a pointer is down on the 3D view: it
  *     waits and starts 0.25 s after the release (a newer select without focus cancels it).
+ *   Contract v4 (UI/UX): *setIdleOrbit(bool) → bool · *isIdleOrbit(). A slow cinematic drift of the camera for the Inicio screen:
+ *     in the cockpit view the eye sways a few centimetres and looks around (±14° yaw, ≈ 70 s per cycle); in the exterior view
+ *     (or the 'afuera' / 'dos' layouts) the orbit camera turns around the airplane (autoRotate). It never fights the student: a
+ *     pointer press on the 3D view, a drag/zoom of the orbit controls, a held control or a camera fly-to ends it for good (event
+ *     *'idleorbit'(false)); the UI turns it on again when Inicio is entered.
  *   *poseExterior(name) → Spanish caption | false (ext.pose: a held movement) · *clearPose() · *getPoses() (ext.POSES)
  *   *getAnimState() → ext.animState | null · *isMirroring() · event *'mirror'(bool).
  *     MIRROR: whenever ext.animState.active (a lesson animation or a pose), core snapshots the sim state once, turns on
@@ -891,8 +896,51 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     emit('preset', name);
     return true;
   }
+  /* ------------------------------------------------------------------ idle orbit (Inicio) */
+  var idle = { on: false, base: null, t0: 0 };
+  function stopIdleOrbit(restore) {
+    if (!idle.on) return;
+    if (restore && idle.base && camera && controls) { camera.position.copy(idle.base.p); controls.target.copy(idle.base.t); camera.lookAt(controls.target); }   // leaving Inicio: put the eye back
+    idle.on = false; idle.base = null;
+    if (extControls) extControls.autoRotate = false;
+    emit('idleorbit', false);
+  }
+  function setIdleOrbit(on) {
+    on = !!on;
+    if (!inited) return false;
+    if (on === idle.on) return on;
+    if (!on) { stopIdleOrbit(true); return false; }
+    idle.on = true; idle.base = null;
+    if (extControls) { extControls.autoRotate = true; extControls.autoRotateSpeed = 0.7; }
+    emit('idleorbit', true);
+    return true;
+  }
+  /** Cockpit sway: offsets the eye sideways/up a little and yaws the target; base is captured once the camera is still. */
+  function updateIdleOrbit() {
+    if (!idle.on) return;
+    if (userBusy()) { stopIdleOrbit(); return; }
+    if (fly || !camera || !controls || !(mainView === 'cockpit' || layout === 'dos')) { idle.base = null; return; }
+    if (!idle.base) {
+      idle.base = { p: camera.position.clone(), t: controls.target.clone() };
+      idle.t0 = clock;
+    }
+    var w = (clock - idle.t0) * (Math.PI * 2 / 70);
+    var b = idle.base, sway = Math.sin(w), bob = Math.sin(w * 1.7 + 0.8);
+    vA.subVectors(b.t, b.p);                              // view direction at the base pose
+    var len = vA.length();
+    if (len < 0.01) return;
+    vB.set(0, 1, 0).cross(vA).normalize();                // camera-right (horizontal)
+    camera.position.copy(b.p).addScaledVector(vB, -0.05 * sway);
+    camera.position.y += 0.012 * bob;
+    var ang = 0.25 * sway;                                // ±14° of yaw around the vertical axis
+    var ca = Math.cos(ang), sa = Math.sin(ang);
+    controls.target.set(b.p.x + vA.x * ca - vA.z * sa, b.t.y + 0.015 * bob, b.p.z + vA.x * sa + vA.z * ca);
+  }
+
   function updateCameras(dt) {
     var split = layout === 'dos';
+    if (idle.on && fly) idle.base = null;
+    updateIdleOrbit();
     if (fly) {
       fly.k = Math.min(1, fly.k + dt / FLY_TIME);
       var e = easeInOut(fly.k), tgt = controls ? controls.target : camTarget;
@@ -1969,7 +2017,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       controls.rotateSpeed = 0.5; controls.zoomSpeed = 0.8; controls.panSpeed = 0.6;
       controls.minDistance = MIN_DIST; controls.maxDistance = MAX_DIST;
       controls.enablePan = true; controls.screenSpacePanning = true;
-      controls.addEventListener('start', function () { fly = null; emit('preset', null); });
+      controls.addEventListener('start', function () { fly = null; stopIdleOrbit(); emit('preset', null); });
       if (ext) {
         extControls = new T.OrbitControls(ext.camera, canvas);
         if (ext.target && ext.target.isVector3) extControls.target = ext.target;
@@ -1979,6 +2027,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         extControls.maxPolarAngle = Math.PI * 0.92;
         extControls.enabled = false;
         extControls.addEventListener('start', function () {
+          stopIdleOrbit();
           if (Math.abs(ext.camera.up.y - 1) > 1e-3) ext.camera.up.set(0, 1, 0);
         });
       }
@@ -2317,8 +2366,9 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     if (a.ground === false || a.onGround === false) return true;
     return num(a.ias, 0) > 30 || Math.abs(num(a.bank, 0)) > 2 || Math.abs(num(a.vs, 0)) > 50 || Math.abs(num(a.pitch, 0)) > 4;
   }
-  var DEMO_AGL = 1500;     // ft above the field for a flight demonstration started on the ground (practice-area height)
-  var DEMO_HAZE = 0.45;    // aerial-haze density during a demonstration (world.setHaze: 1 = the usual hazy afternoon)
+  var DEMO_AGL = 1300;     // ft above the field for a flight demonstration (practice-area height: crisp fields and a sharp horizon)
+  var DEMO_AGL_MAX = 1800; // a demonstration airplane higher than this above the field is brought down to DEMO_AGL
+  var DEMO_HAZE = 0.4;     // aerial-haze density during a demonstration (world.setHaze: 1 = the usual hazy afternoon)
   /** A clear, crisp day for a demonstration: the far fields keep their colour, so the horizon is a sharp line through
    *  the windshield and the bank / pitch read at a glance (world.setHaze, eased); the usual haze comes back after. */
   function mirrorHaze(on) {
@@ -2357,8 +2407,11 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     if (airborne && mirror.airborne !== true) {
       // seen from inside a flight demonstration needs air under the wings: a practice-area height (DEMO_AGL ft), low
       // enough that the fields, the roads and the horizon line stay crisp through the windshield
-      if (air.onGround || num(air.altitude, 0) < num(state.fieldElevation, 0) + 300) {
-        air.altitude = num(state.fieldElevation, 0) + DEMO_AGL;
+      // (also from a high scenario such as the 3000 ft cruise: up there the horizon dissolves into haze and the bank is hard
+      // to read, so the demonstration airplane comes down to the practice-area height; endMirror gives the scenario back)
+      var fieldE = num(state.fieldElevation, 0);
+      if (air.onGround || num(air.altitude, 0) < fieldE + 300 || num(air.altitude, 0) > fieldE + DEMO_AGL_MAX) {
+        air.altitude = fieldE + DEMO_AGL;
         air.onGround = false;
       }
     }
@@ -2467,6 +2520,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     getLayout: getLayout,
     isInteracting: function () { return isInteracting(); },
     setInteracting: setInteracting,
+    setIdleOrbit: setIdleOrbit,
+    isIdleOrbit: function () { return idle.on; },
     operate: operate,
     setInput: setInput,
     hold: holdAndCheck,

@@ -593,6 +593,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       log.appendChild(h('li', { class: 'is-' + it.tono, text: it.cadena[0] + ' → ' + it.cadena[it.cadena.length - 1] }));
     });
     el.narrLogWrap.hidden = L.history.length < 2;
+    if (A.annotate && cur) A.annotate(el.narrNow);
     // overlay on the 3D (compact)
     var ov = el.stageNarr;
     if (ov) {
@@ -1239,6 +1240,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         ? h('button', { type: 'button', class: 'btn btn--small btn--primary', onclick: function () { markDone(ex.id); stopExperiment(); } }, A.icon('check'), 'Terminar')
         : h('button', { type: 'button', class: 'btn btn--small btn--primary', onclick: function () { applyStep(i + 1); } }, 'Siguiente', A.icon('next'))));
     R.appendChild(dots);
+    if (A.annotate) A.annotate(R);
   }
 
   Lab.mount = function (section, api) {

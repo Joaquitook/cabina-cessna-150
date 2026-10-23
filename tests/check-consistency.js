@@ -70,7 +70,9 @@ const CAM_PRESETS = ['pilot', 'panel', 'left', 'center', 'right', 'floor', 'over
 const PROBAR_TIPOS = ['yoke', 'pedales', 'slider', 'toggle', 'opciones', 'master', 'flaps', 'accion', 'luces', 'radio', 'perilla', 'puertas'];
 // contrato §1 + contrato v2 §4 (laboratorio del aire: data/lab.js, airfoil.js, airflow.js, lab.js)
 const SCRIPT_ORDER = ['data/controls-a.js', 'data/controls-b.js', 'data/learning.js', 'data/lab.js', 'data/situations.js', 'sim.js', 'gauges.js',
-  'airfoil.js', 'world.js', 'cockpit.js', 'exterior.js', 'airflow.js', 'core.js', 'lab.js', 'situations.js', 'ui.js'];
+  'airfoil.js', 'world.js', 'cockpit.js', 'exterior.js', 'airflow.js', 'core.js', 'lab.js', 'situations.js', 'icons.js', 'kit.js', 'progress.js', 'ui.js'];
+// contrato UI/UX v4 §4: módulos de las próximas olas (opcionales hasta que existan); si están, van antes de ui.js y después de progress.js
+const SCRIPT_OPTIONAL = ['glossary.js', 'search.js', 'home.js', 'onboarding.js'];
 
 /* ───────────── Carga (global falso, sin DOM) ───────────── */
 
@@ -303,12 +305,20 @@ const uiQuoted = uniq(matchAll(/'([a-z]+(?:-[a-z]+)+)'/g, ui)).filter((s) => /^(
 uiQuoted.forEach((s) => { if (!isCtrl(s) && !ANIMS.includes(s) && !GAUGE_OF[s] && !Object.values(GAUGE_OF).includes(s)) warn('ui.js menciona "' + s + '", que no es un id de ficha'); });
 const html = read('index.html');
 const order = matchAll(/<script\s+data-inline="([^"]+)"/g, html);
-ok(JSON.stringify(order) === JSON.stringify(SCRIPT_ORDER), 'index.html: orden de scripts del contrato §1 (' + order.join(' → ') + ')');
+const orderCore = order.filter((f) => !SCRIPT_OPTIONAL.includes(f));
+ok(JSON.stringify(orderCore) === JSON.stringify(SCRIPT_ORDER), 'index.html: orden de scripts del contrato §1 + v4 (' + order.join(' → ') + ')');
+order.filter((f) => SCRIPT_OPTIONAL.includes(f)).forEach((f) => ok(order.indexOf(f) > order.indexOf('progress.js') && order.indexOf(f) < order.indexOf('ui.js'), 'index.html: ' + f + ' entre progress.js y ui.js'));
 const three = html.indexOf('three@0.147.0/build/three.min.js'), orbit = html.indexOf('OrbitControls.js'), rbox = html.indexOf('RoundedBoxGeometry.js'), first = html.indexOf('data-inline="data/controls-a.js"');
 ok(three > 0 && three < orbit && orbit < rbox && rbox < first, 'index.html: three → OrbitControls → RoundedBoxGeometry antes de los módulos');
 ok(/^<title>[^<]+<\/title>/.test(html.trim()), 'index.html empieza con <title>');
 ok(!/<!doctype|<html[\s>]|<head[\s>]|<body[\s>]/i.test(html), 'index.html sin doctype/html/head/body (los agrega build.js)');
-['explorar', 'basico', 'recorrido', 'checklists', 'volar', 'quiz', 'aire'].forEach((m) => ok(new RegExp('data-mode="' + m + '"').test(html), 'index.html: pestaña ' + m));
+['inicio', 'explorar', 'basico', 'recorrido', 'checklists', 'volar', 'quiz', 'aire'].forEach((m) => {
+  ok(new RegExp('data-mode="' + m + '"').test(html), 'index.html: botón de navegación o sub-pestaña ' + m);
+  ok(new RegExp('id="panel-' + m + '"').test(html), 'index.html: panel ' + m);
+});
+['inicio', 'cabina', 'lecciones', 'practicar', 'aire'].forEach((g) => ok(new RegExp('class="nav-item[^"]*" id="nav-' + g + '" data-group="' + g + '"').test(html), 'index.html: grupo de navegación ' + g));
+ok(/id="nav-escuela"[^>]*hidden/.test(html) && /id="panel-escuela"/.test(html), 'index.html: Escuela reservada (oculta hasta que exista C150.Escuela)');
+ok(/id="sheet-grip"/.test(html) && /id="btn-search"/.test(html) && /id="btn-progress"/.test(html), 'index.html: asa de la hoja inferior, buscar y anillo de avance');
 
 /* ───────────── Resultado ───────────── */
 warnings.forEach((w) => console.warn('  AVISO: ' + w));

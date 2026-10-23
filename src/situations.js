@@ -272,6 +272,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     else if (R.phase === 'run' && R.x) renderRun();
     else if (R.phase === 'fin' && R.x) renderFin();
     else { R.phase = 'lista'; renderList(); }
+    if (A.annotate && R.phase !== 'run') A.annotate(V);
     var s = A.S();
     if (s) runLive(s);
     if (focusTitle || hadFocus) {

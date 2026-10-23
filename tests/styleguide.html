@@ -1,0 +1,171 @@
+<!doctype html>
+<!-- styleguide.html — guía de estilo viva del sistema de diseño v2 (contrato UI/UX v4 §3).
+     Muestra TODOS los componentes de src/kit.js con los estilos reales de src/styles.css.
+     Abrila con un servidor estático desde la raíz del proyecto (python -m http.server 8781) → /tests/styleguide.html
+     Cambiá el tema con el selector de arriba (Automático / Claro / Oscuro). -->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Guía de estilo · Cabina Cessna 150</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=B612+Mono:wght@400;700&family=Barlow+Condensed:wght@500;600;700&display=swap">
+<link rel="stylesheet" href="../src/styles.css">
+<style>
+  html, body { height: auto; }
+  body { overflow: auto; font-size: 17px; line-height: 1.55; }
+  .sg { max-width: 1040px; margin: 0 auto; padding: 24px 20px 96px; }
+  .sg-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--fg); margin-bottom: 8px; }
+  .sg-demo { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 18px; border: 1px dashed var(--line); border-radius: var(--radius-m); background: var(--bg); }
+  .sg-demo + .sg-demo { margin-top: 12px; }
+  .sg-label { font-family: var(--font-data); font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--fg-soft); margin: 18px 0 6px; }
+  .sg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .sg-ico { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 6px; border: 1px solid var(--line); border-radius: var(--radius-s); background: var(--surface); font-family: var(--font-data); font-size: 11.5px; color: var(--fg-soft); text-align: center; }
+  .sg-ico .icon { width: 28px; height: 28px; color: var(--fg); }
+  .sg-sw { display: flex; flex-direction: column; justify-content: flex-end; min-height: 74px; padding: 8px 10px; border-radius: var(--radius-s); font-family: var(--font-data); font-size: 12px; border: 1px solid var(--line); }
+  .sg-wide { flex: 1 1 100%; }
+  .sg-stage { width: 100%; padding: 22px; border-radius: var(--radius-m); background: #0E151B; color: var(--ov-fg); }
+  .sg-stage .glass { display: inline-flex; gap: 12px; padding: 10px 14px; border-radius: 10px; background: var(--ov-bg); border: 1px solid var(--ov-line); backdrop-filter: blur(8px); font-family: var(--font-data); font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="sg" id="sg"></div>
+
+<script src="../src/icons.js"></script>
+<script src="../src/kit.js"></script>
+<script>
+(function () {
+  var K = C150.Kit, h = K.el, root = document.getElementById('sg');
+  var n = 0;
+  function sec(title, meta) { n++; root.appendChild(K.sectionHeader(n, title, meta)); }
+  function demo() { var d = h('div', { 'class': 'sg-demo' }); for (var i = 0; i < arguments.length; i++) K.add(d, arguments[i]); root.appendChild(d); return d; }
+  function label(t) { root.appendChild(h('p', { 'class': 'sg-label', text: t })); }
+
+  /* ---- top: title + theme */
+  var theme = K.segmented({
+    label: 'Tema', auto: true, value: 'auto',
+    items: [{ value: 'auto', label: 'Automático', icon: 'auto' }, { value: 'light', label: 'Claro', icon: 'sun' }, { value: 'dark', label: 'Oscuro', icon: 'moon' }],
+    onChange: function (v) { var de = document.documentElement; if (v === 'auto') de.removeAttribute('data-theme'); else de.setAttribute('data-theme', v); }
+  });
+  root.appendChild(h('header', { 'class': 'sg-top' },
+    h('div', null, h('p', { 'class': 'mode-kicker' }, h('span', { 'class': 'mode-kicker-dot' }), 'Sistema de diseño v2'),
+      h('h1', { 'class': 'display', text: 'Guía de estilo' }),
+      h('p', { 'class': 'mode-sub', text: 'Todos los componentes de C150.Kit con los estilos reales de la app. Probalos en claro y en oscuro.' })),
+    theme));
+
+  /* ---- 01 colores */
+  sec('Colores y tokens', 'claro · oscuro');
+  var sw = h('div', { 'class': 'sg-grid' });
+  [['--bg', 'fondo'], ['--surface', 'superficie'], ['--surface-2', 'superficie 2'], ['--line', 'línea'], ['--fg', 'texto'], ['--fg-soft', 'texto suave'],
+   ['--accent', 'acento'], ['--accent-ink', 'acento (texto)'], ['--ok', 'ok'], ['--warn', 'aviso'], ['--bad', 'error'], ['--info', 'info']].forEach(function (t) {
+    var dark = ['--fg', '--accent-ink', '--bad', '--info', '--ok', '--fg-soft'].indexOf(t[0]) >= 0;
+    sw.appendChild(h('div', { 'class': 'sg-sw', style: { background: 'var(' + t[0] + ')', color: dark ? '#fff' : 'var(--fg)' } }, h('strong', { text: t[1] }), t[0]));
+  });
+  root.appendChild(sw);
+
+  /* ---- 02 tipografía */
+  sec('Tipografía', 'Barlow Condensed · Atkinson · B612 Mono');
+  demo(h('div', { 'class': 'sg-wide' },
+    h('p', { 'class': 'display', text: 'Display 40 — Cabina Cessna 150' }),
+    h('p', { 'class': 'h1', text: 'H1 30 — Tu camino para aprender a volar' }),
+    h('p', { 'class': 'h2', text: 'H2 22 — Conocé la cabina' }),
+    h('p', { 'class': 'h3', text: 'H3 18 — El acelerador' }),
+    h('p', { 'class': 'measure', text: 'Cuerpo 17/1.55 (Atkinson Hyperlegible). Tirás el volante hacia vos y la nariz del avión sube; lo empujás y baja. Es el mando más importante de la cabina, y por eso conviene aprenderlo primero. Largo de línea máximo: 62 caracteres.' }),
+    h('p', { 'class': 'small soft', text: 'Chico 14,5 — para aclaraciones y datos secundarios.' }),
+    h('p', { 'class': 'data', text: 'DATO 15 · 2 450 RPM · 85 kt · 29,92 inHg' })));
+
+  /* ---- 03 botones */
+  sec('Botones');
+  demo(K.button({ label: 'Primario', variant: 'primary', icon: 'play' }), K.button({ label: 'Secundario', variant: 'secondary' }), K.button({ label: 'Normal' }),
+    K.button({ label: 'Fantasma', variant: 'ghost' }), K.button({ label: 'Cargando', variant: 'primary', loading: true }), K.button({ label: 'Desactivado', disabled: true }),
+    K.button({ label: 'Siguiente', variant: 'primary', iconRight: 'chevron-right' }));
+  demo(K.button({ label: 'Grande', variant: 'primary', size: 'large', icon: 'plane' }), K.button({ label: 'Chico', size: 'small' }), K.button({ label: 'Chico', variant: 'secondary', size: 'small' }),
+    K.iconButton({ icon: 'search', label: 'Buscar' }), K.iconButton({ icon: 'settings', label: 'Ajustes', small: true }),
+    K.button({ icon: 'close', ariaLabel: 'Cerrar', variant: 'secondary', size: 'small' }));
+  var tipBtn = K.iconButton({ icon: 'help', label: 'Ayuda' }); K.tooltip(tipBtn, 'Pasá el mouse o enfocá con Tab: así se ve un tooltip');
+  demo(tipBtn, h('span', { 'class': 'soft small', text: '← Tooltip: hover o foco de teclado' }));
+
+  /* ---- 04 chips y badges */
+  sec('Chips y badges');
+  demo(K.chip({ label: 'Motor', color: '#C4428E', selected: true }), K.chip({ label: 'Instrumentos', color: '#2196C4', selected: false }), K.chip({ label: 'Con ícono', icon: 'eye' }),
+    K.badge('Esencial', 'accent'), K.badge('Hecho', 'ok', 'check'), K.badge('Cuidado', 'warn', 'warning'), K.badge('Error', 'bad'), K.badge('Dato', 'info', 'info'), K.badge('Nuevo', 'solid'), K.badge('Neutro'));
+
+  /* ---- 05 segmentado y pestañas */
+  sec('Segmentado y pestañas');
+  demo(K.segmented({ label: 'Vista', value: 'cabina', items: [{ value: 'cabina', label: 'Cabina' }, { value: 'dos', label: 'Las dos' }, { value: 'afuera', label: 'Afuera' }], onChange: function () {} }));
+  demo(h('div', { 'class': 'sg-wide' }, K.tabs({ label: 'Pestañas de línea', variant: 'line', value: 'a', items: [{ id: 'a', label: 'Resumen' }, { id: 'b', label: 'Cómo se usa' }, { id: 'c', label: 'Errores comunes' }] })));
+  demo(h('div', { 'class': 'sg-wide', style: { 'max-width': '440px' } }, K.tabs({ label: 'Sub-pestañas', variant: 'pill', value: 'b', items: [{ id: 'a', label: 'Checklists' }, { id: 'b', label: 'Misiones y situaciones' }, { id: 'c', label: 'Quiz' }] })));
+
+  /* ---- 06 tarjetas */
+  sec('Tarjetas', 'plana · elevada · interactiva');
+  var cards = h('div', { 'class': 'sg-grid', style: { 'grid-template-columns': 'repeat(auto-fill, minmax(260px, 1fr))' } });
+  cards.appendChild(K.card({ variant: 'flat', title: 'Plana', sub: 'Fondo suave, sin borde.', children: h('p', { text: 'Sirve para agrupar contenido sin que pese.' }) }));
+  cards.appendChild(K.card({ variant: 'raised', title: 'Elevada', sub: 'Con sombra.', children: h('p', { text: 'Para lo que querés destacar.' }) }));
+  cards.appendChild(K.card({ variant: 'interactive', icon: 'cabin', title: 'Interactiva', sub: 'Toda la tarjeta es un botón.', onClick: function () { K.toast('¡Tocaste la tarjeta!', 'good'); } }));
+  root.appendChild(cards);
+
+  /* ---- 07 encabezados y avisos */
+  sec('Encabezados de sección y avisos');
+  demo(h('div', { 'class': 'sg-wide' }, K.sectionHeader(1, 'Mirá cómo vuela', '4 min'), K.sectionHeader(2, 'Probalo yo')));
+  var co = h('div', { 'class': 'sg-wide' });
+  co.appendChild(K.callout({ variant: 'tip', text: 'Agarrá el volante suave, como una taza de café: sin apretar.' }));
+  co.appendChild(K.callout({ variant: 'dato', text: 'Los dos volantes del Cessna 150 están unidos: si movés uno, se mueve el otro.' }));
+  co.appendChild(K.callout({ variant: 'cuidado', text: 'No muevas la mezcla a "pobre" a ciegas: el motor puede recalentarse.' }));
+  co.appendChild(K.callout({ variant: 'error', title: 'Eso no estaba bien', text: 'Soltaste el freno de mano con el motor a fondo.' }));
+  co.appendChild(K.callout({ variant: 'ok', text: '¡Perfecto! Terminaste la checklist antes de arrancar.' }));
+  demo(co);
+
+  /* ---- 08 progreso */
+  sec('Progreso', 'barra · anillo · pasos');
+  var pb = K.progressBar(0.45, { label: 'Avance' });
+  var pbl = K.progressBar(0.8, { size: 'lg', ok: true, label: 'Casi listo' });
+  demo(h('div', { 'class': 'sg-wide' }, pb, h('div', { style: { height: '12px' } }), pbl));
+  demo(K.progressRing(0.35, { size: 96, label: 'camino' }), K.progressRing(1, { size: 72, ok: true, label: 'listo' }), K.progressRing(0.06, { size: 56, ariaLabel: 'Avance del quiz' }),
+    h('div', { style: { flex: '1 1 260px' } }, K.progressSteps({ label: 'Tu camino', steps: [{ label: 'Conocé la cabina', state: 'done' }, { label: 'Cómo vuela', state: 'done' }, { label: 'Procedimientos', state: 'current' }, { label: 'Volá', state: 'todo' }, { label: 'Quiz', state: 'todo' }] })));
+
+  /* ---- 09 datos */
+  sec('Datos en vivo', 'stat · clave-valor');
+  var ras = K.stat({ label: 'Velocidad (IAS)', value: '85', unit: 'kt' });
+  demo(h('div', { 'class': 'stat-grid sg-wide' }, ras, K.stat({ label: 'Altura', value: '2 450', unit: 'ft' }), K.stat({ label: 'Motor', value: '2 300', unit: 'RPM' }), K.stat({ label: 'Rumbo', value: '090', unit: '°', small: true })));
+  demo(h('div', { 'class': 'sg-wide' }, K.keyValue([['Dónde está', 'Frente a tu asiento'], ['Cuándo se usa', 'Todo el vuelo'], ['Rango verde', '47 – 107 kt'], ['Nunca exceder', '141 kt']])));
+  var live = 85; setInterval(function () { live = 85 + Math.round(Math.sin(Date.now() / 700) * 6); ras.set(live); }, 400);
+
+  /* ---- 10 acordeón */
+  sec('Acordeón', '<details> animado');
+  demo(h('div', { 'class': 'sg-wide' },
+    K.accordion({ title: 'Qué hace', open: true, icon: 'info', content: h('p', { text: 'Mueve los alerones y el timón de profundidad con un solo mando. Tirar sube la nariz; girar inclina el avión.' }) }),
+    K.accordion({ title: 'Errores comunes', content: h('p', { text: 'Apretar el volante con fuerza. Mirar el instrumento en vez de mirar afuera.' }) }),
+    K.accordion({ title: 'Ver más', content: h('p', { text: 'Contenido que sólo aparece cuando lo pedís: así las pantallas no se llenan de texto.' }) })));
+
+  /* ---- 11 popover, diálogo, hoja */
+  sec('Popover, diálogo y hoja inferior');
+  var popBtn = K.button({ label: 'Abrir popover', variant: 'secondary', onClick: function () {
+    K.popover(popBtn, { title: 'IAS', content: [h('p', { text: 'Velocidad que marca el anemómetro, en nudos. Es la velocidad respecto del aire, no del suelo.' }), K.button({ label: 'Verlo en 3D', size: 'small', variant: 'primary', icon: 'eye' })] });
+  } });
+  var dlgBtn = K.button({ label: 'Abrir diálogo', variant: 'primary', onClick: function () {
+    K.dialog({ kicker: 'Bienvenida', title: '¿Es tu primera vez?', body: [h('p', { text: 'Con esta cabina en 3D vas a aprender qué es cada mando antes de tu primera clase. Podés tocar todo: no se rompe nada.' }), K.callout({ variant: 'tip', text: 'En el celular esto se ve como una hoja que sube desde abajo.' })],
+      actions: [{ label: 'Ya sé algo', variant: 'secondary' }, { label: 'Empezar', variant: 'primary', icon: 'play' }] });
+  } });
+  var toastBtn = K.button({ label: 'Mostrar aviso (toast)', onClick: function () { K.toast('Listo: checklist completa.', 'good'); } });
+  demo(popBtn, dlgBtn, toastBtn);
+
+  /* ---- 12 vacío, esqueleto, kbd */
+  sec('Estados vacíos, esqueleto y teclas');
+  demo(h('div', { 'class': 'sg-wide' }, K.emptyState({ icon: 'search', title: 'No encontré nada', text: 'Probá con otra palabra, por ejemplo "flaps" o "acelerador".', action: { label: 'Limpiar búsqueda', variant: 'secondary' } })));
+  demo(h('div', { style: { flex: '1 1 320px' } }, K.skeleton('title'), K.skeleton('text', 3), h('div', { style: { height: '10px' } }), K.skeleton('block')),
+    h('p', null, 'Atajos: ', K.kbd('Ctrl'), ' + ', K.kbd('K'), ' buscar · ', K.kbd('?'), ' ayuda · ', K.kbd('Esc'), ' cerrar'));
+
+  /* ---- 13 sobre el 3D */
+  sec('Vidrio sobre el 3D', 'cinematográfico');
+  demo(h('div', { 'class': 'sg-stage' }, h('span', { 'class': 'glass' }, h('span', { text: 'IAS 085 kt' }), h('span', { text: 'ALT 2 450 ft' }), h('span', { text: 'RPM 2 300' }))));
+
+  /* ---- 14 íconos */
+  sec('Íconos', C150.Icons.names.length + ' · sprite inline');
+  var ig = h('div', { 'class': 'sg-grid' });
+  C150.Icons.names.forEach(function (nm) { ig.appendChild(h('div', { 'class': 'sg-ico' }, K.icon(nm), nm)); });
+  root.appendChild(ig);
+})();
+</script>
+</body>
+</html>
