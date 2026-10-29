@@ -72,7 +72,10 @@ const PROBAR_TIPOS = ['yoke', 'pedales', 'slider', 'toggle', 'opciones', 'master
 const SCRIPT_ORDER = ['data/controls-a.js', 'data/controls-b.js', 'data/learning.js', 'data/lab.js', 'data/situations.js', 'sim.js', 'gauges.js',
   'airfoil.js', 'world.js', 'cockpit.js', 'exterior.js', 'airflow.js', 'core.js', 'lab.js', 'situations.js', 'icons.js', 'kit.js', 'progress.js', 'ui.js'];
 // contrato UI/UX v4 §4: módulos de las próximas olas (opcionales hasta que existan); si están, van antes de ui.js y después de progress.js
-const SCRIPT_OPTIONAL = ['nav.js', 'glossary.js', 'search.js', 'home.js', 'onboarding.js'];   // nav.js (contrato v6): después de progress.js, antes de ui.js
+// contrato v7 (Escuela): mismo orden, justo antes de ui.js. Entre motor.js y leccion.js van modelos.js, figuras.js (si existe) y los componentes c-*.js (cada pasada suma los suyos).
+const ESCUELA_EXTRAS = fs.existsSync(path.join(SRC, 'escuela')) ? fs.readdirSync(path.join(SRC, 'escuela')).filter((f) => /^(c-.*|modelos|figuras)\.js$/.test(f)).map((f) => 'escuela/' + f) : [];
+const ESCUELA_SCRIPTS = ['escuela/datos.js', 'escuela/store.js', 'escuela/motor.js'].concat(ESCUELA_EXTRAS.slice().sort((a, b) => (a === 'escuela/modelos.js' ? -1 : b === 'escuela/modelos.js' ? 1 : a === 'escuela/figuras.js' ? -1 : b === 'escuela/figuras.js' ? 1 : a.localeCompare(b))), ['escuela/leccion.js', 'escuela/pantallas.js', 'escuela/escuela.js']);
+const SCRIPT_OPTIONAL = ['nav.js', 'glossary.js', 'search.js', 'home.js', 'onboarding.js'].concat(ESCUELA_SCRIPTS);   // nav.js (contrato v6): después de progress.js, antes de ui.js
 
 /* ───────────── Carga (global falso, sin DOM) ───────────── */
 
@@ -308,6 +311,32 @@ const order = matchAll(/<script\s+data-inline="([^"]+)"/g, html);
 const orderCore = order.filter((f) => !SCRIPT_OPTIONAL.includes(f));
 ok(JSON.stringify(orderCore) === JSON.stringify(SCRIPT_ORDER), 'index.html: orden de scripts del contrato §1 + v4 (' + order.join(' → ') + ')');
 order.filter((f) => SCRIPT_OPTIONAL.includes(f)).forEach((f) => ok(order.indexOf(f) > order.indexOf('progress.js') && order.indexOf(f) < order.indexOf('ui.js'), 'index.html: ' + f + ' entre progress.js y ui.js'));
+// Escuela (contrato v7 §3): sus scripts van en su orden, después de nav / glossary / search y antes de ui.js; los bloques JSON se inyectan antes que ellos.
+{
+  const pos = ESCUELA_SCRIPTS.map((f) => order.indexOf(f));
+  // los de la lista van seguidos y justo antes de ui.js; modelos.js y figuras.js primero, los c-*.js en cualquier orden entre sí
+  const iD = order.indexOf('escuela/datos.js'), iM = order.indexOf('escuela/motor.js'), iL = order.indexOf('escuela/leccion.js'), iE = order.indexOf('escuela/escuela.js');
+  ok(iD >= 0 && order[iD + 1] === 'escuela/store.js' && order[iD + 2] === 'escuela/motor.js' && iL > iM && order[iL + 1] === 'escuela/pantallas.js' && order[iL + 2] === 'escuela/escuela.js' && order.indexOf('ui.js') === iE + 1 &&
+    JSON.stringify(order.slice(iM + 1, iL).slice().sort()) === JSON.stringify(ESCUELA_EXTRAS.slice().sort()), 'index.html: los ' + ESCUELA_SCRIPTS.length + ' scripts de escuela/ seguidos (datos, store, motor, modelos, figuras, c-*, leccion, pantallas, escuela), justo antes de ui.js');
+  ok(!ESCUELA_EXTRAS.includes('escuela/modelos.js') || order.indexOf('escuela/modelos.js') === iM + 1, 'index.html: modelos.js va justo después de motor.js');
+  ESCUELA_EXTRAS.filter((f) => /\/c-/.test(f)).forEach((f) => ok(order.indexOf(f) > order.indexOf('escuela/modelos.js') && (!ESCUELA_EXTRAS.includes('escuela/figuras.js') || order.indexOf(f) > order.indexOf('escuela/figuras.js')), 'index.html: ' + f + ' después de modelos.js y figuras.js'));
+  ['nav.js', 'glossary.js', 'search.js'].forEach((f) => ok(order.indexOf(f) < pos[0], 'index.html: ' + f + ' antes de escuela/datos.js'));
+  ok(html.indexOf('<!--ESCUELA-JSON-->') > 0 && html.indexOf('<!--ESCUELA-JSON-->') < html.indexOf('data-inline="escuela/datos.js"'), 'index.html: marcador <!--ESCUELA-JSON--> antes de escuela/datos.js (build.js inyecta ahí el índice y los módulos)');
+  const ED = path.join(SRC, 'data', 'escuela');
+  const ix = JSON.parse(fs.readFileSync(path.join(ED, 'indice.json'), 'utf8'));
+  const idsIx = [], estado = {};
+  ix.modulos.forEach((m) => m.unidades.forEach((u) => { ok(u.id.indexOf(m.id + '-') === 0, 'escuela indice: unidad ' + u.id + ' dentro de ' + m.id); u.lecciones.forEach((l) => { idsIx.push(l.id); estado[l.id] = l.detalle; ok(l.id.indexOf(u.id + '-') === 0, 'escuela indice: lección ' + l.id + ' dentro de ' + u.id); }); }));
+  ok(idsIx.length === uniq(idsIx).length, 'escuela indice: ids de lección únicos (' + idsIx.length + ')');
+  const enArchivos = [];
+  fs.readdirSync(ED).filter((f) => /^[A-Z]{3}\.json$/.test(f)).forEach((f) => {
+    const mod = JSON.parse(fs.readFileSync(path.join(ED, f), 'utf8'));
+    ok(mod.id === f.replace('.json', ''), 'escuela ' + f + ': el id del módulo coincide con el archivo');
+    mod.unidades.forEach((u) => u.lecciones.forEach((l) => { enArchivos.push(l.id); ok(estado[l.id] === 'completo', 'escuela ' + f + ': ' + l.id + ' está en el índice con detalle "completo" (corré node tools/escuela-indice.js)'); }));
+  });
+  idsIx.filter((id) => estado[id] === 'completo').forEach((id) => ok(enArchivos.includes(id), 'escuela indice: ' + id + ' es "completo" pero no está en ningún archivo de módulo'));
+  const bs = read('../build.js');
+  ok(!/_teorico/.test(bs.replace(/\/\/.*$/gm, '')), 'build.js no lee _teorico/ (sólo lo menciona en comentarios)');
+}
 const three = html.indexOf('three@0.147.0/build/three.min.js'), orbit = html.indexOf('OrbitControls.js'), rbox = html.indexOf('RoundedBoxGeometry.js'), first = html.indexOf('data-inline="data/controls-a.js"');
 ok(three > 0 && three < orbit && orbit < rbox && rbox < first, 'index.html: three → OrbitControls → RoundedBoxGeometry antes de los módulos');
 ok(/^<title>[^<]+<\/title>/.test(html.trim()), 'index.html empieza con <title>');

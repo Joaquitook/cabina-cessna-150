@@ -1402,6 +1402,33 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   Lab.startExperiment = function (id, step) { return L.mounted ? startExperiment(id, step) : false; };
   Lab.stopExperiment = function () { if (L.mounted) stopExperiment(); };
   Lab.setView = function (name) { return L.mounted ? setLabView(name) : false; };
+  /* API para la Escuela (enlace3d): el estado del laboratorio en un solo gesto (todo opcional; devuelve false si todavía no está montado). */
+  Lab.setCapas = function (m) {
+    if (!L.mounted || !m || typeof m !== 'object') return false;
+    for (var k in m) if (Object.prototype.hasOwnProperty.call(m, k) && Object.prototype.hasOwnProperty.call(L.capas, k)) L.capas[k] = !!m[k];
+    pushAirflow(); syncCapas();
+    return true;
+  };
+  Lab.setFoco = function (region) { if (!L.mounted || !region) return false; var r = setLabView(region); flowFocus(region); return r; };
+  Lab.setTunel = function (o) {
+    if (!L.mounted || !o) return false;
+    var set = {}, t = {};
+    if (isFinite(o.ias)) t.ias = o.ias;
+    if (isFinite(o.aoa)) t.aoa = o.aoa;
+    if (Object.keys(t).length) set.tunnel = t;
+    if (isFinite(o.flaps)) set.flaps = o.flaps;
+    applySet(set);
+    return true;
+  };
+  /** Abre (si estaba plegada) la sección con esa clave ('ala' = «El ala por dentro») y la trae a la vista. */
+  Lab.irA = function (clave) {
+    if (!L.mounted) return false;
+    var body = document.getElementById('lab-body-' + clave);
+    if (!body) return false;
+    if (body.hidden) { var head = document.querySelector('[aria-controls="lab-body-' + clave + '"]'); if (head) head.click(); }
+    if (body.scrollIntoView) body.scrollIntoView({ block: 'start', behavior: reduced() ? 'auto' : 'smooth' });
+    return true;
+  };
   Lab.getInfo = function () {
     return { active: L.active, mode: L.mode, fake: L.fake, experiment: L.exp ? L.exp.id : null, step: L.step,
       capas: L.capas, view: L.view, history: L.history.map(function (x) { return x.cadena.join(' → '); }),

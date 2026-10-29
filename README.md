@@ -46,9 +46,21 @@ src/
   gauges.js                los instrumentos dibujados
   sim.js                   simulador de motor, sistemas y vuelo
   data/                    contenido: fichas, lecciones, recorrido, checklists, misiones, quiz y glosario
+  escuela/                 pestaña ESCUELA (C150.Escuela): datos.js (índice + carga perezosa), store.js (progreso, repaso espaciado), motor.js (componentes), leccion.js, pantallas.js, escuela.js
+    modelos.js · figuras.js · c-simulador.js · c-calculadora.js · c-diagrama.js · c-animacion.js · c-clasificar.js · c-emparejar.js · c-situacion.js · c-enlace3d.js
+                           componentes de las lecciones (pasada 1, parte A): C150.ESCUELA.modelos (funciones puras del simulador: sustentación y pérdida, atmósfera estándar,
+                           factor de carga, viento cruzado, porcentaje, recreos, franjas, riesgo, Bernoulli, Venturi…), C150.ESCUELA.herramientas (la calculadora: conversión,
+                           viento cruzado, tiempo-velocidad-distancia, combustible, altitud de presión y densidad, plazos y fechas…), C150.ESCUELA.figuras (dibujos SVG propios con
+                           capas y puntos) y los cuatro componentes. El esquema de `datos` de cada uno está documentado al principio de su archivo.
+                           Parte B: clasificar (fichas a cajas, con ES.arrastre compartido), emparejar (dos columnas que se funden), situación (decisiones con consecuencia, con ramas) y enlace 3D (MIRAR / ABRIR con el modelo de navegación).
+  data/escuela/            indice.json (módulos, unidades y lecciones; lo genera tools/escuela-indice.js) y un <ID>.json por módulo con el texto adaptado (se carga a pedido)
 tests/                     pruebas (Node) y páginas de prueba (styleguide.html = guía de estilo viva)
 build.js                   arma todo en un solo HTML
 ```
+
+## La pestaña ESCUELA y cómo se agrega contenido
+
+ESCUELA es la teoría del curso para el examen, adaptada con palabras propias (nunca copiada de las diapositivas): un mapa de 12 módulos, cada módulo con unidades y lecciones, y cada lección con un recorrido de pasos, práctica, mini-quiz y resumen. Los textos viven en `src/data/escuela/<ID>.json` (un archivo por módulo, JSON puro: unidades → lecciones con `objetivos`, `contenido`, `componentes[{tipo, titulo, descripcion, datos}]`, `preguntas`, `glosario` y `enlaces`). El índice liviano (`src/data/escuela/indice.json`: todos los módulos y lecciones, con `detalle` completo / pendiente / próximamente) lo genera `node tools/escuela-indice.js` a partir del plan de contenidos de `_teorico/` y marca como `completo` sólo las lecciones que existen en `src/data/escuela/<ID>.json`; hay que volver a correrlo cada vez que se suma o se completa un módulo (`tests/check-consistency.js` falla si un `<ID>.json` tiene lecciones que el índice no da por completas). `_teorico/` no se publica: está en `.gitignore`, `build.js` nunca lo lee y las pruebas verifican que ningún archivo publicado lo nombre. Los módulos se emiten a pedido: `node build.js` mete el índice en el HTML (`<script type="application/json" id="escuela-indice">`), deja cada módulo como un bloque `id="escuela-<ID>"` que sólo se interpreta cuando el alumno abre ese módulo, y escribe además `cabina-cessna-150/escuela/<ID>.json` minificado para que, publicado, el módulo se baje con `fetch` la primera vez; el motor de componentes (`C150.ESCUELA.componentes`) tolera los esbozos libres del plan y, si un `datos` no sirve, muestra una tarjeta de reserva que no bloquea nada. `node tests/validate-escuela.js` revisa el índice, cada lección (4 opciones, `correcta` válida, enlaces contra los ids reales de la app), el `normalizar` de cada componente y la lógica del progreso.
 
 ## Uso local
 
@@ -74,6 +86,7 @@ node tests/validate-search.js
 node tests/validate-progress.js
 node tests/validate-lab.js
 node tests/validate-situations.js
+node tests/validate-escuela.js
 node tests/airflow.test.js
 node tests/exterior.test.js
 ```

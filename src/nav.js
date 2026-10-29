@@ -143,7 +143,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       return e;
     }
 
-    /** kind: go (IR) | push (ABRIR) | detail (same tab) | replace. opts: {returnLabel, run, force, label} */
+    /** kind: go (IR) | push (ABRIR) | detail (same tab) | replace. opts: {returnLabel, run, force, label, nest} */
     function navigate(kind, route, opts) {
       opts = opts || {};
       route = String(route || '');
@@ -172,7 +172,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       entries.length = idx + 1;                                      // the browser drops the forward entries too
       var e = mk(route, kind);
       if (kind === 'push') e.ret = { label: label, dismissed: false };
-      if (kind === 'detail') e.parent = c.parent || c.id;          // every detail of a chain points at the list it came from
+      if (kind === 'detail') e.parent = opts.nest ? c.id : (c.parent || c.id);   // every detail of a chain points at the list it came from (opts.nest: at the entry it was opened from: UP goes one level up, e.g. lesson → module)
       entries.push(e); idx++;
       writeHist('push', e);
       clearLook();

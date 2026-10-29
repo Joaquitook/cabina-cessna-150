@@ -9,6 +9,12 @@
 // En src/index.html:
 //   <style data-inline="styles.css"></style>            se reemplaza por el CSS del archivo
 //   <script data-inline="sim.js"></script>              se reemplaza por el JS del archivo
+//   <!--ESCUELA-JSON-->                                 se reemplaza por los bloques <script type="application/json"> de la Escuela:
+//                                                       id="escuela-indice" (src/data/escuela/indice.json) y uno por módulo,
+//                                                       id="escuela-<ID>" (src/data/escuela/<ID>.json); este último se parsea recién
+//                                                       cuando el alumno abre ese módulo (src/escuela/datos.js). Sin módulos sigue andando.
+//   La carpeta que se publica en Vercel recibe además cabina-cessna-150/escuela/<ID>.json (minificados) para la carga por fetch.
+//   _teorico/ (material del curso, fuera de git) NUNCA se lee desde acá.
 const fs = require('fs');
 const path = require('path');
 
@@ -24,7 +30,22 @@ const read = (rel) => {
 // Evita que un "</script>" dentro del JS cierre la etiqueta antes de tiempo.
 const safeJs = (code) => code.replace(/<\/script/gi, '<\\/script');
 
+// ---- ESCUELA: datos en JSON (índice + un archivo por módulo)
+const ESC_DIR = path.join(SRC, 'data', 'escuela');
+const escFiles = fs.existsSync(ESC_DIR) ? fs.readdirSync(ESC_DIR).filter((f) => /^[A-Za-z0-9_-]+\.json$/.test(f)).sort() : [];
+const escData = {};
+escFiles.forEach((f) => {
+  const id = f.replace(/\.json$/, '');
+  try { escData[id] = JSON.parse(fs.readFileSync(path.join(ESC_DIR, f), 'utf8')); }
+  catch (e) { throw new Error('src/data/escuela/' + f + ' no es JSON válido: ' + e.message); }
+});
+// Un bloque de datos dentro del HTML: nada de "</script" ni "<!--" que lo corten antes de tiempo (los escapes son JSON válido).
+const jsonBlock = (id, obj) => '<script type="application/json" id="escuela-' + id + '">' +
+  JSON.stringify(obj).replace(/<\/script/gi, '<\\/script').replace(/<!--/g, '<\\u0021--') + '</script>';
+const escBlocks = Object.keys(escData).sort((a, b) => (a === 'indice' ? -1 : b === 'indice' ? 1 : a.localeCompare(b))).map((id) => jsonBlock(id, escData[id])).join('\n');
+
 let body = template
+  .replace('<!--ESCUELA-JSON-->', () => escBlocks)
   .replace(/<style\s+data-inline="([^"]+)"\s*><\/style>/g, (_, rel) => `<style>\n${read(rel)}\n</style>`)
   .replace(/<script\s+data-inline="([^"]+)"\s*><\/script>/g, (_, rel) => `<script>\n/* ---- ${rel} ---- */\n${safeJs(read(rel))}\n</script>`);
 
@@ -69,7 +90,14 @@ const SITE = path.join(__dirname, 'cabina-cessna-150');
 fs.mkdirSync(SITE, { recursive: true });
 fs.writeFileSync(path.join(SITE, 'index.html'), full);
 
+// Datos de la Escuela para la carga perezosa por fetch (escuela/<ID>.json, minificados). Los que ya no existen en src/ se borran.
+const SITE_ESC = path.join(SITE, 'escuela');
+fs.mkdirSync(SITE_ESC, { recursive: true });
+fs.readdirSync(SITE_ESC).forEach((f) => { if (/\.json$/.test(f) && !(f.replace(/\.json$/, '') in escData)) fs.unlinkSync(path.join(SITE_ESC, f)); });
+Object.keys(escData).forEach((id) => fs.writeFileSync(path.join(SITE_ESC, id + '.json'), JSON.stringify(escData[id])));
+
 const kb = (s) => (Buffer.byteLength(s) / 1024).toFixed(0) + ' KB';
 console.log('OK  cabina-cessna-150.html', kb(full));
 console.log('OK  cabina-cessna-150/index.html (Vercel)', kb(full));
 console.log('OK  dist/artifact.html', kb(body));
+console.log('OK  cabina-cessna-150/escuela/ (' + Object.keys(escData).length + ' archivos JSON: ' + Object.keys(escData).join(', ') + ')');

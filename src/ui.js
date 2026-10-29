@@ -704,9 +704,11 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     return true;
   }
   /** Same tab: open a card / lesson / run (kind 'detail': UP == Back) or change it in place (kind 'replace': prev / next). */
-  function navDetail(kind, route, fn) {
+  function navDetail(kind, route, fn, extra) {
     if (!navOn()) { fn(); return; }
-    NAV()[kind](route, { run: quiet(fn) });
+    var o = { run: quiet(fn) };
+    if (extra) for (var k in extra) if (Object.prototype.hasOwnProperty.call(extra, k)) o[k] = extra[k];
+    NAV()[kind](route, o);
   }
   /** MIRAR: only the 3D moves; the tab never changes. Shows the chip "Volver a la vista anterior". */
   function navLook(fn, label) {
@@ -5173,6 +5175,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       currentPreset: function () { return currentPreset; }, getMainView: function () { return mainView; },
       syncMainView: syncMainView, reducedMotion: reducedMotion, now: now, showToast: showToast,
       navDetail: function (route, fn) { navDetail('detail', route, fn); },
+      navTo: function (kind, route, fn, extra) { navDetail(kind, route, fn, extra); },            // kind: 'detail' | 'replace' | 'go' · extra: {nest:true} (Escuela: module → lesson)
+      navOpen: function (path, o) { return navOpen(path, o); }, navLook: function (fn, label) { navLook(fn, label); },
       navUp: function () { var n = NAV(); return !!(navOn() && n && isFn(n.up) && n.up()); }
     };
   }
@@ -5452,7 +5456,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       up: function () { var Lb = C150.Lab; if (!labExp() || !Lb || !isFn(Lb.stopExperiment)) return false; Lb.stopExperiment(); return true; },
       inDetail: function () { return !!labExp(); }, active: none
     });
-    N.registerProvider('escuela', {
+    var esProv = (C150.Escuela && isFn(C150.Escuela.navProvider)) ? safe(function () { return C150.Escuela.navProvider(); }, 'Escuela.navProvider') : null;
+    N.registerProvider('escuela', esProv || {
       label: function () { return 'Escuela'; }, crumbs: function () { return ['Escuela']; }, route: function () { return 'escuela'; },
       capture: function () { return {}; }, restore: function () {}, up: none, inDetail: none, active: none
     });

@@ -338,6 +338,34 @@
 <script src="../src/search.js"></script>
 <script src="../src/home.js"></script>
 <script src="../src/onboarding.js"></script>
+<script>
+/* Escuela (contrato v7): el build inyecta el índice como bloque inline; acá se lee con una lectura síncrona del mismo archivo y los módulos se piden por fetch. */
+window.C150_ESCUELA_BASE = '../src/data/escuela/';
+(function () {
+  try {
+    var x = new XMLHttpRequest(); x.open('GET', window.C150_ESCUELA_BASE + 'indice.json', false); x.send();
+    if (x.status === 200 || (x.status === 0 && x.responseText)) {
+      var s = document.createElement('script'); s.type = 'application/json'; s.id = 'escuela-indice'; s.textContent = x.responseText; document.body.appendChild(s);
+    }
+  } catch (e) { /* sin índice: la Escuela lo pide por fetch */ }
+})();
+</script>
+<script src="../src/escuela/datos.js"></script>
+<script src="../src/escuela/store.js"></script>
+<script src="../src/escuela/motor.js"></script>
+<script src="../src/escuela/modelos.js"></script>
+<script src="../src/escuela/figuras.js"></script>
+<script src="../src/escuela/c-simulador.js"></script>
+<script src="../src/escuela/c-animacion.js"></script>
+<script src="../src/escuela/c-calculadora.js"></script>
+<script src="../src/escuela/c-diagrama.js"></script>
+<script src="../src/escuela/c-clasificar.js"></script>
+<script src="../src/escuela/c-emparejar.js"></script>
+<script src="../src/escuela/c-situacion.js"></script>
+<script src="../src/escuela/c-enlace3d.js"></script>
+<script src="../src/escuela/leccion.js"></script>
+<script src="../src/escuela/pantallas.js"></script>
+<script src="../src/escuela/escuela.js"></script>
 <script src="../src/ui.js"></script>
 
 </body>

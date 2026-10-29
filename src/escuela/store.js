@@ -1,0 +1,304 @@
+var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = root.C150 || {};
+/*
+ * escuela/store.js — C150.ESCUELA.store: el progreso de la Escuela, guardado en el dispositivo (localStorage 'c150.escuela.v1',
+ * todo dentro de try/catch; si el almacenamiento está bloqueado sigue en memoria). Sin cuentas ni datos personales. Contrato v7 §3/§7.
+ * Sin DOM: la lógica pura (estrellas, cajas de Leitner, racha, fusión, exportar/importar) se prueba en Node (tests/validate-escuela.js).
+ *
+ * Forma guardada (v1):
+ *   { v:1,
+ *     lecciones: { 'INT-01-01': { estado:'en-curso'|'hecha', estrellas:0..3, mejor:0..1, intentos:n, paso:n (índice del paso donde quedó),
+ *                                 q:{i, ok, resp:[…]}|null (mini-quiz a medias), t:ms (último movimiento), min:n (minutos acreditados),
+ *                                 h:['p2.0', 'pr.1'] (componentes ya hechos: ctx.key de cada uno) } },
+ *     respuestas:{ 'INT-01-01:ab12cd34': { ok:n, mal:n, t:ms } },            // por pregunta (id estable calculado con el texto)
+ *     mazo:      { 'INT-01-01:clasificar:3': { tipo, ref, caja:1..5, prox:'YYYY-MM-DD', t:ms } },   // repaso espaciado (cajas de Leitner)
+ *     racha:     { dias:n, ultimo:'YYYY-MM-DD'|'' , gracia:'YYYY-Www'|'' , mejor:n },
+ *     minutos:   { 'YYYY-MM-DD': n },                                        // minutos estudiados por día (para "esta semana")
+ *     insignias: { primera: ms, … },
+ *     ultima:    { leccion:'INT-01-01', paso:n, t:ms } | null,                // "Continuar donde dejaste"
+ *     prefs:     { mapa:'tarjetas'|'camino' } }
+ *
+ * API pura (Store.*): estrellas(frac, primerIntento) · cajaSiguiente(caja, acierto) · INTERVALOS · fechaLocal(ms) · sumarDias(fecha, n) ·
+ *   diasEntre(a, b) · semanaDe(fecha) · rachaActualizar(racha, hoy) · rachaVigente(racha, hoy) · hashTexto(s) · vacio() · fusionar(a, b) · sanear(obj)
+ * Instancia: Store.crear({storage?, now?}) → s  (el singleton es Store.s, creado perezosamente por Store.get()):
+ *   s.estado() copia del estado                   s.lec(id) registro o null          s.setPaso(id, paso) · s.setQuizParcial(id, q|null)
+ *   s.quiz(id, correctas, total) → {estrellas, primero}      registra un intento del mini-quiz (mejor, intentos, estrellas)
+ *   s.marcarLista(id, {minutos}) → {estrellas, nueva, insignias:[ids nuevos]}      estado 'hecha'; suma racha, minutos e insignias
+ *   s.respuesta(qid, ok)   s.ultima()   s.tocar(id, paso)   (mueve "ultima" y pasa la lección a 'en-curso' si estaba sin ver)
+ *   s.mazoAgregar({id, tipo, ref}) · s.mazo() · s.vencidas(hoy?) · s.repasar(id, ok)
+ *   s.racha(hoy?) → días de racha vigente    s.minutosSemana(hoy?)      s.insignias() · s.otorgar(id) → bool
+ *   s.exportar() → texto JSON    s.importar(texto) → {ok, error?, lecciones}      s.reset()      s.onChange(fn) → desuscribir
+ *   s.pref(k, v?)  s.persistente
+ */
+(function (C150) {
+  'use strict';
+
+  var ES = C150.ESCUELA = C150.ESCUELA || {};
+  var Store = ES.store = ES.store || {};
+
+  var KEY = 'c150.escuela.v1';
+  var INTERVALOS = [1, 3, 7, 14, 30];       // días de cada caja de Leitner
+  var BAD_KEY = { '__proto__': 1, 'constructor': 1, 'prototype': 1 };
+  var ID_LEC = /^[A-Z]{3}-\d{2}-\d{2}$/;
+  Store.INTERVALOS = INTERVALOS;
+  Store.INSIGNIAS = {
+    'primera': { titulo: 'Primera lección', texto: 'Terminaste tu primera lección de la Escuela.' },
+    'racha7': { titulo: 'Racha de 7 días', texto: 'Estudiaste siete días seguidos.' },
+    'sin-errores': { titulo: 'Sin errores', texto: 'Un mini-quiz perfecto.' }
+  };
+
+  function num(v, d) { return (typeof v === 'number' && isFinite(v)) ? v : d; }
+  function isObj(o) { return !!o && typeof o === 'object' && !Array.isArray(o); }
+  function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+  function okKey(k) { return typeof k === 'string' && k.length > 0 && k.length <= 120 && !BAD_KEY[k]; }
+
+  /* ------------------------------------------------------------------ lógica pura */
+  /** 1 estrella al terminar · 2 con 70 % o más · 3 con 100 % al primer intento. */
+  Store.estrellas = function (frac, primerIntento) {
+    frac = num(frac, 0);
+    if (frac >= 0.999 && primerIntento) return 3;
+    return frac >= 0.7 ? 2 : 1;
+  };
+  Store.cajaSiguiente = function (caja, acierto) { return acierto ? clamp(Math.round(num(caja, 1)) + 1, 1, 5) : 1; };
+
+  function p2(n) { return (n < 10 ? '0' : '') + n; }
+  Store.fechaLocal = function (ms) { var d = new Date(ms); return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()); };
+  function aUTC(f) { var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(f || ''); return m ? Date.UTC(+m[1], +m[2] - 1, +m[3]) : NaN; }
+  Store.diasEntre = function (a, b) { return Math.round((aUTC(b) - aUTC(a)) / 86400000); };
+  Store.sumarDias = function (f, n) { var t = aUTC(f); if (isNaN(t)) return f; var d = new Date(t + n * 86400000); return d.getUTCFullYear() + '-' + p2(d.getUTCMonth() + 1) + '-' + p2(d.getUTCDate()); };
+  /** Semana ISO ("2026-W44") de una fecha 'YYYY-MM-DD'. */
+  Store.semanaDe = function (f) {
+    var t = aUTC(f);
+    if (isNaN(t)) return '';
+    var d = new Date(t);
+    d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7) + 3);      // el jueves de esa semana fija el año ISO
+    var jueves = d.getTime(), y = d.getUTCFullYear();
+    d.setUTCMonth(0, 1);
+    if (d.getUTCDay() !== 4) d.setUTCMonth(0, 1 + ((4 - d.getUTCDay()) + 7) % 7);
+    return y + '-W' + p2(1 + Math.ceil((jueves - d.getTime()) / 604800000));
+  };
+  /** Hubo actividad el día `hoy`: suma a la racha (un día de gracia por semana cubre un día sin estudiar). */
+  Store.rachaActualizar = function (r, hoy) {
+    r = isObj(r) ? r : {};
+    var dias = num(r.dias, 0), ultimo = typeof r.ultimo === 'string' ? r.ultimo : '', gracia = typeof r.gracia === 'string' ? r.gracia : '';
+    if (ultimo === hoy) return { dias: Math.max(dias, 1), ultimo: hoy, gracia: gracia, mejor: Math.max(num(r.mejor, 0), dias, 1) };
+    var d = ultimo ? Store.diasEntre(ultimo, hoy) : NaN;
+    if (d === 1) dias += 1;
+    else if (d === 2 && gracia !== Store.semanaDe(Store.sumarDias(ultimo, 1))) { gracia = Store.semanaDe(Store.sumarDias(ultimo, 1)); dias += 1; }
+    else dias = 1;
+    return { dias: dias, ultimo: hoy, gracia: gracia, mejor: Math.max(num(r.mejor, 0), dias) };
+  };
+  /** Días de racha que siguen vigentes hoy (0 si pasó demasiado tiempo desde la última actividad). */
+  Store.rachaVigente = function (r, hoy) {
+    if (!isObj(r) || !r.ultimo) return 0;
+    var d = Store.diasEntre(r.ultimo, hoy);
+    if (d <= 1) return num(r.dias, 0);
+    if (d === 2 && r.gracia !== Store.semanaDe(Store.sumarDias(r.ultimo, 1))) return num(r.dias, 0);
+    return 0;
+  };
+  /** Hash corto y estable (8 hex) de un texto: id de pregunta, semilla del mezclado. */
+  Store.hashTexto = function (s) {
+    s = String(s); var h = 2166136261;
+    for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return ('00000000' + (h >>> 0).toString(16)).slice(-8);
+  };
+
+  Store.vacio = function () {
+    return { v: 1, lecciones: {}, respuestas: {}, mazo: {}, racha: { dias: 0, ultimo: '', gracia: '', mejor: 0 }, minutos: {}, insignias: {}, ultima: null, prefs: {} };
+  };
+
+  function saneLec(r) {
+    if (!isObj(r)) return null;
+    var o = { estado: r.estado === 'hecha' ? 'hecha' : 'en-curso', estrellas: clamp(Math.round(num(r.estrellas, 0)), 0, 3), mejor: clamp(num(r.mejor, 0), 0, 1),
+      intentos: Math.max(0, Math.round(num(r.intentos, 0))), paso: Math.max(0, Math.round(num(r.paso, 0))), q: null, t: Math.max(0, num(r.t, 0)), min: Math.max(0, Math.round(num(r.min, 0))), h: [] };
+    if (Array.isArray(r.h)) r.h.slice(0, 40).forEach(function (k) { if (typeof k === 'string' && /^[a-z0-9.]{1,16}$/.test(k) && o.h.indexOf(k) < 0) o.h.push(k); });
+    if (isObj(r.q) && Array.isArray(r.q.resp)) o.q = { i: Math.max(0, Math.round(num(r.q.i, 0))), ok: Math.max(0, Math.round(num(r.q.ok, 0))), resp: r.q.resp.slice(0, 12).map(function (x) { return Math.round(num(x, -1)); }) };
+    return o;
+  }
+  /** Devuelve un estado v1 limpio a partir de cualquier objeto (descarta claves raras y valores fuera de rango). */
+  Store.sanear = function (o) {
+    var s = Store.vacio();
+    if (!isObj(o)) return s;
+    if (isObj(o.lecciones)) for (var k in o.lecciones) { if (ID_LEC.test(k)) { var l = saneLec(o.lecciones[k]); if (l) s.lecciones[k] = l; } }
+    if (isObj(o.respuestas)) for (var q in o.respuestas) { if (okKey(q) && isObj(o.respuestas[q])) s.respuestas[q] = { ok: Math.max(0, Math.round(num(o.respuestas[q].ok, 0))), mal: Math.max(0, Math.round(num(o.respuestas[q].mal, 0))), t: Math.max(0, num(o.respuestas[q].t, 0)) }; }
+    if (isObj(o.mazo)) for (var m in o.mazo) {
+      var e = o.mazo[m];
+      if (okKey(m) && isObj(e) && typeof e.tipo === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(e.prox || '')) s.mazo[m] = { tipo: e.tipo.slice(0, 30), ref: String(e.ref === undefined ? '' : e.ref).slice(0, 60), caja: clamp(Math.round(num(e.caja, 1)), 1, 5), prox: e.prox, t: Math.max(0, num(e.t, 0)) };
+    }
+    if (isObj(o.racha)) s.racha = { dias: Math.max(0, Math.round(num(o.racha.dias, 0))), ultimo: /^\d{4}-\d{2}-\d{2}$/.test(o.racha.ultimo || '') ? o.racha.ultimo : '', gracia: /^\d{4}-W\d{2}$/.test(o.racha.gracia || '') ? o.racha.gracia : '', mejor: Math.max(0, Math.round(num(o.racha.mejor, 0))) };
+    if (isObj(o.minutos)) for (var d in o.minutos) { if (/^\d{4}-\d{2}-\d{2}$/.test(d)) s.minutos[d] = Math.max(0, Math.round(num(o.minutos[d], 0))); }
+    if (isObj(o.insignias)) for (var n in o.insignias) { if (okKey(n)) s.insignias[n] = Math.max(0, num(o.insignias[n], 0)); }
+    if (isObj(o.ultima) && ID_LEC.test(o.ultima.leccion || '')) s.ultima = { leccion: o.ultima.leccion, paso: Math.max(0, Math.round(num(o.ultima.paso, 0))), t: Math.max(0, num(o.ultima.t, 0)) };
+    if (isObj(o.prefs) && (o.prefs.mapa === 'tarjetas' || o.prefs.mapa === 'camino')) s.prefs.mapa = o.prefs.mapa;
+    return s;
+  };
+  /** Fusiona dos estados quedándose con lo mejor de cada uno (importar sin perder lo que ya hay). */
+  Store.fusionar = function (a, b) {
+    a = Store.sanear(a); b = Store.sanear(b);
+    var s = Store.sanear(a), k;
+    for (k in b.lecciones) {
+      var x = s.lecciones[k], y = b.lecciones[k];
+      if (!x) { s.lecciones[k] = y; continue; }
+      var m = (y.estado === 'hecha' && x.estado !== 'hecha') ? y : (x.estado === 'hecha' && y.estado !== 'hecha') ? x : (y.t > x.t ? y : x);
+      s.lecciones[k] = { estado: (x.estado === 'hecha' || y.estado === 'hecha') ? 'hecha' : 'en-curso', estrellas: Math.max(x.estrellas, y.estrellas), mejor: Math.max(x.mejor, y.mejor),
+        intentos: Math.max(x.intentos, y.intentos), paso: m.paso, q: m.q, t: Math.max(x.t, y.t), min: Math.max(x.min, y.min),
+        h: x.h.concat(y.h.filter(function (k) { return x.h.indexOf(k) < 0; })) };
+    }
+    for (k in b.respuestas) { var r1 = s.respuestas[k], r2 = b.respuestas[k]; s.respuestas[k] = r1 ? { ok: Math.max(r1.ok, r2.ok), mal: Math.max(r1.mal, r2.mal), t: Math.max(r1.t, r2.t) } : r2; }
+    for (k in b.mazo) { if (!s.mazo[k] || b.mazo[k].t > s.mazo[k].t) s.mazo[k] = b.mazo[k]; }
+    if (b.racha.ultimo > s.racha.ultimo) s.racha = b.racha; else s.racha.mejor = Math.max(s.racha.mejor, b.racha.mejor);
+    for (k in b.minutos) s.minutos[k] = Math.max(s.minutos[k] || 0, b.minutos[k]);
+    for (k in b.insignias) if (!s.insignias[k] || b.insignias[k] < s.insignias[k]) s.insignias[k] = b.insignias[k];
+    if (b.ultima && (!s.ultima || b.ultima.t > s.ultima.t)) s.ultima = b.ultima;
+    if (b.prefs.mapa && !s.prefs.mapa) s.prefs.mapa = b.prefs.mapa;
+    return s;
+  };
+
+  /* ------------------------------------------------------------------ instancia */
+  Store.crear = function (opts) {
+    opts = opts || {};
+    var storage = opts.storage !== undefined ? opts.storage : (function () { try { return root.localStorage || null; } catch (e) { return null; } })();
+    var nowFn = typeof opts.now === 'function' ? opts.now : function () { return Date.now(); };
+    var st = null, listeners = [], persist = true;
+
+    function leer() {
+      try {
+        var raw = storage && storage.getItem(KEY);
+        if (!raw) return Store.vacio();
+        return Store.sanear(JSON.parse(raw));
+      } catch (e) { persist = false; return Store.vacio(); }
+    }
+    function S() { if (!st) st = leer(); return st; }
+    function guardar() {
+      try { if (storage) { storage.setItem(KEY, JSON.stringify(st)); persist = true; } else persist = false; } catch (e) { persist = false; }
+    }
+    function avisar(que) { listeners.slice().forEach(function (fn) { try { fn(que); } catch (e) { if (root.console) console.error('[Escuela.store]', e); } }); }
+    function hoy() { return Store.fechaLocal(nowFn()); }
+    function cambio(que) { guardar(); avisar(que); }
+
+    var s = {
+      get persistente() { return persist; },
+      estado: function () { return JSON.parse(JSON.stringify(S())); },
+      lec: function (id) { var r = S().lecciones[id]; return r ? JSON.parse(JSON.stringify(r)) : null; },
+      /** El alumno está en la lección `id`, en el paso `paso`: queda como "en curso" y como "ultima" para Continuar. */
+      tocar: function (id, paso) {
+        if (!ID_LEC.test(id)) return;
+        var r = S().lecciones[id];
+        if (!r) r = S().lecciones[id] = { estado: 'en-curso', estrellas: 0, mejor: 0, intentos: 0, paso: 0, q: null, t: 0, min: 0, h: [] };
+        r.paso = Math.max(0, Math.round(num(paso, 0))); r.t = nowFn();
+        S().ultima = { leccion: id, paso: r.paso, t: r.t };
+        cambio('tocar');
+      },
+      setPaso: function (id, paso) { s.tocar(id, paso); },
+      /** El componente `key` (ctx.key) de la lección quedó hecho. */
+      hecho: function (id, key) {
+        var r = S().lecciones[id];
+        if (!r) { s.tocar(id, 0); r = S().lecciones[id]; }
+        if (typeof key !== 'string' || !/^[a-z0-9.]{1,16}$/.test(key) || r.h.length >= 40) return false;
+        if (r.h.indexOf(key) < 0) { r.h.push(key); guardar(); }
+        return true;
+      },
+      setQuizParcial: function (id, q) {
+        var r = S().lecciones[id];
+        if (!r) return;
+        r.q = q && Array.isArray(q.resp) ? { i: q.i | 0, ok: q.ok | 0, resp: q.resp.slice(0, 12) } : null;
+        guardar();
+      },
+      /** Un mini-quiz terminado: guarda el mejor resultado (nunca se resta) y cuenta el intento. */
+      quiz: function (id, correctas, total) {
+        var r = S().lecciones[id];
+        if (!r) { s.tocar(id, 0); r = S().lecciones[id]; }
+        var primero = r.intentos === 0, frac = total > 0 ? correctas / total : 1;
+        var est = Store.estrellas(frac, primero);
+        r.intentos += 1; r.mejor = Math.max(r.mejor, frac); r.estrellas = Math.max(r.estrellas, est); r.q = null; r.t = nowFn();
+        var nuevas = [];
+        if (total >= 3 && correctas === total && s.otorgar('sin-errores', true)) nuevas.push('sin-errores');
+        cambio('quiz');
+        return { estrellas: est, primero: primero, insignias: nuevas };
+      },
+      /** "Marcar como lista": estado 'hecha', al menos 1 estrella, racha, minutos e insignias. */
+      marcarLista: function (id, o) {
+        o = o || {};
+        var r = S().lecciones[id];
+        if (!r) { s.tocar(id, 0); r = S().lecciones[id]; }
+        var nueva = r.estado !== 'hecha', t = nowFn(), f = Store.fechaLocal(t);
+        r.estado = 'hecha'; r.estrellas = Math.max(r.estrellas, 1); r.q = null; r.t = t;
+        var nuevas = [];
+        if (nueva) {
+          var m = Math.max(0, Math.round(num(o.minutos, 0)));
+          r.min = m; S().minutos[f] = (S().minutos[f] || 0) + m;
+          if (s.otorgar('primera', true)) nuevas.push('primera');
+        }
+        S().racha = Store.rachaActualizar(S().racha, f);
+        if (S().racha.dias >= 7 && s.otorgar('racha7', true)) nuevas.push('racha7');
+        S().ultima = { leccion: id, paso: r.paso, t: t };
+        cambio('lista');
+        return { estrellas: r.estrellas, nueva: nueva, insignias: nuevas };
+      },
+      respuesta: function (qid, ok) {
+        if (!okKey(qid)) return;
+        var r = S().respuestas[qid] || (S().respuestas[qid] = { ok: 0, mal: 0, t: 0 });
+        if (ok) r.ok++; else r.mal++;
+        r.t = nowFn(); guardar();
+      },
+      ultima: function () { var u = S().ultima; return u ? { leccion: u.leccion, paso: u.paso, t: u.t } : null; },
+
+      /* repaso espaciado */
+      mazoAgregar: function (it) {
+        if (!it || !okKey(it.id) || typeof it.tipo !== 'string') return false;
+        var e = S().mazo[it.id], f = hoy();
+        S().mazo[it.id] = { tipo: it.tipo.slice(0, 30), ref: String(it.ref === undefined ? '' : it.ref).slice(0, 60), caja: 1, prox: Store.sumarDias(f, INTERVALOS[0]), t: nowFn() };
+        cambio(e ? 'mazo' : 'mazo');
+        return true;
+      },
+      mazo: function () { return JSON.parse(JSON.stringify(S().mazo)); },
+      vencidas: function (f) { f = f || hoy(); var out = []; for (var k in S().mazo) if (S().mazo[k].prox <= f) out.push({ id: k, tipo: S().mazo[k].tipo, ref: S().mazo[k].ref, caja: S().mazo[k].caja, prox: S().mazo[k].prox }); return out; },
+      repasar: function (id, ok) {
+        var e = S().mazo[id];
+        if (!e) return null;
+        e.caja = Store.cajaSiguiente(e.caja, ok); e.prox = Store.sumarDias(hoy(), INTERVALOS[e.caja - 1]); e.t = nowFn();
+        S().racha = Store.rachaActualizar(S().racha, hoy());
+        cambio('repaso');
+        return { caja: e.caja, prox: e.prox };
+      },
+
+      /* racha, minutos e insignias */
+      racha: function (f) { return Store.rachaVigente(S().racha, f || hoy()); },
+      mejorRacha: function () { return S().racha.mejor; },
+      minutosSemana: function (f) {
+        f = f || hoy();
+        var w = Store.semanaDe(f), n = 0;
+        for (var k in S().minutos) if (Store.semanaDe(k) === w) n += S().minutos[k];
+        return n;
+      },
+      insignias: function () { return JSON.parse(JSON.stringify(S().insignias)); },
+      otorgar: function (id, silencioso) {
+        if (!okKey(id) || S().insignias[id]) return false;
+        S().insignias[id] = nowFn();
+        if (!silencioso) cambio('insignia');
+        return true;
+      },
+
+      pref: function (k, v) {
+        if (v === undefined) return S().prefs[k];
+        S().prefs[k] = v; guardar(); return v;
+      },
+
+      /* exportar / importar */
+      exportar: function () { return JSON.stringify({ app: 'cabina-c150-escuela', v: 1, exportado: new Date(nowFn()).toISOString(), datos: S() }); },
+      importar: function (txt) {
+        var o;
+        try { o = JSON.parse(String(txt)); } catch (e) { return { ok: false, error: 'El archivo no es un JSON válido.' }; }
+        if (!isObj(o) || o.app !== 'cabina-c150-escuela' || o.v !== 1 || !isObj(o.datos)) return { ok: false, error: 'Este archivo no es un progreso de la Escuela.' };
+        st = Store.fusionar(S(), o.datos);
+        cambio('importar');
+        return { ok: true, lecciones: Object.keys(st.lecciones).length };
+      },
+      reset: function () { st = Store.vacio(); cambio('reset'); },
+      onChange: function (fn) { if (typeof fn !== 'function') return function () {}; listeners.push(fn); return function () { var i = listeners.indexOf(fn); if (i >= 0) listeners.splice(i, 1); }; }
+    };
+    return s;
+  };
+
+  /** El singleton de la app (se crea al primer uso, así el almacenamiento ya está disponible). */
+  Store.get = function () { if (!Store.s) Store.s = Store.crear(); return Store.s; };
+})(root.C150);

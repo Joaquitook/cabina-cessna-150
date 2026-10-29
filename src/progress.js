@@ -128,7 +128,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       if (!l) return null;
       return {
         kind: l.kind, id: l.id, t: l.t, d: l.d, hecho: !!entryOf(l.kind, l.id),
-        ruta: ROUTE[l.kind] || '#inicio', titulo: titleOf(l.kind, l.id)
+        ruta: rutaDe(l), titulo: titleOf(l.kind, l.id)
       };
     },
 
@@ -162,6 +162,11 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     items.forEach(function (e) { if (known.indexOf(e.id) >= 0) n++; });
     return n;
   }
+  /** Ruta para volver a una actividad: la lección de la Escuela vuelve al paso donde quedó (touch('escuela', id, {ruta:'INT-01-01/3'})). */
+  function rutaDe(l) {
+    if (l.kind === 'escuela' && /^[A-Z]{3}-\d{2}-\d{2}$/.test(l.id)) return '#escuela/' + (l.d && typeof l.d.ruta === 'string' && /^[A-Z0-9-]+(\/[a-z0-9]+)?$/.test(l.d.ruta) ? l.d.ruta : l.id);
+    return ROUTE[l.kind] || '#inicio';
+  }
   function titleOf(kind, id) {
     var data = D(), i, L;
     function find(list) { L = arr(list); for (i = 0; i < L.length; i++) if (L[i] && String(L[i].id) === id) return L[i]; return null; }
@@ -174,7 +179,10 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     if (kind === 'cabina') { x = find(data.controls); return x ? x.nombre : 'La cabina'; }
     if (kind === 'recorrido') return 'Recorrido guiado';
     if (kind === 'quiz') return 'Quiz';
-    if (kind === 'escuela') return 'Escuela';
+    if (kind === 'escuela') {
+      var t = (C150.Escuela && typeof C150.Escuela.tituloLeccion === 'function') ? C150.Escuela.tituloLeccion(id) : '';
+      return t ? 'Escuela: ' + t : 'Escuela';
+    }
     return '';
   }
 

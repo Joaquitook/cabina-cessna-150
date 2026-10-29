@@ -44,6 +44,28 @@
 
 <script src="../src/icons.js"></script>
 <script src="../src/kit.js"></script>
+<script src="../src/data/controls-a.js"></script>
+<script src="../src/data/controls-b.js"></script>
+<script src="../src/data/learning.js"></script>
+<script src="../src/data/lab.js"></script>
+<script src="../src/data/situations.js"></script>
+<script src="../src/sim.js"></script>
+<script src="../src/exterior.js"></script>
+<script src="../src/escuela/datos.js"></script>
+<script src="../src/escuela/store.js"></script>
+<script src="../src/escuela/motor.js"></script>
+<script src="../src/escuela/modelos.js"></script>
+<script src="../src/escuela/figuras.js"></script>
+<script src="../src/escuela/c-simulador.js"></script>
+<script src="../src/escuela/c-animacion.js"></script>
+<script src="../src/escuela/c-calculadora.js"></script>
+<script src="../src/escuela/c-diagrama.js"></script>
+<script src="../src/escuela/c-clasificar.js"></script>
+<script src="../src/escuela/c-emparejar.js"></script>
+<script src="../src/escuela/c-situacion.js"></script>
+<script src="../src/escuela/c-enlace3d.js"></script>
+<script src="../src/escuela/leccion.js"></script>
+<script src="../src/escuela/pantallas.js"></script>
 <script>
 (function () {
   var K = C150.Kit, h = K.el, root = document.getElementById('sg');
@@ -255,6 +277,109 @@
   co3.appendChild(svgHold.firstChild);
   co3.appendChild(h('div', { 'class': 'callout3d is-hover', style: { left: '190px', top: '34px', position: 'absolute' } }, h('span', { 'class': 'callout3d-name', style: { '--cat': '#C4428E' }, text: 'Acelerador' }), h('span', { 'class': 'callout3d-en', text: 'Throttle' }), h('span', { 'class': 'callout3d-sum', text: 'Empujás para más potencia y tirás para menos.' }), h('span', { 'class': 'callout3d-hint', text: 'Tocá para conocerlo' })));
   root.appendChild(h('div', { 'class': 'sg-demo' }, co3));
+
+  /* ---- ESCUELA (contrato v7): el mapa, el módulo, un paso del ejecutor y el componente de reserva, con el código real de src/escuela/ */
+  sec('Escuela', 'mapa · módulo · lección · componente');
+  (function () {
+    var ES = C150.ESCUELA, D = ES.datos, ST = ES.store.crear({ storage: null }), P = ES.pantallas, Lc = ES.leccion, Mot = ES.componentes;
+    function L(id, t, pp, min, comps, det) { return { id: id, titulo: t, paginas: pp, minutos: min, componentes: comps, enlaces: 1, detalle: det || 'completo' }; }
+    D.setIndice({ v: 1, modulos: [
+      { id: 'INT', orden: 1, titulo: 'Introducción', fuente: 'aerosur', paginas: '1–47', color: '#D64545', icono: 'cap', resumen: 'Cómo funciona la escuela, el aeropuerto y los trámites de alumno piloto.', examen: { numPreguntas: 15 },
+        unidades: [{ id: 'INT-01', titulo: 'Bienvenida a AeroSur', paginas: '1–10', lecciones: [L('INT-01-01', 'Bienvenida y mapa de la misión', '1–4', 8, ['diapositiva', 'diagrama', 'completar']), L('INT-01-02', 'Quiénes somos', '5', 7, ['diagrama', 'emparejar'], 'proximamente')] }] },
+      { id: 'AER', orden: 2, titulo: 'Aerodinámica', fuente: 'aerosur', paginas: '48–193', color: '#2F6FE0', icono: 'flaps', resumen: 'Las cuatro fuerzas, el ala y la pérdida: por qué vuela un avión.', examen: { numPreguntas: 40 },
+        unidades: [{ id: 'AER-01', titulo: 'Las cuatro fuerzas y el ala', paginas: '48–55', lecciones: [
+          L('AER-01-01', 'Las cuatro fuerzas', '48–49', 8, ['simulador', 'clasificar', 'enlace3d']), L('AER-01-02', 'El ala y el perfil', '50–52', 9, ['diagrama', 'simulador']),
+          L('AER-01-03', 'Sustentación y ángulo de ataque', '53–55', 10, ['animacion', 'ordenar'], 'proximamente')] }] },
+      { id: 'MET', orden: 8, titulo: 'Meteorología', fuente: 'complementario', paginas: '', color: '#3FB4E8', icono: 'wind', resumen: 'La atmósfera, el viento, las nubes y cómo leer un METAR y un TAF.', examen: { numPreguntas: 80 },
+        unidades: [{ id: 'MET-01', titulo: 'La atmósfera', paginas: '', lecciones: [L('MET-01-01', 'De qué está hecha la atmósfera', '', 8, ['diagrama'], 'proximamente')] }] }
+    ] });
+    ST.tocar('AER-01-01', 5); ST.quiz('AER-01-01', 4, 4); ST.marcarLista('AER-01-01', { minutos: 8 }); ST.tocar('AER-01-02', 2);
+    var E = { K: K, h: h, icon: K.icon, datos: D, store: ST, secOpen: {}, irModulo: function () {}, irLeccion: function () {}, irMapa: function () {}, irReservada: function () {}, exportar: function () {}, importar: function () {} };
+    function marco(el) { var w = h('div', { 'class': 'sg-demo sg-paper paper es-root', style: { display: 'block', 'max-width': '560px' } }); w.appendChild(h('div', { 'class': 'es-view' }, el)); root.appendChild(w); return w; }
+    label('Mapa de la escuela: continuar, racha, módulos con anillo y color de acento (el color de cada módulo sólo aparece como acento chico)');
+    marco(P.mapa(E));
+    label('Módulo: anillo, minutos que faltan, unidades plegables y filas de lección (sin ver · en curso · hecha con estrellas · próximamente)');
+    marco(P.modulo(E, 'AER'));
+    var lec = { id: 'AER-01-01', titulo: 'Las cuatro fuerzas', objetivos: ['Nombrar las cuatro fuerzas que actúan sobre el avión.', 'Explicar cuándo están en equilibrio.'],
+      contenido: ['En vuelo recto y nivelado la sustentación iguala al peso y la tracción iguala a la resistencia.', 'Si una fuerza cambia, el avión sube, baja o cambia de velocidad hasta encontrar un nuevo equilibrio.'],
+      componentes: [{ tipo: 'simulador', titulo: 'Mové la potencia', descripcion: 'Un deslizador de potencia cambia la tracción y se ve cómo cambia la velocidad.', datos: {} }, { tipo: 'clasificar', titulo: 'Qué fuerza es cada flecha', descripcion: 'Arrastrá cada ficha a la fuerza que corresponde.', datos: {} }],
+      preguntas: [1, 2, 3].map(function (i) { return { pregunta: 'Pregunta de ejemplo ' + i + ': ¿qué fuerza sostiene al avión?', opciones: ['El peso', 'La sustentación', 'La resistencia', 'La tracción'], correcta: 1, explicacion: 'La sustentación contrarresta al peso.', pagina: 48 }; }),
+      glosario: [{ termino: 'Sustentación', definicion: 'La fuerza que sostiene al avión en el aire.' }], enlaces: [{ tipo: 'control', id: 'yoke' }] };
+    var deps = { api: null, store: ST, progress: null, volver: function () {}, irLeccion: function () {}, siguiente: function () { return null; }, enlace: function () {}, mirar: function (f) { f(); }, abrir: function () {}, glosario: function () {}, toast: function () {}, reducedMotion: function () { return false; }, onDark: function () { return true; } };
+    label('Ejecutor de lección (el marco .runner de AIRE): un paso con su punto clave y el componente de reserva, y el resumen');
+    var r1 = Lc.crear(deps, D.leccion('AER-01-01'), lec, 1); marco(r1.el);
+    var r2 = Lc.crear(deps, D.leccion('AER-01-01'), lec, 5); marco(r2.el);
+    label('Componente de reserva (cualquier tipo sin implementar o con datos que no se pueden normalizar): consigna + "Marcar como hecho"');
+    var host = h('div', { 'class': 'es-lesson es-root', style: { '--es-hue': '#2F6FE0' } });
+    Mot.render(host, { tipo: 'enlace3d', titulo: 'Mirá el altímetro', descripcion: 'Abrí la cabina y mirá cómo cambia el altímetro al mover el volante hacia atrás.', datos: {} }, Mot.ctxMinimo());
+    marco(host);
+  })();
+
+  /* ---- ESCUELA · componentes A (E2): simulador, calculadora, diagrama y animación, con el código real y datos canónicos (y un esbozo libre del plan) */
+  sec('Escuela · componentes A', 'simulador · calculadora · diagrama · animación');
+  (function () {
+    var ES = C150.ESCUELA, Mot = ES.componentes;
+    function marco2(el) { var w = h('div', { 'class': 'sg-demo sg-paper paper es-root', style: { display: 'block', 'max-width': '560px' } }); w.appendChild(h('div', { 'class': 'es-view' }, h('div', { 'class': 'es-lesson es-root', style: { '--es-hue': '#2F6FE0' } }, el))); root.appendChild(w); }
+    function comp(tit, c, extra) { label(tit); var host = h('div', { 'class': 'es-comps' }); Mot.render(host, c, Mot.ctxMinimo(extra)); marco2(host); }
+    comp('Simulador (SIM): un modelo registrado, cifras en vivo, semáforo, gráfico que se arrastra, escenarios y consigna verificada',
+      { tipo: 'simulador', titulo: 'Ángulo de ataque y pérdida', descripcion: 'Subí el ángulo hasta que el ala deje de sostener.', datos: { modelo: 'sustentacion-alfa' } });
+    comp('Simulador: esbozo libre del plan (INT-02-02), el normalizar encuentra el modelo "porcentaje-umbral" por las palabras',
+      { tipo: 'simulador', titulo: 'El semáforo del 75 %', descripcion: 'Un deslizador elige cuántas acertás de 20.', datos: { entradas: [{ id: 'aciertos', etiqueta: 'Preguntas acertadas', min: 0, max: 20, paso: 1, valor: 15 }, { id: 'total', valor: 20, fijo: true }], salidas: [{ id: 'porcentaje', formula: 'aciertos/total*100' }], umbral: 75 } });
+    comp('Calculadora (CAL): entradas con unidades, resultado, pasos a la vista, ejemplos y modo desafío',
+      { tipo: 'calculadora', titulo: 'Viento cruzado', descripcion: 'Cuánto del viento te empuja de costado.', datos: { herramienta: 'viento-cruzado' } });
+    comp('Calculadora: conversión de unidades',
+      { tipo: 'calculadora', titulo: 'Pies, metros y nudos', descripcion: 'Convertí entre unidades.', datos: { herramienta: 'conversion' } });
+    comp('Diagrama (DGR): figura propia con capas, puntos que abren una ficha, zoom y modo prueba',
+      { tipo: 'diagrama', titulo: 'El ala por dentro', descripcion: 'Prendé y apagá capas.', datos: { figura: 'perfil-ala' } });
+    comp('Diagrama: esbozo libre del plan (organigrama con niveles y capas), acomodado solo',
+      { tipo: 'diagrama', titulo: 'Organigrama de la escuela', descripcion: 'Cargos.', datos: { nodos: [{ id: 'g', cargo: 'Gerente Responsable', nivel: 0 }, { id: 'l', cargo: 'Representante Legal', nivel: 0 }, { id: 'c', cargo: 'Control de Gestión y Calidad', nivel: 1, capa: 'Dirección y control' }, { id: 'a', cargo: 'Auditores', nivel: 1, capa: 'Dirección y control' }, { id: 'j', cargo: 'Jefe de Instrucción', nivel: 1, capa: 'Instrucción' }] } });
+    comp('Animación (ANI): camino de pasos con una ficha que avanza, reproducir/pausar, paso a paso, velocidad y barra de tiempo',
+      { tipo: 'animacion', titulo: 'El camino de un test', descripcion: 'Un test paso a paso.', datos: { pasos: ['Terminás la materia', 'Simulacro la clase anterior', 'Test por Classroom', '¿Sacaste 75 % o más?', 'Aprobado'] } });
+    comp('Animación: figura propia con cambios por escena (se muestran capas y se resalta una parte)',
+      { tipo: 'animacion', titulo: 'Cómo se arma la sustentación', descripcion: 'Capa por capa.', datos: { figura: 'perfil-ala', forma: 'figura', escenas: [
+        { t: 0, texto: 'Este es el perfil del ala, visto de costado.', cambios: { mostrar: ['contorno'], resaltar: ['contorno'] } }, { t: 4, texto: 'El aire llega de frente: es el viento relativo.', cambios: { mostrar: ['viento'], resaltar: ['viento'] } },
+        { t: 8, texto: 'Arriba la presión baja y abajo sube.', cambios: { mostrar: ['presion'], resaltar: ['presion'] } }, { t: 12, texto: 'La diferencia empuja el ala hacia arriba: sustentación.', cambios: { mover: { contorno: [0, -6] } } }] } });
+    comp('Animación con "reducir movimiento": pasos estáticos, sin reproducir sola',
+      { tipo: 'animacion', titulo: 'Con movimiento reducido', descripcion: 'Pasos.', datos: { pasos: ['Uno', 'Dos', 'Tres'] } }, { reducedMotion: true });
+  })();
+
+  /* ---- ESCUELA · componentes B (E3): clasificar, emparejar, situación y enlace 3D, con el código real y datos canónicos (y esbozos libres del plan) */
+  sec('Escuela · componentes B', 'clasificar · emparejar · situación · enlace 3D');
+  (function () {
+    var ES = C150.ESCUELA, Mot = ES.componentes;
+    function marco3(el) { var w = h('div', { 'class': 'sg-demo sg-paper paper es-root', style: { display: 'block', 'max-width': '560px' } }); w.appendChild(h('div', { 'class': 'es-view' }, h('div', { 'class': 'es-lesson es-root', style: { '--es-hue': '#2F6FE0' } }, el))); root.appendChild(w); }
+    function comp(tit, c, extra) { label(tit); var host = h('div', { 'class': 'es-comps' }); Mot.render(host, c, Mot.ctxMinimo(extra)); marco3(host); }
+    var llamadas = h('p', { 'class': 'es-note', id: 'sg-llamadas', text: 'Lo que pidió el enlace 3D (en la app: MIRAR mueve sólo la cámara; ABRIR abre la ficha, el experimento o la checklist con la barra «← Volver a la lección»): —' });
+    comp('Clasificar (CLA): fichas que se arrastran (o se toca la ficha y después la caja), explicación al instante, repetir las falladas; esbozo del plan INT-01-03',
+      { tipo: 'clasificar', titulo: 'Base principal o base satélite', descripcion: 'Arrastrá cada ficha a su caja.', datos: { categorias: [{ id: 'principal', nombre: 'Base principal' }, { id: 'satelite', nombre: 'Base satélite' }], items: [
+        { texto: 'Aeropuerto de Carrasco', categoria: 'principal', explicacion: 'Es la base principal de la escuela.' }, { texto: '“Green” (Guazuvirá)', categoria: 'satelite', explicacion: 'Una de las 3 bases satélite.' },
+        { texto: 'Aeropuerto del Jagüel (Punta del Este)', categoria: 'satelite', explicacion: 'Una de las 3 bases satélite.' }, { texto: 'Permite vuelos diurnos, nocturnos y por instrumentos', categoria: 'principal', explicacion: 'Eso lo dice el curso de Carrasco.' },
+        { texto: 'Da mayor versatilidad en caso de ser necesario', categoria: 'satelite', explicacion: 'Es para lo que sirven las satélite.' }] } });
+    comp('Clasificar con tres cajas y dos listas paralelas (factores ↔ acciones, del plan AER-02-06)',
+      { tipo: 'clasificar', titulo: '¿Quién controla el factor?', descripcion: 'Qué cambia cada acción.', datos: { factores: ['ángulo de ataque', 'coeficiente', 'velocidad'], acciones: ['tirar del comando', 'bajar flaps', 'dar potencia'] } });
+    comp('Emparejar (EMP): dos columnas, tocá uno de cada lado o arrastrá; el par correcto se funde; el error vibra sin penalizar; una tarjeta de relleno',
+      { tipo: 'emparejar', titulo: 'Siglas del primer día', descripcion: 'Uní la sigla con su significado.', datos: { pares: [['CIAC', 'Centro de Instrucción de Aeronáutica Civil: los exámenes los toman inspectores propios de la escuela'], ['DINACIA', 'Dirección Nacional de Aviación Civil e Infraestructura Aeronáutica'], ['MEC', 'Ministerio de Educación y Cultura: reconoce a la escuela']], distractoresB: ['Dirección de Meteorología'] } });
+    comp('Emparejar con 3 columnas del plan (el tercer dato aparece al unir)',
+      { tipo: 'emparejar', titulo: 'Fuerza, definición y quién la produce', descripcion: 'Uní cada fuerza.', datos: { pares: [['Peso', 'atracción gravitatoria, hacia abajo', 'la Tierra'], ['Sustentación', 'igual y contraria al peso', 'el ala'], ['Tracción', 'hacia adelante', 'la hélice']] } });
+    comp('Situación (SIT): contexto, qué ves, opciones mezcladas, consecuencia y porqué; probá otra si fallás; cierre «Para llevarte»',
+      { tipo: 'situacion', titulo: 'Beacon prendido, hélice parada', descripcion: 'Qué hacés.', datos: { escenas: [{ id: 'a', escenario: 'Caminás por la plataforma y ves un avión con el beacon prendido; la hélice parece detenida.', senales: ['La luz roja gira arriba del timón.', 'Nadie está a la vista.'], pregunta: '¿Qué hacés?', opciones: [
+        { texto: 'No me acerco: está por prender el motor o ya lo tiene prendido', correcta: true, resultado: 'Es la regla del curso: beacon prendido = peligro de hélice.' }, { texto: 'Paso por detrás, que ahí no pasa nada', correcta: false, resultado: 'No: detrás hay chorro de hélice que puede arrojar piedras.' }, { texto: 'Me acerco para saludar al piloto', correcta: false, resultado: 'No: no hay que acercarse al avión con el beacon prendido.' }] }], leccionFinal: 'Con el beacon prendido, la hélice se considera viva: se mira de lejos.' } });
+    comp('Situación que RAMIFICA y con una escena de «elegí todas» (varias correctas)',
+      { tipo: 'situacion', titulo: 'Perdiste el test, ¿y ahora?', descripcion: 'Decisiones con consecuencias.', datos: { escenas: [
+        { id: 'ini', escenario: 'Sacaste 14 de 20 en el test de una materia.', opciones: [{ texto: 'Repaso lo que erré y hago el re-take', correcta: true, resultado: '14 de 20 es 70 %, por debajo del 75 %: corresponde repasar y rendir el re-take.', siguiente: 'motivos' }, { texto: 'Paso a la materia siguiente igual', correcta: false, resultado: 'No: la nota mínima es 75 %.', siguiente: 'mal' }] },
+        { id: 'mal', escenario: 'Te anotaron como pendiente: no podés seguir con la próxima materia.', opciones: [{ texto: 'Volver y hacer el re-take', correcta: true, resultado: 'Así se destraba.', siguiente: 'fin' }, { texto: 'Esperar a ver qué pasa', correcta: false }] },
+        { id: 'motivos', escenario: 'Querés practicar antes del re-take. ¿Qué sirve?', motivos: [{ texto: 'Repetir el simulacro en casa', valido: true, resultado: 'Se puede repetir todas las veces que haga falta.' }, { texto: 'Mirar la clase de nuevo', valido: true, resultado: 'Ayuda a fijar lo que fallaste.' }, { texto: 'Dejarlo para el día del re-take', valido: false, resultado: 'Sin práctica, el re-take sale igual.' }] }] } });
+    function avisar(txt) { llamadas.textContent = txt; }
+    comp('Enlace 3D (3D): «Mirarlo» mueve sólo la cámara; «Abrir la ficha» abre otra pantalla con la barra de vuelta; consigna que se verifica sola',
+      { tipo: 'enlace3d', titulo: 'Mirá los pedales y los frenos', descripcion: 'En la cabina.', datos: { destino: 'cabina', controles: ['rudder-pedals', 'toe-brakes'], consigna: { texto: 'Soltá el freno de estacionamiento (también se puede en la ficha).', cumple: { parkingBrake: false } }, preset: 'parked' } },
+      { abrir: function (r) { avisar('ABRIR → ' + r + ' (con la barra «← Volver a Lección … · paso N»)'); }, mirar: function (fn, o) { avisar('MIRAR (sólo la cámara, con «Volver a la vista anterior») → ' + ((o && o.label) || '')); } });
+    comp('Enlace 3D hacia el laboratorio AIRE (experimento) y poses del exterior; esbozo del plan AER-03-01',
+      { tipo: 'enlace3d', titulo: 'Pérdida en el túnel', descripcion: 'Experimento y pose.', datos: { experimento: 'perdida', pose: 'perdida' } },
+      { abrir: function (r) { avisar('ABRIR → ' + r); }, mirar: function (fn, o) { avisar('MIRAR → ' + ((o && o.label) || '')); } });
+    root.appendChild(llamadas);
+    comp('Clasificar con «reducir movimiento» (sin vibración ni animaciones)',
+      { tipo: 'clasificar', titulo: '¿Es materia del curso?', descripcion: 'Sí o no.', datos: { categorias: [{ id: 'si', nombre: 'Es materia del curso' }, { id: 'no', nombre: 'No es materia del curso' }], items: [{ texto: 'Aerodinámica', categoria: 'si' }, { texto: 'Meteorología', categoria: 'si' }, { texto: 'Contabilidad', categoria: 'no' }, { texto: 'Mecánica automotriz', categoria: 'no' }] } }, { reducedMotion: true });
+  })();
 
   /* ---- 14 íconos */
   sec('Íconos', C150.Icons.names.length + ' · sprite inline');
