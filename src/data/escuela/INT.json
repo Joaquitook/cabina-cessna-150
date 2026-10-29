@@ -1564,9 +1564,27 @@
       "Seguir el camino correcto si perdés un test o un re-take."
      ],
      "contenido": [
-      "Unos días después de terminar cada materia hay un test de múltiple opción, que se hace por Google Classroom. La nota mínima para aprobar es 75 %.",
-      "Si no llegás al 75 %, repasás las preguntas que erraste y tenés otra oportunidad: el re-take. Si perdés también el re-take, volvés a tener clase de toda la materia para tener un segundo re-take.",
-      "Para llegar bien al test, la clase anterior se hace un simulacro: sirve para ver si hace falta repasar algún tema en especial. Después de hacerlo en clase con el profe, lo podés repetir en casa todas las veces que haga falta."
+      {
+       "titulo": "El mínimo para aprobar",
+       "tipo": "dato",
+       "dato": {
+        "valor": 75,
+        "unidad": "%",
+        "etiqueta": "Nota mínima para aprobar un test"
+       },
+       "texto": "Unos días después de terminar cada materia hay un **test** de múltiple opción, que se hace por Google Classroom. La nota mínima para aprobar es {{75|%}}."
+      },
+      {
+       "titulo": "Si no llegás: el re-take",
+       "tipo": "regla",
+       "n": 1,
+       "texto": "Si no llegás al ==75 %==, repasás las preguntas que erraste y tenés otra oportunidad: el **re-take**. Si perdés también el re-take, volvés a tener clase de toda la materia para tener un segundo re-take."
+      },
+      {
+       "titulo": "El simulacro, antes del test",
+       "tipo": "texto",
+       "texto": "Para llegar bien al test, la clase anterior se hace un **simulacro**: sirve para ver si hace falta repasar algún tema en especial. Después de hacerlo en clase con el profe, lo podés repetir en casa todas las veces que haga falta."
+      }
      ],
      "componentes": [
       {
@@ -1790,6 +1808,11 @@
        "termino": "Re-take",
        "definicion": "Segunda oportunidad de un test perdido, después de repasar las preguntas erradas."
       }
+     ],
+     "resumen": [
+      "Con 75 % o más aprobás el test.",
+      "Si no llegás: repasás lo errado y vas al re-take; si lo perdés, volvés a tener clase.",
+      "El simulacro lo podés repetir en casa todas las veces que haga falta."
      ]
     },
     {
@@ -2508,12 +2531,49 @@
       "Entender por qué volar en una aeronave ajena a AeroSur es una muestra de pobre criterio aeronáutico."
      ],
      "contenido": [
-      "Regla 1: las cervezas anotadas no se pueden exonerar (perdonar), salvo que 3 instructores lo determinen. Regla 2: el tipo de cerveza se elige por consenso general.",
-      "Regla 3: si un piloto no concurre, igualmente se le debitan las cervezas que le corresponden.",
-      "Regla 4, la regla “Nando”: todo piloto tiene derecho a pedir un recuento de sus cervezas. Los errores a favor del que reclama los paga la dirección; si no hay ningún error, se duplica el monto adeudado.",
-      "Regla 5: las comidas de camaradería son para divertirse y conocer camaradas (“no trabajamos al día siguiente”).",
-      "Regla 6: si un alumno cambia su horario de vuelo para salir a pasear en una aeronave ajena a AeroSur, esa hora no se puede anotar fuera del CIAC y el seguro no cubre un eventual incidente. Es una muestra de pobre criterio aeronáutico y corresponde la máxima pena por los retrasos que cause en la planilla o en los teóricos.",
-      "Regla 7: todas las faltas se clasifican en leves, medias y graves. La vemos en la próxima lección."
+      {
+       "titulo": "Regla 1: las cervezas anotadas",
+       "tipo": "regla",
+       "n": 1,
+       "texto": "Las cervezas anotadas **no se pueden exonerar** (perdonar), salvo que ==3 instructores== lo determinen."
+      },
+      {
+       "titulo": "Regla 2: el tipo de cerveza",
+       "tipo": "regla",
+       "n": 2,
+       "texto": "El tipo de cerveza se elige por ==consenso general==."
+      },
+      {
+       "titulo": "Regla 3: si no concurrís",
+       "tipo": "regla",
+       "n": 3,
+       "texto": "Si un piloto no concurre, igualmente se le debitan las cervezas que le corresponden."
+      },
+      {
+       "titulo": "Regla 4: la regla “Nando”",
+       "tipo": "idea",
+       "texto": "Todo piloto tiene derecho a pedir un recuento de sus cervezas.",
+       "ojo": "Los errores a favor del que reclama los paga la dirección; si no hay ningún error, **se duplica el monto adeudado**."
+      },
+      {
+       "titulo": "Regla 5: las comidas de camaradería",
+       "tipo": "regla",
+       "n": 5,
+       "texto": "Las comidas de camaradería son para divertirse y conocer camaradas (“no trabajamos al día siguiente”)."
+      },
+      {
+       "titulo": "Regla 6: la aeronave ajena",
+       "tipo": "regla",
+       "n": 6,
+       "texto": "Si un alumno cambia su horario de vuelo para salir a pasear en una aeronave ajena a AeroSur, esa hora no se puede anotar fuera del CIAC y el seguro no cubre un eventual incidente.",
+       "ojo": "Es una muestra de pobre criterio aeronáutico y corresponde la máxima pena por los retrasos que cause en la planilla o en los teóricos."
+      },
+      {
+       "titulo": "Regla 7: leves, medias y graves",
+       "tipo": "regla",
+       "n": 7,
+       "texto": "Todas las faltas se clasifican en leves, medias y graves. La vemos en la próxima lección."
+      }
      ],
      "componentes": [
       {
@@ -2701,7 +2761,8 @@
        "termino": "Planilla",
        "definicion": "Registro de las clases y de los horarios de vuelo de la escuela."
       }
-     ]
+     ],
+     "resumen": "Siete reglas del Cervesómetro: las seis primeras ordenan las cervezas y el vuelo; la séptima clasifica las faltas."
     },
     {
      "id": "INT-03-03",
@@ -3256,9 +3317,22 @@
       "Ubicar los portones y el puesto de control en el plano de los Hangares Sur."
      ],
      "contenido": [
-      "El Portón 6A (“seis alfa”) es el acceso principal a los Hangares Sur. Abre de lunes a viernes de 06:00 a 21:00, y los sábados y domingos de 06:00 a 19:00.",
-      "Cuando el 6A está cerrado se usa el Portón de Bomberos, que tiene horario de 24 horas. En el plano: el 6A está detrás del Starbucks y el de Bomberos queda aparte.",
-      "Los horarios y las ubicaciones pueden cambiar con el tiempo: confirmalos con la escuela antes de ir."
+      {
+       "titulo": "Portón 6A",
+       "tipo": "definicion",
+       "texto": "El **Portón 6A** (“seis alfa”) es el acceso principal a los Hangares Sur.",
+       "ejemplo": "Un viernes a las 20:30 entrás por el 6A: de lunes a viernes abre hasta las {{21:00}}."
+      },
+      {
+       "titulo": "Horarios y portón de reserva",
+       "tipo": "lista",
+       "texto": "El 6A abre:\nDe lunes a viernes, de 06:00 a 21:00.\nSábados y domingos, de 06:00 a 19:00.\nCuando está cerrado se usa el **Portón de Bomberos**, que tiene horario de 24 horas.\nEn el plano: el 6A está detrás del Starbucks y el de Bomberos queda aparte."
+      },
+      {
+       "titulo": "Confirmá antes de ir",
+       "tipo": "ojo",
+       "texto": "Los horarios y las ubicaciones pueden cambiar con el tiempo: **confirmalos con la escuela** antes de ir."
+      }
      ],
      "componentes": [
       {
@@ -3587,7 +3661,8 @@
        "termino": "Portón de Bomberos",
        "definicion": "Acceso de 24 horas a los Hangares Sur, que se usa cuando el 6A está cerrado."
       }
-     ]
+     ],
+     "resumen": "Dos portones: el 6A es el principal y el de Bomberos, que abre las 24 horas, es el de reserva."
     },
     {
      "id": "INT-04-02",

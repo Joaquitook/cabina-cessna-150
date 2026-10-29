@@ -3,8 +3,9 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
  * escuela/c-enlace3d.js — componente `enlace3d` (3D): salta a la cabina, al laboratorio AIRE, al exterior o al simulador de vuelo en un estado dado
  * y vuelve a la lección en el mismo paso (contrato v7, E3; modelo de navegación del contrato v6, C150.Nav).
  *
- *   MIRAR  (Nav.look)  «mirá el altímetro / ese mando / el avión en esa pose»: se mueve SÓLO la cámara o la vista 3D; la pestaña no cambia y aparece el
- *                      chip "Volver a la vista anterior". Lo usan «Mirarlo» (UI.lookAt → controles) y «Ver en el avión» (poses: ctx.mirar).
+ *   MIRAR  (visor 3D)   «mirá el altímetro / ese mando / el avión en esa pose»: se abre el VISOR 3D (src/escuela/visor.js, contrato v8) al costado o arriba de la
+ *                      lección, con la cámara en ese mando / pose y una barra con la consigna y «Volver a la lección». Lo usan «Mirarlo» (controles) y «Ver en el
+ *                      avión» (poses). Sin visor (harness viejo) cae al MIRAR de antes (ctx.mirar → Nav.look: sólo se mueve la cámara y aparece el chip).
  *   ABRIR  (Nav.push)  abre otra pantalla (ficha de un mando, experimento del laboratorio AIRE, checklist, situación, lección de la app) con la barra
  *                      "← Volver a Lección «…» · paso N" (ctx.abrir / ctx.enlace: la etiqueta la arma el proveedor de Nav de la Escuela).
  *   CONSIGNA           si el dato trae `consigna.cumple`, el componente mira el estado del simulador (handle.slow) y, cuando se cumple, se da por hecho solo
@@ -191,7 +192,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     var h = ctx.h, K = ctx.Kit, A = ctx.api || null, UI = C150.UI || null;
     var armado = !!ctx.hecho, logrado = !!ctx.hecho, usado = !!ctx.hecho, racha = 0, poseActiva = false, pausado = false, vistoFalso = false, elYa = null, offLook = null, vistaAntes = null;
     var cons = datos.consigna;
-    var elTask = null, elTaskT = null, elTaskBtn = null;
+    var elTask = null, elTaskT = null, elTaskBtn = null, visorMio = false, leyendaBase = '';
 
     function aviso(texto) { if (A && isFn(A.showToast)) A.showToast({ text: texto, kind: 'info' }); }
     function seguro(fn, nombre) { try { return fn(); } catch (e) { if (root.console) console.error('[Escuela] enlace3d ' + nombre, e); aviso('No pudimos abrir eso ahora. Probá desde la pestaña correspondiente.'); } return undefined; }
@@ -203,7 +204,11 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       logrado = true; pintarTarea(); if (elYa) elYa.hidden = true;
       if (isFn(ctx.done)) ctx.done();
     }
+    /** La leyenda del visor: la consigna mientras no se cumple (la lección puede quedar fuera de pantalla en el teléfono). */
+    function leyenda(base) { return cons && !logrado ? 'Consigna: ' + cons.texto : (cons && logrado ? '¡Lo lograste! ' + (cons.aviso || '') : base); }
+    function visorVivo() { var VS = C150.Escuela && C150.Escuela.visor; return visorMio && VS && isFn(VS.isOpen) && VS.isOpen() ? VS : null; }
     function pintarTarea() {
+      var VS0 = visorVivo(); if (VS0) VS0.setCaption(leyenda(leyendaBase));
       if (!elTask) return;
       elTask.classList.toggle('is-ok', logrado);
       elTaskT.textContent = logrado ? '¡Lo lograste! ' + (cons.aviso || '') : cons.texto;
@@ -218,9 +223,21 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     }
 
     /* ---- MIRAR / ABRIR */
-    function mirarControl(id) {
+    /** Abre el visor 3D con ese dato; false = no hay visor / 3D (entonces se usa el MIRAR de antes). */
+    function abrirVisor(target, label, base, ev) {
+      if (!isFn(ctx.visor)) return false;
+      leyendaBase = base; visorMio = true;
+      var ok = ctx.visor(target, { label: label, caption: leyenda(base), returnLabel: 'Volver a la lección', opener: ev && ev.currentTarget ? ev.currentTarget : null,
+        onClose: function () { visorMio = false; soltarPose(); } });
+      if (!ok) visorMio = false;
+      return ok;
+    }
+    function resumenControl(id) { var l = arr(datosApp().controls); for (var i = 0; i < l.length; i++) if (l[i].id === id) return str(l[i].resumen); return ''; }
+    function mirarControl(id, ev) {
       armar(); soltarPose();
       seguro(function () {
+        var nom = nombreControl(id), r = resumenControl(id);
+        if (abrirVisor({ control: id }, nom, r ? nom + ': ' + r : 'Mirá «' + nom + '» en la cabina. Arrastrá para girar la vista.', ev)) return;
         if (UI && isFn(UI.lookAt)) UI.lookAt(id);
         else if (isFn(ctx.mirar)) ctx.mirar(function () { if (A && isFn(A.cc)) A.cc('select', id, { focus: true }); }, { label: nombreControl(id) });
       }, 'mirar');
@@ -245,9 +262,11 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       });
       if (vistaAntes === null && N && isFn(N.hasLook) && !N.hasLook() && Co && isFn(Co.getMainView)) { try { vistaAntes = Co.getMainView(); } catch (err) { vistaAntes = null; } }
     }
-    function verPose(id) {
-      armar(); poseActiva = true; recordarVista();
+    function verPose(id, ev) {
+      armar(); poseActiva = true;
       seguro(function () {
+        if (abrirVisor({ pose: id }, etiquetaPose(id), 'Así se ve el avión: «' + etiquetaPose(id) + '». Arrastrá para girar alrededor.', ev)) return;
+        recordarVista();
         ctx.mirar(function () {
           if (!A || !isFn(A.cc)) return;
           A.cc('setMainView', 'exterior'); if (isFn(A.syncMainView)) A.syncMainView();
@@ -255,13 +274,20 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         }, { label: etiquetaPose(id) });
       }, 'pose');
     }
-    function verAvion() {
-      armar(); recordarVista();
-      seguro(function () { ctx.mirar(function () { if (A && isFn(A.cc)) { A.cc('setMainView', 'exterior'); if (isFn(A.syncMainView)) A.syncMainView(); } }, { label: 'el avión' }); }, 'exterior');
+    function verAvion(ev) {
+      armar();
+      seguro(function () {
+        if (abrirVisor({ vista: 'exterior' }, 'El avión', 'Mirá el avión desde afuera. Arrastrá para girar alrededor.', ev)) return;
+        recordarVista();
+        ctx.mirar(function () { if (A && isFn(A.cc)) { A.cc('setMainView', 'exterior'); if (isFn(A.syncMainView)) A.syncMainView(); } }, { label: 'el avión' });
+      }, 'exterior');
     }
-    function verCabina() {
-      armar(); recordarVista();
-      seguro(function () { ctx.mirar(function () { if (A && isFn(A.cc)) { A.cc('setMainView', 'cockpit'); if (isFn(A.syncMainView)) A.syncMainView(); A.cc('focusPreset', 'panel'); } }, { label: 'la cabina' }); }, 'cabina');
+    function verCabina(ev) {
+      armar();
+      seguro(function () {
+        if (abrirVisor({ vista: 'cabina', foco: 'panel' }, 'La cabina', 'Mirá el tablero de la cabina. Arrastrá para girar la vista.', ev)) return;
+        recordarVista();
+        ctx.mirar(function () { if (A && isFn(A.cc)) { A.cc('setMainView', 'cockpit'); if (isFn(A.syncMainView)) A.syncMainView(); A.cc('focusPreset', 'panel'); } }, { label: 'la cabina' }); }, 'cabina');
     }
     function abrir(ruta, extra) { armar(); seguro(function () { ctx.abrir(ruta, extra || {}); }, 'abrir'); }
     function prepararAvion() {
@@ -297,7 +323,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     var lead = datos.destino === 'aire' ? 'Esto se ve mejor en el laboratorio del aire. Se abre en otra pantalla y, cuando termines, volvés a este mismo paso de la lección.'
       : datos.destino === 'exterior' ? 'Mirá el avión desde afuera: la cámara se mueve, pero seguís en la lección.'
       : datos.destino === 'vuelo' ? 'Esto se practica volando. Se abre en otra pantalla y, cuando termines, volvés a este mismo paso.'
-      : 'Mirarlo mueve la cámara de la cabina y no te saca de la lección. Abrir la ficha te lleva a otra pantalla, pero volvés con un toque.';
+      : 'Mirarlo abre el visor 3D al lado de la lección: no te saca de acá y lo cerrás cuando quieras. La ficha completa te lleva a otra pantalla, pero volvés con un toque.';
     partes.push(h('p', { 'class': 'es-note es-3d-lead', text: lead }));
 
     if (datos.controles.length) {
@@ -305,13 +331,13 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         return h('li', { 'class': 'es-3d-row' },
           h('span', { 'class': 'es-3d-n' }, h('span', { 'class': 'es-3d-ico', 'aria-hidden': 'true' }, ctx.icon('cabin')), h('span', { text: nombreControl(id) })),
           h('span', { 'class': 'es-3d-b' },
-            boton({ label: 'Mirarlo', icon: 'target', size: 'small', variant: variante(), ariaLabel: 'Mirar en la cabina: ' + nombreControl(id), onClick: function () { mirarControl(id); } }),
-            boton({ label: 'Abrir la ficha', icon: 'list', size: 'small', variant: 'ghost', ariaLabel: 'Abrir la ficha de ' + nombreControl(id), onClick: function () { abrir('cabina/' + id); } })));
+            boton({ label: 'Mirarlo', icon: 'target', size: 'small', variant: variante(), ariaLabel: 'Mirar en la cabina: ' + nombreControl(id), onClick: function (ev) { mirarControl(id, ev); } }),
+            boton({ label: 'Ver la ficha completa', icon: 'list', size: 'small', variant: 'ghost', ariaLabel: 'Ver la ficha completa de ' + nombreControl(id), onClick: function () { abrir('cabina/' + id); } })));
       })));
     }
     if (datos.poses.length) {
       partes.push(h('div', { 'class': 'es-3d-grp' }, h('p', { 'class': 'es-meta', text: 'VER EN EL AVIÓN, DESDE AFUERA' }),
-        h('div', { 'class': 'es-3d-poses' }, datos.poses.map(function (id) { return boton({ label: etiquetaPose(id), icon: 'plane', size: 'small', variant: variante(), onClick: function () { verPose(id); } }); }))));
+        h('div', { 'class': 'es-3d-poses' }, datos.poses.map(function (id) { return boton({ label: etiquetaPose(id), icon: 'plane', size: 'small', variant: variante(), onClick: function (ev) { verPose(id, ev); } }); }))));
     }
     var acciones = [];
     if (datos.preset || datos.estado) acciones.push(boton({ label: 'Preparar el avión' + (datos.preset ? ': ' + (ESCENARIOS[datos.preset] || datos.preset).toLowerCase() : ''), icon: 'reset', size: 'small', variant: cons ? 'primary' : 'secondary', onClick: prepararAvion }));
@@ -324,8 +350,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     if (datos.leccionApp) acciones.push(boton({ label: 'Ver la lección «' + tituloDe(datosApp().lessons, datos.leccionApp) + '»', icon: 'book', size: 'small', variant: variante(), onClick: function () { armar(); seguro(function () { ctx.enlace({ tipo: 'leccion', id: datos.leccionApp }); }, 'leccion'); } }));
     if (datos.destino === 'vuelo' && !datos.situacion) acciones.push(boton({ label: 'Ir a volar', icon: 'plane', size: 'small', variant: variante(), onClick: function () { abrir('volar'); } }));
     if (!datos.controles.length && !datos.poses.length && !datos.aire && !datos.checklist && !datos.situacion && !datos.leccionApp) {
-      if (datos.destino === 'exterior') acciones.push(boton({ label: 'Ver el avión desde afuera', icon: 'plane', size: 'small', variant: variante(), onClick: verAvion }));
-      else if (datos.destino === 'cabina') acciones.push(boton({ label: 'Mirar la cabina', icon: 'cabin', size: 'small', variant: variante(), onClick: verCabina }));
+      if (datos.destino === 'exterior') acciones.push(boton({ label: 'Ver el avión desde afuera', icon: 'plane', size: 'small', variant: variante(), onClick: function (ev) { verAvion(ev); } }));
+      else if (datos.destino === 'cabina') acciones.push(boton({ label: 'Mirar la cabina', icon: 'cabin', size: 'small', variant: variante(), onClick: function (ev) { verCabina(ev); } }));
     }
     if (acciones.length) partes.push(h('div', { 'class': 'es-3d-acts' }, acciones));
 
@@ -345,7 +371,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     host.appendChild(h('div', { 'class': 'es-3d' }, partes));
 
     return {
-      destroy: function () { soltarPose(); if (isFn(offLook)) { offLook(); offLook = null; } },
+      destroy: function () { var VS = visorVivo(); if (VS) VS.close({ focus: false }); soltarPose(); if (isFn(offLook)) { offLook(); offLook = null; } },
       pause: function () { pausado = true; soltarPose(); },
       resume: function () { pausado = false; racha = 0; var s = A && isFn(A.S) ? A.S() : null; if (s) revisar(s); },
       slow: function (s) { revisar(s); },

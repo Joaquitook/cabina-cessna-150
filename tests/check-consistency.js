@@ -73,8 +73,8 @@ const SCRIPT_ORDER = ['data/controls-a.js', 'data/controls-b.js', 'data/learning
   'airfoil.js', 'world.js', 'cockpit.js', 'exterior.js', 'airflow.js', 'core.js', 'lab.js', 'situations.js', 'icons.js', 'kit.js', 'progress.js', 'ui.js'];
 // contrato UI/UX v4 §4: módulos de las próximas olas (opcionales hasta que existan); si están, van antes de ui.js y después de progress.js
 // contrato v7 (Escuela): mismo orden, justo antes de ui.js. Entre motor.js y leccion.js van modelos.js, figuras.js (si existe) y los componentes c-*.js (cada pasada suma los suyos).
-const ESCUELA_EXTRAS = fs.existsSync(path.join(SRC, 'escuela')) ? fs.readdirSync(path.join(SRC, 'escuela')).filter((f) => /^(c-.*|modelos|figuras)\.js$/.test(f)).map((f) => 'escuela/' + f) : [];
-const ESCUELA_SCRIPTS = ['escuela/datos.js', 'escuela/store.js', 'escuela/motor.js'].concat(ESCUELA_EXTRAS.slice().sort((a, b) => (a === 'escuela/modelos.js' ? -1 : b === 'escuela/modelos.js' ? 1 : a === 'escuela/figuras.js' ? -1 : b === 'escuela/figuras.js' ? 1 : a.localeCompare(b))), ['escuela/leccion.js', 'escuela/pantallas.js', 'escuela/escuela.js']);
+const ESCUELA_EXTRAS = fs.existsSync(path.join(SRC, 'escuela')) ? fs.readdirSync(path.join(SRC, 'escuela')).filter((f) => /^(c-.*|modelos|figuras|texto|bloques)\.js$/.test(f)).map((f) => 'escuela/' + f) : [];
+const ESCUELA_SCRIPTS = ['escuela/datos.js', 'escuela/store.js', 'escuela/motor.js'].concat(ESCUELA_EXTRAS.slice().sort((a, b) => (a === 'escuela/modelos.js' ? -1 : b === 'escuela/modelos.js' ? 1 : a === 'escuela/figuras.js' ? -1 : b === 'escuela/figuras.js' ? 1 : a.localeCompare(b))), ['escuela/leccion.js', 'escuela/pantallas.js', 'escuela/visor.js', 'escuela/escuela.js']);
 const SCRIPT_OPTIONAL = ['nav.js', 'glossary.js', 'search.js', 'home.js', 'onboarding.js'].concat(ESCUELA_SCRIPTS);   // nav.js (contrato v6): después de progress.js, antes de ui.js
 
 /* ───────────── Carga (global falso, sin DOM) ───────────── */
@@ -316,8 +316,8 @@ order.filter((f) => SCRIPT_OPTIONAL.includes(f)).forEach((f) => ok(order.indexOf
   const pos = ESCUELA_SCRIPTS.map((f) => order.indexOf(f));
   // los de la lista van seguidos y justo antes de ui.js; modelos.js y figuras.js primero, los c-*.js en cualquier orden entre sí
   const iD = order.indexOf('escuela/datos.js'), iM = order.indexOf('escuela/motor.js'), iL = order.indexOf('escuela/leccion.js'), iE = order.indexOf('escuela/escuela.js');
-  ok(iD >= 0 && order[iD + 1] === 'escuela/store.js' && order[iD + 2] === 'escuela/motor.js' && iL > iM && order[iL + 1] === 'escuela/pantallas.js' && order[iL + 2] === 'escuela/escuela.js' && order.indexOf('ui.js') === iE + 1 &&
-    JSON.stringify(order.slice(iM + 1, iL).slice().sort()) === JSON.stringify(ESCUELA_EXTRAS.slice().sort()), 'index.html: los ' + ESCUELA_SCRIPTS.length + ' scripts de escuela/ seguidos (datos, store, motor, modelos, figuras, c-*, leccion, pantallas, escuela), justo antes de ui.js');
+  ok(iD >= 0 && order[iD + 1] === 'escuela/store.js' && order[iD + 2] === 'escuela/motor.js' && iL > iM && order[iL + 1] === 'escuela/pantallas.js' && order[iL + 2] === 'escuela/visor.js' && order[iL + 3] === 'escuela/escuela.js' && order.indexOf('ui.js') === iE + 1 &&
+    JSON.stringify(order.slice(iM + 1, iL).slice().sort()) === JSON.stringify(ESCUELA_EXTRAS.slice().sort()), 'index.html: los ' + ESCUELA_SCRIPTS.length + ' scripts de escuela/ seguidos (datos, store, motor, modelos, figuras, c-*, leccion, pantallas, visor, escuela), justo antes de ui.js');
   ok(!ESCUELA_EXTRAS.includes('escuela/modelos.js') || order.indexOf('escuela/modelos.js') === iM + 1, 'index.html: modelos.js va justo después de motor.js');
   ESCUELA_EXTRAS.filter((f) => /\/c-/.test(f)).forEach((f) => ok(order.indexOf(f) > order.indexOf('escuela/modelos.js') && (!ESCUELA_EXTRAS.includes('escuela/figuras.js') || order.indexOf(f) > order.indexOf('escuela/figuras.js')), 'index.html: ' + f + ' después de modelos.js y figuras.js'));
   ['nav.js', 'glossary.js', 'search.js'].forEach((f) => ok(order.indexOf(f) < pos[0], 'index.html: ' + f + ' antes de escuela/datos.js'));

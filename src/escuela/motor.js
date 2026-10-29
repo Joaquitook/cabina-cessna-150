@@ -40,6 +40,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
  *                    No resta nunca. Para un componente sin nota usá sólo done().
  *     glosario(termino, definicion?)    abre la definición de un término (Glossary.show si existe; si no, un diálogo con `definicion`)
  *     mirar(fn, {label})                MIRAR: corre fn (mueve la cámara / vista 3D) SIN cambiar de pestaña; aparece el chip "Volver a la vista anterior" (Nav.look)
+ *     visor(target, {caption, label, returnLabel, onClose}) → bool   VISOR 3D (contrato v8): abre el visor a pedido (cabina / pose / avión) con la lección al lado; false = no hay 3D (usá mirar)
+ *                    target: {control:id} | {pose:id} | {vista:'exterior'|'cabina', foco?} | function (ver src/escuela/visor.js)
  *     abrir(ruta, {returnLabel})        ABRIR: 'cabina/yoke', 'aire/fuerzas', 'basico/<id>', 'volar/<id>', 'escuela/AER-03-02'… con la barra "← Volver a la lección … · paso N"
  *     enlace({tipo, id})                atajo según el tipo del plan: control · aire/experimento · leccion · situacion · escuela (id de lección) · pose (mirar)
  *     reducedMotion  true si el alumno pidió "reducir movimiento" (no animes: cambiá de estado directo)        onDark  true si el tema es oscuro
@@ -124,7 +126,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     var ctx = {
       leccion: { id: 'XXX-00-00', titulo: 'Prueba', modulo: 'XXX', paginas: '', minutos: 0 }, paso: { n: 1, clave: 'p1', titulo: 'Prueba' }, key: 'p1.0',
       api: null, h: K.el, icon: K.icon, Kit: K, store: null, hecho: false,
-      done: function () { done = true; ctx.hecho = true; }, score: function () {}, glosario: function () {}, mirar: function (fn) { if (isFn(fn)) fn(); },
+      done: function () { done = true; ctx.hecho = true; }, score: function () {}, glosario: function () {}, mirar: function (fn) { if (isFn(fn)) fn(); }, visor: function () { return false; },
       abrir: function () {}, enlace: function () {}, reducedMotion: false, onDark: true, ahora: function () { return Date.now(); }, _done: function () { return done; }
     };
     if (extra) for (var k in extra) if (Object.prototype.hasOwnProperty.call(extra, k)) ctx[k] = extra[k];

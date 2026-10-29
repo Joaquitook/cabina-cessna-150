@@ -1693,7 +1693,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   function updateCallout() {
     if (!CO.box) return;
     // hover anywhere; the selection only where it means "this one" (fichas, recorrido, checklists, lecciones)
-    var selOk = mode === 'explorar' || mode === 'recorrido' || mode === 'checklists' || mode === 'basico';
+    var selOk = mode === 'explorar' || mode === 'recorrido' || mode === 'checklists' || mode === 'basico' || (mode === 'escuela' && !!$('app') && $('app').getAttribute('data-visor') === 'open');
     var id = CO.hoverId || (selOk ? CO.selId : null), sub = CO.hoverId ? CO.hoverSub : null;
     var c = id && CTRL[id];
     var cockpitShown = layoutMode === 'dos' || mainView === 'cockpit';
@@ -1717,6 +1717,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     }
     var vp = $('viewport');
     var area = layoutMode === 'dos' ? dosRects().cockpit : { x: 0, y: 0, w: vp.clientWidth, h: vp.clientHeight };
+    var evh = layoutMode !== 'dos' ? vp.querySelector('.es-visor-head') : null;            // ESCUELA visor: its header sits on top of the stage
+    if (evh && evh.offsetHeight) area = { x: area.x, y: area.y + evh.offsetHeight, w: area.w, h: area.h - evh.offsetHeight };
     var x = p.x, y = p.y, bw = CO.bw, bh = CO.bh, gap = 40;
     // keep clear of the HUD (top-left) and of the chain bar + dock (bottom): measured, they change height with the tab
     var vr0 = vp.getBoundingClientRect(), hudBottom = 0, hudRight = 0, botTop = area.y + area.h;
@@ -5177,7 +5179,17 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       navDetail: function (route, fn) { navDetail('detail', route, fn); },
       navTo: function (kind, route, fn, extra) { navDetail(kind, route, fn, extra); },            // kind: 'detail' | 'replace' | 'go' · extra: {nest:true} (Escuela: module → lesson)
       navOpen: function (path, o) { return navOpen(path, o); }, navLook: function (fn, label) { navLook(fn, label); },
-      navUp: function () { var n = NAV(); return !!(navOn() && n && isFn(n.up) && n.up()); }
+      navUp: function () { var n = NAV(); return !!(navOn() && n && isFn(n.up) && n.up()); },
+      /* v8 · ESCUELA a pantalla completa + visor 3D (src/escuela/visor.js) */
+      app: $('app'),
+      stageSuspend: function (on) { if (coreReady && has('setSuspended')) cc('setSuspended', !!on); kick(); },                       // stage hidden: Core stops drawing (sim + 'frame' keep ~15 Hz)
+      lookControl: function (id) {                                                                                                   // like Cabina's "Mostrámelo" but without the Nav look chip: the visor owns going back
+        if (!CTRL[id]) return false;
+        if (mainView === 'exterior' && layoutMode !== 'dos') { cc('setMainView', 'cockpit'); syncMainView(); }
+        focusControl(id, true);
+        return true;
+      },
+      hidePeek: hidePeek
     };
   }
   function labOk() { var Lb = C150.Lab; return !!(Lb && isFn(Lb.mount) && isFn(Lb.enter)); }

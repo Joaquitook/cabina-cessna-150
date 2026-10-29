@@ -42,7 +42,7 @@ function load(extra) {
   ['data/controls-a.js', 'data/controls-b.js', 'data/learning.js', 'data/lab.js', 'data/situations.js'].forEach(run);
   run('sim.js'); run('exterior.js');
   run('icons.js'); run('kit.js'); run('progress.js'); run('glossary.js'); run('search.js');
-  ['escuela/datos.js', 'escuela/store.js', 'escuela/motor.js', 'escuela/leccion.js', 'escuela/pantallas.js', 'escuela/escuela.js'].forEach(run);
+  ['escuela/datos.js', 'escuela/store.js', 'escuela/motor.js', 'escuela/texto.js', 'escuela/bloques.js', 'escuela/leccion.js', 'escuela/pantallas.js', 'escuela/visor.js', 'escuela/escuela.js'].forEach(run);
   // un Kit de mentira para los componentes (sin DOM)
   vm.runInContext('C150.Kit = C150.Kit || {}; if (!C150.Kit.el) { C150.Kit.el = function () { return {}; }; C150.Kit.icon = function () { return {}; }; }', sandbox);
   const dir = path.join(SRC, 'escuela');
@@ -538,6 +538,126 @@ eq(LE.elegirPreguntas(muchas).map((q) => q.pregunta), LE.elegirPreguntas(muchas)
 ok(LE.elegirPreguntas({ id: 'XXX-01-04', preguntas: [{ pregunta: 'x', opciones: ['a'], correcta: 0 }, { pregunta: '', opciones: ['a', 'b'], correcta: 0 }, { pregunta: 'ok', opciones: ['a', 'b'], correcta: 5 }] }).length === 0, 'elegirPreguntas descarta las preguntas mal formadas');
 
 /* ------------------------------------------------------------------ store */
+seccion('lectura editorial (puro): texto.js, tipos de punto clave, mini-marcado');
+{
+  const T = ES.texto;
+  ok(T && ['markup', 'plano', 'balanceado', 'partir', 'parrafos', 'item', 'validarItem', 'tituloPaso', 'etiquetaTipo', 'listaLineas', 'layoutPaso', 'recorte', 'resumenPaso', 'resumenLeccion', 'promesa', 'minutosFalta', 'nbsp', 'p2'].every((k) => typeof T[k] === 'function'), 'ES.texto expone la parte pura');
+  eq(T.TIPOS, ['texto', 'definicion', 'regla', 'dato', 'idea', 'ojo', 'ejemplo', 'lista'], 'los 8 tipos de punto clave');
+  // mini-marcado
+  eq(T.markup('La **ala** y ==esto== vale {{75|%}} o {{5}}').map((x) => x.t + ':' + x.v + (x.u !== undefined ? '|' + x.u : '')), ['txt:La ', 'term:ala', 'txt: y ', 'clave:esto', 'txt: vale ', 'dato:75|%', 'txt: o ', 'dato:5|'], 'markup: término, clave y cifra con unidad');
+  eq(T.plano('La **ala** y ==esto== vale {{75|%}}'), 'La ala y esto vale 75 %', 'plano: sin marcado');
+  ok(T.balanceado('a **b** c') && T.balanceado('{{1|kt}} ==x==') && !T.balanceado('a **b') && !T.balanceado('==x') && !T.balanceado('{{75|%') && !T.balanceado('75}} x') && !T.balanceado('**  **'), 'balanceado: detecta marcas sin cerrar o vacías');
+  eq(T.markup('sin marcas **').map((x) => x.t), ['txt'], 'markup: una marca suelta queda como texto (no rompe)');
+  // primera oración (lead)
+  eq(T.partir('Primero esto es una oración completa. Luego sigue otra.'), { lead: 'Primero esto es una oración completa.', resto: 'Luego sigue otra.' }, 'partir: primera oración y resto');
+  eq(T.partir('Una sola oración sin punto final'), { lead: 'Una sola oración sin punto final', resto: '' }, 'partir: una sola oración = todo lead');
+  eq(T.partir('Mirá el plano en pp. 12 del curso, que explica todo. Después vemos más.').lead, 'Mirá el plano en pp. 12 del curso, que explica todo.', 'partir: no corta en abreviaturas (pp.)');
+  eq(T.partir('Es la **regla. Nando** del recuento y vale mucho. Y sigue.').lead, 'Es la **regla. Nando** del recuento y vale mucho.', 'partir: no corta dentro de un marcado');
+  eq(T.partir('Sí. Esto sigue siendo la primera oración larga. Y la tercera.').lead, 'Sí. Esto sigue siendo la primera oración larga.', 'partir: una oración muy cortita se une con la que sigue');
+  eq(T.partir('Primer párrafo corto de una oración sola.\nSegundo párrafo. Con dos oraciones.'), { lead: 'Primer párrafo corto de una oración sola.', resto: 'Segundo párrafo. Con dos oraciones.' }, 'partir: el primer párrafo manda');
+  eq(T.partir(''), { lead: '', resto: '' }, 'partir: vacío');
+  eq(T.parrafos('a\n\n b \nc'), ['a', 'b', 'c'], 'parrafos');
+  eq(T.listaLineas('Para entrar:\n1. Mostrá el DNI\n- Firmá\nEsperá'), { intro: 'Para entrar:', items: ['Mostrá el DNI', 'Firmá', 'Esperá'] }, 'listaLineas: introducción con ":" y viñetas');
+  eq(T.listaLineas('uno\ndos').items, ['uno', 'dos'], 'listaLineas: sin introducción');
+  ok(T.recorte('palabra '.repeat(40), 50).length <= 51 && /…$/.test(T.recorte('palabra '.repeat(40), 50)) && T.recorte('corto', 50) === 'corto', 'recorte');
+  eq([T.p2(3), T.p2(12), T.nbsp('75 % y 3 min').split('').filter((c) => c.charCodeAt(0) === 160).length], ['03', '12', 2], 'p2 y nbsp');
+  // puntos clave
+  ok(T.item('  hola  ').texto === 'hola' && T.item('  hola  ').tipo === 'texto' && T.item('') === null && T.item('   ') === null && T.item(null) === null && T.item(5) === null && T.item([]) === null, 'item: string (formato viejo), vacíos y basura');
+  const it = T.item({ titulo: ' T ', texto: 'x', tipo: 'regla', n: 3, ejemplo: 'e', ojo: 'o', dato: { valor: 75, unidad: '%', etiqueta: 'Mínimo' } });
+  eq([it.titulo, it.tipo, it.n, it.ejemplo, it.ojo, it.dato], ['T', 'regla', '3', 'e', 'o', { valor: '75', unidad: '%', etiqueta: 'Mínimo' }], 'item: objeto completo normalizado');
+  ok(T.item({ tipo: 'inventado', texto: 'x' }).tipo === 'texto' && T.item({ tipo: 'dato', dato: { valor: 5 } }).dato.valor === '5' && T.item({ titulo: 'solo título' }) === null && T.item({ tipo: 'dato', dato: { valor: '' } }) === null, 'item: tipo desconocido cae a texto; sin nada que mostrar = null');
+  // validación
+  const v = (x) => T.validarItem(x).length;
+  ok(v('un texto') === 0 && v({ texto: 'x' }) === 0 && v({ titulo: 'Portón 6A', tipo: 'definicion', texto: 'x', ejemplo: 'y' }) === 0 && v({ tipo: 'dato', dato: { valor: 75, unidad: '%' } }) === 0 && v({ tipo: 'lista', texto: 'a\nb' }) === 0 && v({ tipo: 'idea', texto: 'x', ojo: 'y' }) === 0, 'validarItem: acepta los formatos buenos');
+  ok(v('') > 0 && v('a **b') > 0 && v(5) > 0 && v({ texto: 'x', tipo: 'inventado' }) > 0 && v({ tipo: 'dato', texto: 'x' }) > 0 && v({ tipo: 'dato', dato: { unidad: '%' } }) > 0 && v({ tipo: 'definicion', texto: 'x' }) > 0 && v({ tipo: 'lista', texto: 'una sola' }) > 0 && v({ texto: 'x', raro: 1 }) > 0 && v({ texto: 'x', ojo: 'a ==b' }) > 0 && v({ tipo: 'ojo', texto: 'x', ojo: 'y' }) > 0 && v({ tipo: 'regla' }) > 0 && v({ texto: 7 }) > 0, 'validarItem: rechaza tipo desconocido, dato sin valor, definición sin título, lista de una línea, marcado sin cerrar, campos raros');
+  // título del paso, rótulo, layout
+  eq([T.tituloPaso({ titulo: 'El **mínimo**' }, { titulo: 'Comp' }, 2), T.tituloPaso({ titulo: '' }, { titulo: 'Comp' }, 2), T.tituloPaso(T.item('x'), null, 4), T.tituloPaso(null, { titulo: '  ' }, 1)], ['El mínimo', 'Comp', 'Punto clave 4', 'Punto clave 1'], 'tituloPaso: titulo → título del componente → «Punto clave N»');
+  eq([T.etiquetaTipo({ tipo: 'dato' }, 'Simulador'), T.etiquetaTipo({ tipo: 'texto' }, 'Simulador'), T.etiquetaTipo(null, ''), T.etiquetaTipo({ tipo: 'ojo' }, '')], ['Dato', 'Simulador', 'Punto clave', 'Ojo'], 'etiquetaTipo');
+  eq([T.layoutPaso(T.item('x'), []), T.layoutPaso(null, [{ tipo: 'simulador' }]), T.layoutPaso(T.item('x'), [{ tipo: 'diagrama' }]), T.layoutPaso(T.item('x'), [{ c: { tipo: 'enlace3d' } }]), T.layoutPaso(T.item('x'), [{ tipo: 'clasificar' }]), T.layoutPaso(T.item('x'), [{ tipo: 'situacion' }, { tipo: 'calculadora' }])], ['texto', 'solo', 'dos', 'dos', 'centro', 'dos'], 'layoutPaso: texto / solo / dos columnas / centrada');
+  // resumen, promesa, tiempo
+  eq([T.resumenPaso({ resumen: ['a', ' b '] }, T.item('x'), 1), T.resumenPaso({ resumen: ['a'] }, T.item('x'), 3), T.resumenPaso({ resumen: 'una' }, T.item('x'), 0), T.resumenPaso({}, T.item({ texto: 'x', resumen: 'del ítem' }), 0)], ['b', '', '', 'del ítem'], 'resumenPaso: lista por punto clave o el campo del ítem');
+  eq([T.resumenLeccion({ resumen: ' una ' }), T.resumenLeccion({ resumen: ['a'] }), T.promesa({ resumen: 'Mi frase.' }, 8), T.promesa({ objetivos: ['Explicar cómo son los tests.'] }, 8), T.promesa({ objetivos: ['ADS-B es útil'] }, 0), T.promesa({ titulo: 'Sólo título' }, 0)], ['una', '', 'Mi frase.', 'En unos 8 minutos vas a poder explicar cómo son los tests.', 'En esta lección vas a poder ADS-B es útil.', 'Sólo título'], 'promesa: resumen, primer objetivo o título');
+  eq([T.minutosFalta(8, 0, 9), T.minutosFalta(8, 4, 9), T.minutosFalta(8, 8, 9), T.minutosFalta(8, 99, 9), T.minutosFalta(0, 3, 9), T.minutosFalta(8, 0, 1)], [8, 4, 0, 0, 0, 8], 'minutosFalta: de todos los minutos a cero');
+}
+
+seccion('lectura editorial (puro): el contenido real y el armado de pasos');
+{
+  const T = ES.texto;
+  const tiposVistos = {};
+  todasLasLecciones.forEach((l) => {
+    const w = l.id;
+    l.contenido.forEach((x, i) => { const pr = T.validarItem(x); ok(pr.length === 0, w + ' punto clave ' + (i + 1) + ': ' + pr.join('; ')); if (x && typeof x === 'object') tiposVistos[x.tipo || 'texto'] = (tiposVistos[x.tipo || 'texto'] || 0) + 1; });
+    ok(l.contenido.every((x) => T.item(x) !== null), w + ': todos los puntos clave tienen algo que mostrar');
+    if (l.resumen !== undefined) ok((typeof l.resumen === 'string' && T.balanceado(l.resumen) && l.resumen.trim().length > 0) || (Array.isArray(l.resumen) && l.resumen.length <= l.contenido.length && l.resumen.every((r) => typeof r === 'string' && T.balanceado(r))), w + ': resumen = texto o una línea por punto clave');
+    const pasos = LE.armar(l);
+    pasos.filter((p) => p.k === 'paso').forEach((p) => ok(typeof p.titulo === 'string' && p.titulo.trim() && p.n >= 1, w + ' paso ' + p.n + ': tiene título'));
+    const ind = LE.indice(pasos);
+    ok(ind.length === pasos.length && ind.every((e, i) => e.idx === i && e.titulo) && ind[0].k === 'intro' && ind[ind.length - 1].k === 'resumen', w + ': el índice de la lección tiene una entrada con título por etapa');
+    ok(LE.llevas(pasos, l).every((x) => x.texto && x.titulo && x.texto.length <= 175), w + ': "Lo que te llevás" con texto corto');
+  });
+  // las tres lecciones de muestra (INT.json) usan los tipos nuevos y mantienen sus componentes y preguntas
+  const lec = (id) => todasLasLecciones.find((l) => l.id === id);
+  const tipos = (id) => lec(id).contenido.map((x) => (typeof x === 'object' ? x.tipo || 'texto' : 'texto'));
+  const extras = (id, k) => lec(id).contenido.some((x) => typeof x === 'object' && x[k]);
+  ok(tipos('INT-02-02').includes('dato') && tipos('INT-02-02').includes('regla') && lec('INT-02-02').contenido.some((x) => x.dato && x.dato.valor === 75), 'INT-02-02: dato (75 %) y regla');
+  ok(tipos('INT-03-02').includes('idea') && extras('INT-03-02', 'ojo') && tipos('INT-03-02').filter((t) => t === 'regla').length >= 5, 'INT-03-02: idea + ojo + reglas numeradas');
+  ok(tipos('INT-04-01').includes('definicion') && tipos('INT-04-01').includes('lista') && extras('INT-04-01', 'ejemplo') && tipos('INT-04-01').includes('ojo'), 'INT-04-01: definición + ejemplo + lista');
+  ['INT-02-02', 'INT-03-02', 'INT-04-01'].forEach((id) => ok(lec(id).componentes.length >= 3 && lec(id).preguntas.length >= 3 && lec(id).resumen, id + ': conserva componentes y preguntas y tiene resumen'));
+  ok(Object.keys(tiposVistos).length >= 5, 'el contenido real usa varios tipos de punto clave (' + Object.keys(tiposVistos).join(', ') + ')');
+  // armar con objetos: título, tipo, número de regla, texto
+  const px = LE.armar({ id: 'XXX-02-01', contenido: ['Texto viejo. Con dos oraciones.', { titulo: 'Mi regla', tipo: 'regla', texto: 'a' }, { tipo: 'regla', texto: 'b' }, { tipo: 'dato', dato: { valor: 5, unidad: 'kt' } }], componentes: [{ tipo: 'diagrama', titulo: 'Figura 1' }, { tipo: 'simulador', titulo: 'Sim 2' }], preguntas: [] });
+  const pp = px.filter((p) => p.k === 'paso');
+  eq(pp.map((p) => p.titulo), ['Figura 1', 'Mi regla', 'Punto clave 3', 'Punto clave 4'], 'armar: título = titulo del punto, o del componente, o «Punto clave N»');
+  eq(pp.map((p) => p.tipo), ['texto', 'regla', 'regla', 'dato'], 'armar: tipo de cada paso');
+  eq(pp.map((p) => p.reglaN), [0, 1, 2, 0], 'armar: las reglas se numeran solas');
+  ok(pp[0].texto === 'Texto viejo. Con dos oraciones.' && pp[0].item.obj === false && pp[3].texto === '' && pp[3].item.dato.valor === '5', 'armar: un texto viejo sigue siendo texto; el dato sin texto es válido');
+  eq(LE.indice(px).map((e) => e.num + '|' + e.titulo), ['|Antes de empezar', '01|Figura 1', '02|Mi regla', '03|Punto clave 3', '04|Punto clave 4', '|Resumen'], 'indice: número y título de cada etapa');
+  eq(LE.llevas(px, { resumen: ['Línea uno'] }).map((x) => x.n + ':' + x.texto), ['1:Línea uno', '2:a', '3:b', '4:5 kt'], 'llevas: resumen del punto, primera oración o el dato');
+}
+
+seccion('visor 3D (puro: sin DOM ni 3D)');
+{
+  const VS = C.Escuela && C.Escuela.visor;
+  ok(VS && ['open', 'close', 'isOpen', 'capture', 'restore', 'resume', 'init', 'setCaption', 'onChange', 'normalizar'].every((k) => typeof VS[k] === 'function'), 'Escuela.visor expone open / close / isOpen / capture / restore / resume / init / setCaption / onChange');
+  const n = (t) => VS.normalizar(t);
+  ok(n({ control: 'throttle' }).t.control === 'throttle', 'normalizar: {control}');
+  ok(n('exterior').t.vista === 'exterior' && n('cabina').t.vista === 'cabina' && n('throttle').t.control === 'throttle', 'normalizar: "exterior" / "cabina" / id de mando');
+  ok(n({ pose: 'nivelado', label: 'Nivelado' }).t.pose === 'nivelado' && n({ pose: 'nivelado', label: 'Nivelado' }).t.label === 'Nivelado', 'normalizar: {pose, label}');
+  ok(n({ vista: 'afuera', foco: 'wing' }).t.vista === 'exterior' && n({ vista: 'afuera', foco: 'wing' }).t.foco === 'wing', 'normalizar: {vista:"afuera", foco}');
+  const f = () => 1, nf = n(f);
+  ok(nf.fn === f && nf.t === null, 'normalizar: una función se corre pero no se guarda (capture / reload)');
+  ok(n({}).t === null && !n({}).fn && n(null).t === null && n(42).t === null, 'normalizar: lo que no se entiende da null');
+  ok(JSON.stringify(n({ control: 'x', fn: f }).t) === '{"control":"x"}', 'normalizar: lo guardable es JSON puro (sin la función)');
+  ok(VS.open('throttle') === false && VS.isOpen() === false, 'open() sin ui.js (sin init) devuelve false y no abre nada');
+  ok(JSON.stringify(VS.capture()) === '{"open":false}' && VS.resume('escuela/INT-01-02') === false, 'capture() cerrado = {open:false}; resume() sin nada guardado = false');
+  ok(VS.close() === false, 'close() con el visor cerrado devuelve false');
+}
+
+seccion('pantallas (puro): saludo, minutos, estado de lección y geometría del camino');
+{
+  const Pn = ES.pantallas;
+  ok(typeof Pn.mapa === 'function' && typeof Pn.modulo === 'function' && typeof Pn.reservada === 'function' && typeof Pn.proximamente === 'function', 'pantallas.js: mapa, módulo, reservada y próximamente');
+  eq([Pn.fmtMin(0), Pn.fmtMin(7), Pn.fmtMin(59), Pn.fmtMin(60), Pn.fmtMin(65), Pn.fmtMin(264)], ['0 min', '7 min', '59 min', '1 h 00 min', '1 h 05 min', '4 h 24 min'], 'fmtMin: minutos y horas');
+  eq([Pn.saludo(0), Pn.saludo(5), Pn.saludo(6), Pn.saludo(12), Pn.saludo(13), Pn.saludo(19), Pn.saludo(20), Pn.saludo(23)], ['Buenas noches', 'Buenas noches', 'Buen día', 'Buen día', 'Buenas tardes', 'Buenas tardes', 'Buenas noches', 'Buenas noches'], 'saludo: voseo por franja horaria');
+  const st = ST.crear({ storage: null });
+  eq(Pn.estadoLec(st, 'INT-01-01'), { estado: 'nueva', estrellas: 0, paso: 0 }, 'estadoLec: sin registro = nueva');
+  st.tocar('INT-01-01', 3);
+  ok(Pn.estadoLec(st, 'INT-01-01').estado === 'en-curso' && Pn.estadoLec(st, 'INT-01-01').paso === 3, 'estadoLec: con paso = en curso');
+  st.quiz('INT-01-01', 4, 4); st.marcarLista('INT-01-01', { minutos: 8 });
+  ok(Pn.estadoLec(st, 'INT-01-01').estado === 'hecha' && Pn.estadoLec(st, 'INT-01-01').estrellas >= 1, 'estadoLec: marcada = hecha con estrellas');
+  // el camino: una fila de 100 unidades por estación, zigzag entre dos x, tramos de entrada y de salida
+  const g = Pn.geometriaCamino(12, [36, 64]);
+  eq(g.ys, [50, 150, 250, 350, 450, 550, 650, 750, 850, 950, 1050, 1150], 'camino: la estación i va a y = 100·i + 50');
+  eq(g.x.slice(0, 4), [36, 64, 36, 64], 'camino: alterna izquierda y derecha');
+  ok(g.d.startsWith('M 36 0 L 36 50') && g.d.endsWith('L 64 1200') && (g.d.match(/ C /g) || []).length === 11, 'camino: entra desde arriba, 11 curvas y sale por abajo');
+  ok(g.dHasta(0) === 'M 36 50' && g.dHasta(2).startsWith('M 36 50 C 36 98, 64 102, 64 150') && (g.dHasta(5).match(/ C /g) || []).length === 5, 'camino: dHasta(k) recorta el trazo hasta la estación k');
+  ok(Pn.geometriaCamino(0, [20, 80]).d === '' && Pn.geometriaCamino(1, [20, 80]).d === 'M 20 0 L 20 50 L 20 100', 'camino: sin estaciones no hay trazo; con una, un tramo recto');
+  // los 12 módulos reales: cada uno tiene icono y color para su tarjeta y su estación
+  ES.datos.modulos().forEach((m) => ok(/^#[0-9A-Fa-f]{6}$/.test(m.color) && C.Icons.has(m.icono), 'tarjeta y estación de ' + m.id + ': color e icono válidos'));
+  // la tarjeta de lección usa un icono por tipo de componente: todos existen
+  ['simulador', 'diagrama', 'animacion', 'clasificar', 'emparejar', 'enlace3d', 'calculadora', 'situacion', 'ordenar', 'completar', 'tarjetas', 'diapositiva', 'quiz', 'caso', 'mapa', 'fraseologia'].forEach((t) => ok(Mot.META[t] && Mot.META[t].codigo, 'componente ' + t + ': tiene código para su ficha en la tarjeta'));
+}
+
 seccion('store (estrellas, Leitner, racha, exportar / importar)');
 eq([ST.estrellas(1, true), ST.estrellas(1, false), ST.estrellas(0.7, true), ST.estrellas(0.69, true), ST.estrellas(0, true), ST.estrellas(0.99, true)], [3, 2, 2, 1, 1, 2], 'estrellas: 3 con 100 % al primer intento, 2 con ≥ 70 %, 1 al terminar');
 eq([1, 2, 3, 4, 5].map((c) => ST.cajaSiguiente(c, true)), [2, 3, 4, 5, 5], 'Leitner: acertar sube de caja (tope 5)');

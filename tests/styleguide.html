@@ -37,6 +37,14 @@
   .sg-paper { padding: 20px; border: 1px solid var(--line); border-radius: var(--radius-m); max-width: 440px; width: 100%; }
   .sg-pair { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; width: 100%; }
   .sg-callout-mock { position: absolute; z-index: 3; }
+  /* maqueta del visor 3D (v8): lección a la izquierda + escenario a la derecha con la cabecera y la leyenda reales (en la app el escenario es el 3D) */
+  .sg-visor { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); width: 100%; border: 1px solid var(--line); border-radius: var(--radius-m); overflow: hidden; background: var(--bg); }
+  .sg-visor-l { min-width: 0; padding: 4px 0; }
+  .sg-visor-r { position: relative; min-height: 400px; container: vp / inline-size; border-left: 1px solid var(--line); background: radial-gradient(ellipse at 60% 40%, #3A4B5B 0%, #18222B 58%, #0B1117 100%); }
+  .sg-visor-r svg.sg-panel { position: absolute; inset: 56px 14px 120px; width: calc(100% - 28px); height: calc(100% - 176px); opacity: .55; }
+  .sg-visor-r .es-visor-head, .sg-visor-r .es-visor-cap { display: flex; }
+  .sg-visor-r .es-visor-cap { position: absolute; left: 12px; right: 12px; bottom: 12px; }
+  @media (max-width: 760px) { .sg-visor { grid-template-columns: 1fr; } .sg-visor-r { border-left: 0; border-top: 1px solid var(--line); min-height: 340px; } }
 </style>
 </head>
 <body>
@@ -64,6 +72,8 @@
 <script src="../src/escuela/c-emparejar.js"></script>
 <script src="../src/escuela/c-situacion.js"></script>
 <script src="../src/escuela/c-enlace3d.js"></script>
+<script src="../src/escuela/texto.js"></script>
+<script src="../src/escuela/bloques.js"></script>
 <script src="../src/escuela/leccion.js"></script>
 <script src="../src/escuela/pantallas.js"></script>
 <script>
@@ -294,12 +304,18 @@
         unidades: [{ id: 'MET-01', titulo: 'La atmósfera', paginas: '', lecciones: [L('MET-01-01', 'De qué está hecha la atmósfera', '', 8, ['diagrama'], 'proximamente')] }] }
     ] });
     ST.tocar('AER-01-01', 5); ST.quiz('AER-01-01', 4, 4); ST.marcarLista('AER-01-01', { minutos: 8 }); ST.tocar('AER-01-02', 2);
-    var E = { K: K, h: h, icon: K.icon, datos: D, store: ST, secOpen: {}, irModulo: function () {}, irLeccion: function () {}, irMapa: function () {}, irReservada: function () {}, exportar: function () {}, importar: function () {} };
+    var Dm = Object.create(D); Dm.cargar = function () { return Promise.reject(new Error('maqueta')); };      // la maqueta no pide los JSON de los módulos
+    var E = { K: K, h: h, icon: K.icon, datos: Dm, store: ST, secOpen: {}, irModulo: function () {}, irLeccion: function () {}, irMapa: function () {}, irReservada: function () {}, exportar: function () {}, importar: function () {} };
     function marco(el) { var w = h('div', { 'class': 'sg-demo sg-paper paper es-root', style: { display: 'block', 'max-width': '560px' } }); w.appendChild(h('div', { 'class': 'es-view' }, el)); root.appendChild(w); return w; }
-    label('Mapa de la escuela: continuar, racha, módulos con anillo y color de acento (el color de cada módulo sólo aparece como acento chico)');
-    marco(P.mapa(E));
-    label('Módulo: anillo, minutos que faltan, unidades plegables y filas de lección (sin ver · en curso · hecha con estrellas · próximamente)');
-    marco(P.modulo(E, 'AER'));
+    function ancho(el, wpx) { var w = h('div', { 'class': 'sg-demo sg-paper paper es-root', style: { display: 'block', 'max-width': wpx + 'px', '--es-max': wpx + 'px', padding: '0' } }); w.appendChild(h('div', { 'class': 'es-view', style: { 'max-width': 'none' } }, el)); root.appendChild(w); return w; }
+    label('v8 · Mapa de la escuela a pantalla completa: saludo en tipo display, tarjeta Continuar con el código del módulo como marca de agua, constancia, Repaso del día (llega pronto) y tarjetas de módulo con anillo, estado y barra');
+    ancho(P.mapa(E), 1000);
+    label('v8 · El mismo mapa en la vista Camino: una ruta que serpentea con una estación por módulo (la próxima, resaltada y con «Estás acá»)');
+    ST.pref('mapa', 'camino'); ancho(P.mapa(E), 1000); ST.pref('mapa', 'tarjetas');
+    label('v8 · Módulo: banda con marca de agua y anillo, unidades como secciones grandes numeradas y lecciones como tarjetas (sin ver · en curso · hecha con estrellas · próximamente atenuada y sin tocar; con 1000 px o más suma el índice de unidades pegajoso)');
+    ancho(P.modulo(E, 'AER'), 1000);
+    label('v8 · Pantalla reservada (repaso, examen, glosario, dudas): una tarjeta tranquila «Llega pronto» con su ilustración');
+    ancho(P.reservada(E, 'repaso'), 1000);
     var lec = { id: 'AER-01-01', titulo: 'Las cuatro fuerzas', objetivos: ['Nombrar las cuatro fuerzas que actúan sobre el avión.', 'Explicar cuándo están en equilibrio.'],
       contenido: ['En vuelo recto y nivelado la sustentación iguala al peso y la tracción iguala a la resistencia.', 'Si una fuerza cambia, el avión sube, baja o cambia de velocidad hasta encontrar un nuevo equilibrio.'],
       componentes: [{ tipo: 'simulador', titulo: 'Mové la potencia', descripcion: 'Un deslizador de potencia cambia la tracción y se ve cómo cambia la velocidad.', datos: {} }, { tipo: 'clasificar', titulo: 'Qué fuerza es cada flecha', descripcion: 'Arrastrá cada ficha a la fuerza que corresponde.', datos: {} }],
@@ -313,6 +329,56 @@
     var host = h('div', { 'class': 'es-lesson es-root', style: { '--es-hue': '#2F6FE0' } });
     Mot.render(host, { tipo: 'enlace3d', titulo: 'Mirá el altímetro', descripcion: 'Abrí la cabina y mirá cómo cambia el altímetro al mover el volante hacia atrás.', datos: {} }, Mot.ctxMinimo());
     marco(host);
+  })();
+
+  /* ---- ESCUELA · lectura (contrato v8 §3, L2): la escala tipográfica fluida, los tipos de punto clave, el mini-marcado y una lección entera, con el código real */
+  sec('Escuela · lectura', 'escala fluida · tipos de punto clave · paso · portada · visor 3D');
+  (function () {
+    var ES = C150.ESCUELA, T = ES.texto, Bl = ES.bloques, Lc = ES.leccion, D = ES.datos, ST = ES.store.get();
+    function frame(el, w, extra) { var d = h('div', { 'class': 'sg-demo sg-paper paper es-root' + (extra ? ' ' + extra : ''), style: { display: 'block', 'max-width': w + 'px', '--es-max': w + 'px' } }); d.appendChild(h('div', { 'class': 'es-view', style: { 'max-width': 'none' } }, el)); root.appendChild(d); return d; }
+    label('Escala fluida (clamp con cqi: crece con el ancho de la columna). Display 44→96 · H2 30→52 · lead 20→24 · cuerpo 18→20 (máx. 62 ch) · meta 12→13 mono · pregunta 26→40 · numeral 64→128');
+    var escala = h('div', { 'class': 'es-lesson' },
+      h('p', { 'class': 'es-kicker' }, h('span', { 'class': 'es-kicker-n', text: 'PASO 02 / 08' }), h('span', { 'class': 'es-kicker-sep', text: '·' }), h('span', { 'class': 'es-kicker-t', text: 'DATO' })),
+      h('p', { 'class': 'es-display', text: 'Display: los 3 ejes' }), h('p', { 'class': 'es-h2', style: { 'margin-top': '14px' }, text: 'H2: El semáforo del 75 %' }),
+      h('p', { 'class': 'es-lead-p', style: { 'margin-top': '14px' }, text: 'Lead: la primera oración de cada punto clave se lee más grande, para que se entienda de un vistazo.' }),
+      h('p', { 'class': 'es-p', text: 'Cuerpo: Atkinson Hyperlegible, 18 a 20 px con interlínea 1,7 y un máximo de 62 caracteres por línea. El resto del texto se apoya en el lead y deja aire alrededor.' }),
+      h('p', { 'class': 'es-quest', style: { 'margin-top': '14px' }, text: 'Pregunta del mini-quiz en tipografía de display' }));
+    frame(escala, 860);
+    label('Tipos de punto clave: definición · regla · dato · idea · ojo · lista (con mini-marcado: **término**, ==clave==, {{valor|unidad}}) y los extras ejemplo / ojo');
+    var bl = h('div', { 'class': 'es-lesson', style: { display: 'grid', gap: '56px' } });
+    [{ tipo: 'definicion', titulo: 'Sustentación', texto: 'La **sustentación** es la fuerza que sostiene al avión en el aire. Actúa hacia arriba, perpendicular al ==viento relativo==.', ejemplo: 'A {{90|kt}} con el mismo ángulo de ataque hay más sustentación que a {{60|kt}}.' },
+      { tipo: 'regla', n: 1, texto: 'Las cervezas anotadas **no se pueden exonerar**, salvo que ==3 instructores== lo determinen.' },
+      { tipo: 'dato', dato: { valor: 75, unidad: '%', etiqueta: 'Nota mínima para aprobar' }, texto: 'La nota mínima para aprobar es {{75|%}}.' },
+      { tipo: 'idea', texto: 'Si dudás, el procedimiento manda: mejor perder cinco minutos que una vida.', ojo: 'Un aviso puede acompañar a cualquier tipo.' },
+      { tipo: 'ojo', texto: 'Los horarios cambian: **confirmalos** con la escuela antes de ir.' },
+      { tipo: 'lista', texto: 'Para entrar:\nMostrá tu documento.\nFirmá la planilla.\nEsperá a la PAN.' }].forEach(function (x) { bl.appendChild(Bl.bloque(K, T.item(x), { reglaN: 1 })); });
+    frame(bl, 860);
+    label('Una lección entera con el código real: portada y un paso con idea + ojo; con el ancho de la columna cambia sola de dos columnas a una');
+    var lec = { id: 'AER-01-01', titulo: 'Las cuatro fuerzas', resumen: ['Cuatro fuerzas actúan sobre el avión en vuelo.', 'Si una cambia, el avión busca un nuevo equilibrio.'], objetivos: ['Nombrar las cuatro fuerzas que actúan sobre el avión.', 'Explicar cuándo están en equilibrio.'],
+      contenido: [{ titulo: 'Las cuatro fuerzas', tipo: 'texto', texto: 'En vuelo recto y nivelado la **sustentación** iguala al peso y la tracción iguala a la resistencia. Es el equilibrio básico del vuelo.' }, { titulo: 'Un nuevo equilibrio', tipo: 'idea', texto: 'Si una fuerza cambia, el avión sube, baja o cambia de velocidad hasta encontrar un nuevo equilibrio.', ojo: 'Un cambio chico de potencia ya mueve el equilibrio.' }],
+      componentes: [{ tipo: 'diagrama', titulo: 'Las flechas', descripcion: 'Un diagrama con las cuatro fuerzas.', datos: {} }, { tipo: 'clasificar', titulo: 'Qué fuerza es cada flecha', descripcion: 'Arrastrá cada flecha a su fuerza.', datos: {} }],
+      preguntas: [1, 2, 3].map(function (i) { return { pregunta: 'Pregunta de ejemplo ' + i + ': ¿qué fuerza sostiene al avión?', opciones: ['El peso', 'La sustentación', 'La resistencia', 'La tracción'], correcta: 1, explicacion: 'La sustentación contrarresta el peso.', pagina: 5 }; }), glosario: [], enlaces: [] };
+    var deps = { api: null, store: ST, progress: null, volver: function () {}, irLeccion: function () {}, siguiente: function () { return null; }, anterior: function () { return null; }, enlace: function () {}, mirar: function (f) { f(); }, abrir: function () {}, glosario: function () {}, toast: function () {}, reducedMotion: function () { return false; }, onDark: function () { return true; }, annotate: function () {} };
+    var e = D.leccion('AER-01-01');
+    var r0 = Lc.crear(deps, e, lec, 0); frame(r0.el, 1200);
+    var r1 = Lc.crear(deps, e, lec, 2); frame(r1.el, 1200);
+    label('v8 · Visor 3D (maqueta del reparto en escritorio): la lección queda legible a la izquierda; el escenario (≈ 46 %) lleva la cabecera «CABINA · …» con «Cerrar visor» y la leyenda con la consigna y «Volver a la lección»');
+    (function () {
+      var izq = h('div', { 'class': 'sg-visor-l es-root' }, h('div', { 'class': 'es-view', style: { 'max-width': 'none', padding: '20px 22px' } },
+        h('p', { 'class': 'es-kicker' }, h('span', { 'class': 'es-kicker-n', text: 'PASO 02 / 04' }), h('span', { 'class': 'es-kicker-sep', text: '·' }), h('span', { 'class': 'es-kicker-t', text: 'MIRÁ EN LA CABINA' })),
+        h('p', { 'class': 'es-h2', text: 'Los controles detrás de las faltas' }),
+        h('p', { 'class': 'es-lead-p', style: { 'margin-top': '12px' }, text: 'Mirarlo abre el visor 3D al lado de la lección: no te saca de acá.' }),
+        h('p', { 'class': 'es-p', text: 'Probá cada control en la cabina, leé la consigna y volvé a la lección cuando quieras.' }),
+        K.button({ label: 'Mirarlo', variant: 'secondary', icon: 'eye' })));
+      var svgNS = 'http://www.w3.org/2000/svg', pan = document.createElementNS(svgNS, 'svg'); pan.setAttribute('class', 'sg-panel'); pan.setAttribute('viewBox', '0 0 300 160'); pan.setAttribute('aria-hidden', 'true');
+      pan.innerHTML = '<rect x="6" y="6" width="288" height="148" rx="10" fill="none" stroke="#8FA3B3" stroke-width="2"/><circle cx="70" cy="62" r="34" fill="none" stroke="#8FA3B3" stroke-width="2"/><circle cx="150" cy="62" r="34" fill="none" stroke="#8FA3B3" stroke-width="2"/><circle cx="230" cy="62" r="34" fill="none" stroke="#8FA3B3" stroke-width="2"/><path d="M70 62l16-14M150 62l-6 20M230 62l-14-16" stroke="#E4EAEE" stroke-width="3" stroke-linecap="round"/><rect x="40" y="112" width="60" height="26" rx="5" fill="none" stroke="#8FA3B3" stroke-width="2"/><rect x="200" y="112" width="60" height="26" rx="5" fill="none" stroke="#8FA3B3" stroke-width="2"/>';
+      var der = h('div', { 'class': 'sg-visor-r' }, pan,
+        h('div', { 'class': 'es-visor-head', role: 'group', 'aria-label': 'Visor 3D' }, h('span', { 'class': 'es-visor-dot', 'aria-hidden': 'true' }), h('span', { 'class': 'es-visor-k', text: 'CABINA' }), h('span', { 'class': 'es-visor-sep', 'aria-hidden': 'true', text: '·' }), h('span', { 'class': 'es-visor-t', text: 'Llave de encendido' }),
+          h('button', { type: 'button', 'class': 'es-visor-x' }, K.icon('close'), h('span', { text: 'Cerrar visor' }))),
+        h('div', { 'class': 'es-visor-cap' }, h('p', { 'class': 'es-visor-cap-t', text: 'Llave de encendido: elegí qué magnetos hacen saltar la chispa y, en START, hace girar el motor para arrancar.' }),
+          h('button', { type: 'button', 'class': 'btn btn--primary btn--small es-visor-back' }, K.icon('back'), h('span', { text: 'Volver a la lección' }))));
+      root.appendChild(h('div', { 'class': 'sg-visor' }, izq, der));
+    })();
   })();
 
   /* ---- ESCUELA · componentes A (E2): simulador, calculadora, diagrama y animación, con el código real y datos canónicos (y un esbozo libre del plan) */

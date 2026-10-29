@@ -22,6 +22,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
 
   var ES = C150.ESCUELA = C150.ESCUELA || {};
   var D = ES.datos, Mot = ES.componentes, Leccion = ES.leccion, Pan = ES.pantallas;
+  var Visor = (C150.Escuela && C150.Escuela.visor) || null;      // src/escuela/visor.js (visor 3D a pedido, contrato v8); sin él, MIRAR sigue siendo Nav.look
   var Escuela = C150.Escuela = C150.Escuela || {};
 
   var RESERVADAS = ['repaso', 'examen', 'glosario', 'dudas'];
@@ -125,6 +126,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     if (R) { R.destruir(); R = null; }
     while (body.firstChild) body.removeChild(body.firstChild);
   }
+  /** .app[data-es-view="mapa|modulo|leccion|reservada"]: gancho de CSS para cada pantalla de la Escuela (contrato v8). */
+  function vistaAttr(off) { var ap = A && A.app; if (!ap || !ap.setAttribute || (!off && !active)) return; if (off) ap.removeAttribute('data-es-view'); else ap.setAttribute('data-es-view', V.v); }
   function alTope() { var p = A && A.panel; if (p) p.scrollTop = 0; }
   function depsLeccion(e) {
     return {
@@ -133,6 +136,9 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       volver: E.volverAlModulo,
       irLeccion: function (id) { irLeccion(id); },
       siguiente: function (id) { return D.siguiente(id); },
+      anterior: function (id) { return D.anterior(id); },
+      visorAbierto: function () { return !!(Visor && Visor.isOpen()); },
+      visor: function (t, o) { return !!(Visor && Visor.open(t, o)); },
       enlace: enlace, mirar: mirar, abrir: abrir, glosario: glosario, annotate: annotate, toast: toast, reducedMotion: reduced, onDark: onDark,
       alMostrar: function (r, cambia) { V.clave = r.clave(); if (cambia) { alTope(); } refrescarNav(); }
     };
@@ -174,8 +180,10 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     o = o || {};
     if (!body) return;
     tok++;
+    if (Visor && Visor.isOpen() && !o.keepVisor) Visor.close({ focus: false });      // otra pantalla: el visor no sobrevive
     var antes = V.v + '|' + V.mod + '|' + V.lec;
     V = { v: v.v || 'mapa', mod: v.mod || null, lec: v.lec || null, clave: v.clave || '', res: v.res || null, unidad: v.unidad || null, via: !!v.via };
+    vistaAttr();
     limpiar();
     if (!D.indice()) {                       // sin índice inline (archivo suelto): se pide por fetch
       var mio = tok;
@@ -187,7 +195,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       });
       return;
     }
-    if (V.v === 'modulo') { body.appendChild(Pan.modulo(E, V.mod)); if (V.unidad) E.secOpen[V.unidad] = true; }
+    if (V.v === 'modulo') { if (V.unidad) E.secOpen[V.unidad] = true; body.appendChild(Pan.modulo(E, V.mod)); }
     else if (V.v === 'leccion') pintarLeccion(v);
     else if (V.v === 'reservada') body.appendChild(Pan.reservada(E, V.res));
     else body.appendChild(Pan.mapa(E));
@@ -197,6 +205,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     } else if (antes !== V.v + '|' + V.mod + '|' + V.lec || o.forzar) alTope();
     if (A && isFn(A.kick)) A.kick();
     refrescarNav();
+    if (Visor && V.v === 'leccion' && !o.keepVisor && active) Visor.resume(rutaDe(V));      // recarga a mitad de un MIRAR: vuelve a abrir el visor
   }
   E.repintar = function () { mostrar(V, { forzar: true }); };
 
@@ -231,6 +240,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     mounted = true; A = api; K = C150.Kit; h = K.el; sec = section;
     E.K = K; E.h = h; E.icon = K.icon; E.store = S();
     sec.classList.add('es');
+    if (Visor) { Visor.init(A); Visor.setRoute(function () { return rutaDe(V); }); }
     body = h('div', { 'class': 'es-view' });
     sec.appendChild(h('div', { 'class': 'es-root' }, body));
     mostrar({ v: 'mapa' });
@@ -243,6 +253,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   };
   Escuela.enter = function () {
     active = true;
+    vistaAttr();
     if (A && !prev3d) {
       prev3d = { preset: isFn(A.currentPreset) ? A.currentPreset() : null, view: isFn(A.getMainView) ? A.getMainView() : null };
       try {
@@ -250,12 +261,16 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         if (prev3d.view && prev3d.view !== 'cockpit') { A.cc('setMainView', 'cockpit'); A.syncMainView(); }
       } catch (e) { if (root.console) console.error('[Escuela] enter 3D', e); }
     }
+    if (A && isFn(A.stageSuspend) && !(Visor && Visor.isOpen())) A.stageSuspend(true);      // la cabina 3D no está a la vista: Core deja de dibujar
     if (R) R.reanudar();
     if (A && isFn(A.kick)) A.kick();
   };
   Escuela.exit = function () {
     active = false;
+    vistaAttr(true);
     if (R) R.pausar();
+    if (Visor && Visor.isOpen()) Visor.close({ focus: false, keepRunning: true });
+    if (A && isFn(A.stageSuspend)) A.stageSuspend(false);                                   // el escenario vuelve a la vista de la pestaña que sigue
     if (A && prev3d) {
       var p = prev3d; prev3d = null;
       try {
@@ -293,8 +308,11 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         return c;
       },
       route: function () { return rutaDe(V); },
-      capture: function () { return { v: V.v, mod: V.mod, lec: V.lec, clave: R && V.v === 'leccion' ? R.clave() : V.clave, res: V.res, via: V.via }; },
-      restore: function (o) { if (o && o.v) mostrar({ v: o.v, mod: o.mod, lec: o.lec, clave: o.clave, res: o.res, via: o.via }); },
+      capture: function () { return { v: V.v, mod: V.mod, lec: V.lec, clave: R && V.v === 'leccion' ? R.clave() : V.clave, res: V.res, via: V.via, visor: Visor ? Visor.capture() : null }; },
+      restore: function (o) {
+        if (o && o.v) mostrar({ v: o.v, mod: o.mod, lec: o.lec, clave: o.clave, res: o.res, via: o.via });
+        if (Visor && o && o.v === 'leccion') Visor.restore(o.visor || { open: false });
+      },
       up: function () {
         if (V.v === 'mapa') return false;
         if (V.v === 'leccion') { var e = D.leccion(V.lec); mostrar({ v: 'modulo', mod: e ? e.mod.id : V.mod }); return true; }

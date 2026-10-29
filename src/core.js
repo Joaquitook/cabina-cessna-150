@@ -323,6 +323,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   var ignHeld = false, ignTimer = null;
   var demo = null, primerAnim = null, primerArmed = false;
   var extBaseFov = 35, lockWarnAt = -1e9, frameAcc = 0, sizeCheck = 0, prevPlaying = null, extBusyPrev = false;
+  var suspended = false, suspAcc = 0;   // stage hidden (ESCUELA without the viewer): no drawing, only sim + 'frame' events at ~15 Hz
   var probarIndex = null, probarCount = -1, sliderDir = {};
   var domHandlers = [];
   // scratch objects (no per-frame allocation)
@@ -1084,6 +1085,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   }
   function resize() {
     if (!renderer || !container) return;
+    if (suspended && (!container.clientWidth || !container.clientHeight)) return;      // collapsed stage: keep the last real size
     var W = Math.max(1, Math.round(container.clientWidth)), H = Math.max(1, Math.round(container.clientHeight));
     var pr = Math.min((QUALITY[quality] || QUALITY.alta).pr, root.devicePixelRatio || 1);
     if (renderer.getPixelRatio() !== pr) renderer.setPixelRatio(pr);
@@ -1406,7 +1408,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     return !!(t && t.closest && t.closest('[role="tablist"],[role="listbox"],[role="menu"],[role="menubar"],[role="radiogroup"],[role="slider"],[role="tree"],[role="grid"],[role="spinbutton"]'));
   }
   function onKeyDown(e) {
-    if (!inited || !state || e.defaultPrevented) return;
+    if (!inited || !state || e.defaultPrevented || suspended) return;
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     if (isTypingTarget(e.target)) return;
     var k = e.key && e.key.length === 1 ? e.key.toLowerCase() : e.key;
@@ -1853,6 +1855,21 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     if (!(dt > 0)) dt = 0;
     if (dt > 0.1) dt = 0.1;
     clock += dt;
+    if (suspended) {
+      suspAcc += dt;
+      if (suspAcc < FRAME_EVENT_DT) return;
+      var sdt = suspAcc; suspAcc = 0;
+      updateInputs(sdt);
+      updateMirror(sdt);
+      if (Sim && Sim.step && (!state.paused || mirror)) {
+        var wasP = !!state.paused;
+        if (wasP) state.paused = false;
+        try { Sim.step(state, sdt); } catch (e) { reportOnce('Sim.step', e); }
+        if (wasP) state.paused = true;
+      }
+      emit('frame', state, sdt);
+      return;
+    }
     // safety net for missed ResizeObserver notifications (e.g. container shown after display:none)
     sizeCheck += dt;
     if (sizeCheck >= 0.25) {
@@ -2580,6 +2597,14 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     getAnimState: getAnimState,
     getPoses: function () { return ext && Array.isArray(ext.POSES) ? ext.POSES : []; },
     isMirroring: function () { return !!mirror; },
+    setSuspended: function (on) {                // the stage is hidden: stop drawing (sim + 'frame' events keep ~15 Hz); false: draw again and re-measure
+      on = !!on;
+      if (suspended === on) return suspended;
+      suspended = on; suspAcc = 0; lastNow = 0;
+      if (!on) sizeCheck = 1;                                  // the ResizeObserver / the 4 Hz size check re-measure the stage once it is visible
+      return suspended;
+    },
+    isSuspended: function () { return suspended; },
     setLayout: setLayout,
     getLayout: getLayout,
     isInteracting: function () { return isInteracting(); },
