@@ -34,6 +34,13 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   var IN_PAD = { throttle: 1, mixture: 1, 'carb-heat': 1, 'flap-switch': 1, 'trim-wheel': 1, yoke: 1, 'rudder-pedals': 1 };
   var TIPO = { emergencia: 'Emergencia', anormal: 'Anormal', 'en tierra': 'En tierra' };
 
+  // by type (stable): S1, S2… follow the order of the sections of the list
+  (function () {
+    var ord = { 'en tierra': 0, anormal: 1, emergencia: 2 };
+    var tmp = SIT.map(function (x, i) { return [x, i]; }).sort(function (a, b) { return ((ord[a[0].tipo] === undefined ? 1 : ord[a[0].tipo]) - (ord[b[0].tipo] === undefined ? 1 : ord[b[0].tipo])) || (a[1] - b[1]); });
+    tmp.forEach(function (t, i) { SIT[i] = t[0]; });
+  })();
+
   var A = null;                 // api from ui.js
   var V = null;                 // container
   var R = {                     // runtime
@@ -76,6 +83,11 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   }
 
   /* ------------------------------------------------------------------ flow */
+  /** User-level (contract v6): list → briefing is a history entry 'volar/<id>' (Back / UP return to the list). */
+  function openNav(id) {
+    if (A && A.navDetail) A.navDetail('volar/' + id, function () { open(id); });
+    else open(id);
+  }
   function open(id) {
     var x = byId(id);
     if (!x) return;
@@ -130,10 +142,15 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   }
 
   /* ------------------------------------------------------------------ rendering */
+  /** "Mostrámelo" (MIRAR: only the camera moves) + a small "ficha" button (ABRIR: the control's card, with a way back to this situation). */
   function chipFocus(id) {
     var c = A.CTRL[id];
     if (!c) return null;
-    return A.h('button', { type: 'button', class: 'chip', onclick: function () { A.focusControl(id); } }, A.icon('target'), c.nombre);
+    var look = A.h('button', { type: 'button', class: 'chip', title: 'Mostrámelo en 3D', onclick: function () { A.focusControl(id); } }, A.icon('target'), c.nombre);
+    if (!A.showControl) return look;
+    var card = A.h('button', { type: 'button', class: 'chip chip--ficha', 'aria-label': 'Ver la ficha de ' + c.nombre, title: 'Ver la ficha: ' + c.nombre,
+      onclick: function () { A.showControl(id); } }, A.icon('cabin'));
+    return A.h('span', { class: 'chip-pair' }, look, card);
   }
   function tipoBadge(x) {
     var t = x.tipo || 'anormal';
@@ -161,71 +178,75 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   }
   function head(n, title, meta) { return A.sectHead ? A.sectHead(n, title, meta) : A.h('h3', { class: 'placard placard--small block-title', text: title }); }
 
+  /* v5 · V3 — el lenguaje de AIRE: secciones numeradas por tipo (En tierra · Algo anormal · Emergencias), tarjetas con código S1…, el "runner" para
+   * la presentación, la situación en curso y el repaso, y barras vivas. Los helpers vienen de ui.js (secK, runnerEl, cardDone…). */
+  var GRUPOS = [['en tierra', 'En tierra'], ['anormal', 'Algo anormal'], ['emergencia', 'Emergencias']];
+  function codeOf(x) { return 'S' + (SIT.indexOf(x) + 1); }
+  function tipoLabel(x) { return TIPO[x.tipo || 'anormal'] || x.tipo || 'Anormal'; }
+  function secs(list) { list.forEach(function (s, i) { V.appendChild(A.secK(i + 1, s[0], s[1], s[2], s[3], s[4])); }); }
+  function bullets(arrx) { var ul = A.h('ul', { class: 'bullets' }); arrx.forEach(function (t) { ul.appendChild(A.h('li', { text: t })); }); return ul; }
+
   function renderList() {
-    var h = A.h;
+    var h = A.h, K = C150.Kit;
     V.appendChild(h('p', { class: 'sit-intro', text: 'Cosas que pueden pasar en un vuelo y qué hacés. No es teoría: el avión las vive en el simulador y vos actuás con los mandos (los botones de acá, el teclado o la cabina 3D).' }));
     if (!SIT.length) { V.appendChild(h('p', { class: 'empty', text: 'Las situaciones todavía no están cargadas.' })); return; }
     var doneN = SIT.filter(function (x) { return !!R.best[x.id]; }).length, nextIdx = -1;
     for (var q = 0; q < SIT.length; q++) if (!R.best[SIT[q].id]) { nextIdx = q; break; }
     if (A.pgBar) V.appendChild(h('div', { class: 'lc-prog' }, A.pgBar(doneN / SIT.length, doneN + ' de ' + SIT.length + ' resueltas', doneN === SIT.length)));
-    var grid = h('ul', { class: 'lc-list sit-grid', 'aria-label': 'Situaciones prácticas' });
-    SIT.forEach(function (x, i) {
-      var done = !!R.best[x.id], pr = practicas(x);
-      grid.appendChild(h('li', null, h('button', { type: 'button', class: 'lcard sit-card' + (done ? ' is-done' : '') + (i === nextIdx ? ' is-next' : ''), onclick: function () { open(x.id); } },
-        h('span', { class: 'lcard-n', 'aria-hidden': 'true' }, done ? ico('check') : ('0' + (i + 1)).slice(-2)),
-        h('span', { class: 'lcard-main' },
-          h('span', { class: 'sit-card-top' }, tipoBadge(x), i === nextIdx ? h('span', { class: 'lcard-flag', text: doneN ? 'Siguiente' : 'Empezá por acá' }) : null),
-          h('span', { class: 'lcard-t', text: x.titulo }),
-          h('span', { class: 'lcard-d sit-card-ctx', text: x.contexto }),
-          pr ? h('span', { class: 'sit-practicas' }, ico('target'), h('span', null, h('b', { text: 'Qué practicás: ' }), pr)) : null,
-          h('span', { class: 'lcard-meta' }, A.diffDots ? A.diffDots(nivelOf(x)) : null,
-            done ? h('span', { class: 'lcard-ok' }, ico('check'), 'Resuelta') : null)),
-        h('span', { class: 'lcard-go', 'aria-hidden': 'true' }, ico('chevron-right')))));
+    var list = [];
+    GRUPOS.forEach(function (g) {
+      var idxs = [];
+      SIT.forEach(function (x, i) { var t = x.tipo || 'anormal'; if (t === g[0] || (g[0] === 'anormal' && !TIPO[t])) idxs.push(i); });
+      if (!idxs.length) return;
+      var items = idxs.map(function (i) {
+        var x = SIT[i], pr = practicas(x);
+        return { code: 'S' + (i + 1), title: x.titulo, sum: x.contexto || '', meta: tipoLabel(x) + (pr ? ' · ' + pr : ''),
+          tag: i === nextIdx ? (doneN ? 'Siguiente' : 'Empezá acá') : null, onClick: function () { openNav(x.id); } };
+      });
+      var ul = K.cardCarousel({ items: items, list: true, label: 'Situaciones: ' + g[1].toLowerCase() }), hechas = 0;
+      idxs.forEach(function (i, k) { if (R.best[SIT[i].id]) { hechas++; A.cardDone(ul, k); } });
+      list.push([g[1], hechas + '/' + idxs.length + ' resueltas', ul, 'sit-g-' + g[0], true]);
     });
-    V.appendChild(grid);
+    secs(list);
     V.appendChild(callout('cuidado', 'Para practicar', 'Procedimientos según el POH del 150M, simplificados. En el avión mandan el manual, la checklist de tu escuela y el instructor.'));
   }
 
   function renderBrief() {
     var h = A.h, x = R.x, pr = practicas(x);
-    var sen = h('ul', { class: 'bullets' });
-    senales(x).forEach(function (t) { sen.appendChild(h('li', { text: t })); });
-    V.appendChild(h('div', { class: 'detail-top' },
-      h('button', { type: 'button', class: 'btn btn--ghost btn--small back-btn', onclick: backToList }, A.icon('back'), 'Situaciones')));
-    V.appendChild(h('article', { class: 'card sit-brief lp-card', 'aria-labelledby': 'sit-title' },
-      h('p', { class: 'kicker' }, tipoBadge(x), ' Situación práctica'),
-      h('h2', { class: 'placard detail-title', id: 'sit-title', tabindex: '-1', text: x.titulo }),
-      h('div', { class: 'sit-brief-meta' }, A.diffDots ? A.diffDots(nivelOf(x)) : null),
-      h('p', { class: 'sit-ctx', text: x.contexto }),
-      callout('tip', 'Tu objetivo', x.objetivo),
-      pr ? h('p', { class: 'sit-practicas sit-practicas--big' }, ico('target'), h('span', null, h('b', { text: 'Qué practicás: ' }), pr)) : null,
-      fold('Qué vas a notar', sen, true),
-      h('div', { class: 'btn-row' },
-        h('button', { type: 'button', class: 'btn btn--primary btn--big', onclick: start }, A.icon('play'), 'Empezar'),
-        h('button', { type: 'button', class: 'btn btn--ghost', onclick: backToList }, 'Elegir otra')),
-      h('p', { class: 'soft small', text: 'Al empezar, el avión se pone en el escenario y la situación arranca. Tomate tu tiempo: primero, siempre, volar el avión.' })));
+    var Rn = A.runnerEl({ cls: 'sit-runner sit-brief', titleId: 'sit-title', kicker: 'Situación ' + codeOf(x) + ' · ' + tipoLabel(x), count: A.DIFF_TXT[nivelOf(x)],
+      closeLabel: 'Volver a las situaciones', onClose: backToList, frac: 0, title: x.titulo, text: x.contexto });
+    Rn.appendChild(callout('tip', 'Tu objetivo', x.objetivo));
+    if (pr) Rn.appendChild(h('p', { class: 'sit-practicas sit-practicas--big' }, ico('target'), h('span', null, h('b', { text: 'Qué practicás: ' }), pr)));
+    Rn.appendChild(h('div', { class: 'runner-nav sit-nav' },
+      h('button', { type: 'button', class: 'btn', onclick: backToList }, 'Elegir otra'),
+      h('button', { type: 'button', class: 'btn btn--primary', onclick: start }, A.icon('play'), 'Empezar')));
+    Rn.appendChild(h('p', { class: 'ctl-sub', text: 'Al empezar, el avión se pone en el escenario y la situación arranca. Tomate tu tiempo: primero, siempre, volar el avión.' }));
+    V.appendChild(Rn);
+    var sen = senales(x);
+    if (sen.length) secs([['Qué vas a notar', sen.length + (sen.length === 1 ? ' señal' : ' señales'), bullets(sen), 'sit-b-sen', true]]);
   }
 
   function renderRun() {
-    var h = A.h, x = R.x;
-    var bar = A.progressBar(0, false);
+    var h = A.h, x = R.x, K = C150.Kit;
+    var Rn = A.runnerEl({ cls: 'sit-runner sit-run', titleId: 'sit-title', kicker: 'Situación ' + codeOf(x) + ' · en curso', count: '0:00', closeLabel: 'Salir de la situación',
+      onClose: function () { stop(); }, frac: 0, title: x.titulo, text: '' });
+    var fill = Rn.querySelector('.runner-prog > span'), count = Rn.querySelector('.runner-count');
     var msg = h('p', { class: 'sit-msg', role: 'status', 'aria-live': 'polite' });
-    var pct = h('span', { class: 'pct' });
-    var clock = h('span', { class: 'sit-clock' });
+    var bars = K && K.bars ? K.bars({ rows: [{ key: 'p', label: 'Avance', color: 'var(--accent)' }] }) : null;
     R.live.push(function () {
-      var r = R.res || {};
-      bar.set(num(r.progress, 0), false);
-      A.setText(pct, Math.round(clamp01(num(r.progress, 0)) * 100) + ' %');
+      var r = R.res || {}, f = clamp01(num(r.progress, 0)), p = Math.round(f * 100) + ' %';
+      if (fill) fill.style.width = (f * 100).toFixed(1) + '%';
+      A.setText(count, clockOf(R.ctx ? R.ctx.t : 0));
       A.setText(msg, r.mensaje || '');
-      var t = R.ctx ? R.ctx.t : 0;
-      A.setText(clock, Math.floor(t / 60) + ':' + ('0' + Math.floor(t % 60)).slice(-2));
+      if (bars) bars.set('p', f, p);
     });
-    V.appendChild(h('div', { class: 'mission-bar sit-bar' },
-      h('div', { class: 'mission-bar-top' }, h('span', { class: 'mission-bar-title', text: x.titulo }), clock, pct), bar, msg));
+    Rn.appendChild(callout('tip', 'Objetivo', x.objetivo));
+    Rn.appendChild(h('div', { class: 'cl-now sit-now' }, h('p', { class: 'cl-now-k' }, h('span', { class: 'live-dot', 'aria-hidden': 'true' }), 'Ahora'), msg, bars));
+    Rn.appendChild(h('div', { class: 'runner-nav sit-nav' },
+      h('button', { type: 'button', class: 'btn', onclick: function () { stop(); } }, 'Salir'),
+      h('button', { type: 'button', class: 'btn btn--primary', onclick: start }, A.icon('retry'), 'Empezar de nuevo')));
+    V.appendChild(Rn);
 
-    // what you notice + objective + hints
-    var sen = h('ul', { class: 'bullets' });
-    senales(x).forEach(function (t) { sen.appendChild(h('li', { text: t })); });
     var pistas = Array.isArray(x.pistas) ? x.pistas : [];
     var pl = h('ol', { class: 'steps sit-pistas' });
     var pbtn = h('button', { type: 'button', class: 'btn btn--small' }, 'Dame una pista');
@@ -237,15 +258,6 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     }
     pbtn.addEventListener('click', function () { R.pista = Math.min(pistas.length, R.pista + 1); fillPistas(); });
     fillPistas();
-    V.appendChild(h('article', { class: 'card sit-run', 'aria-labelledby': 'sit-title' },
-      h('p', { class: 'kicker' }, tipoBadge(x), ' En curso'),
-      h('h2', { class: 'placard detail-title', id: 'sit-title', tabindex: '-1', text: x.titulo }),
-      callout('tip', 'Objetivo', x.objetivo),
-      fold('Qué notás', sen, false),
-      h('div', { class: 'sit-pistas-box' }, pl, pbtn),
-      h('div', { class: 'btn-row' },
-        h('button', { type: 'button', class: 'btn btn--small', onclick: start }, A.icon('retry'), 'Empezar de nuevo'),
-        h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: function () { stop(); } }, 'Salir'))));
 
     // the controls for this situation
     var mandos = Array.isArray(x.mandos) ? x.mandos : [];
@@ -259,38 +271,39 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       var w = A.probalo(id, R.live);
       if (w) widgets.appendChild(h('div', { class: 'sit-widget' }, h('h4', { class: 'sit-widget-name', text: c.nombre }), w));
     });
-    V.appendChild(h('div', { class: 'block vo-sec' },
-      head('01', 'Mandos de esta situación'),
-      h('p', { class: 'soft small', text: 'Tocá un nombre para que la cámara te lo muestre en la cabina.' }), chips,
-      widgets.firstChild ? widgets : null));
-    V.appendChild(h('div', { class: 'block vo-sec' }, head('02', 'Instrumentos', 'en vivo'), A.buildHud(R.live)));
-    V.appendChild(h('div', { class: 'block vo-sec' }, head('03', 'Mandos de vuelo'), A.flightPad(R.live)));
+    var sen = senales(x), list = [];
+    if (sen.length) list.push(['Qué notás', sen.length + (sen.length === 1 ? ' señal' : ' señales'), bullets(sen), 'sit-r-sen', false]);
+    if (pistas.length) list.push(['Pistas', pistas.length + (pistas.length === 1 ? ' pista' : ' pistas'), h('div', { class: 'sit-pistas-box' }, pl, pbtn), 'sit-r-pis', true]);
+    list.push(['Mandos de esta situación', 'tocá para ver', h('div', null, h('p', { class: 'ctl-sub', text: 'Tocá un nombre para que la cámara te lo muestre en la cabina.' }), chips, widgets.firstChild ? widgets : null), 'sit-r-man', true]);
+    list.push(['Instrumentos', 'en vivo', A.buildHud(R.live), 'sit-r-ins', true]);
+    list.push(['Mandos de vuelo', 'para volar', A.flightPad(R.live), 'sit-r-pad', true]);
+    secs(list);
   }
 
   function renderFin() {
     var h = A.h, x = R.x, r = R.res || {};
-    var errs = h('ul', { class: 'bullets bullets--warn' });
-    (Array.isArray(x.errores) ? x.errores : []).forEach(function (t) { errs.appendChild(h('li', { text: t })); });
     var t = R.ctx ? num(R.ctx.final, R.ctx.t) : 0;
     var nx = -1;
     for (var k = 0; k < SIT.length; k++) if (SIT[k].id !== x.id && !R.best[SIT[k].id]) { nx = k; break; }
     var sg = [];
     if (!r.ok) sg.push({ primary: true, icon: 'retry', title: 'Probar de nuevo', text: 'Con lo que viste, ahora sale', onClick: start });
-    if (nx >= 0) sg.push({ primary: !!r.ok, icon: 'flag', title: 'Situación: ' + (SIT[nx].titulo || ''), text: practicas(SIT[nx]) ? 'Practicás: ' + practicas(SIT[nx]) : '', onClick: function () { open(SIT[nx].id); } });
+    if (nx >= 0) sg.push({ primary: !!r.ok, icon: 'flag', title: 'Situación: ' + (SIT[nx].titulo || ''), text: practicas(SIT[nx]) ? 'Practicás: ' + practicas(SIT[nx]) : '', onClick: function () { openNav(SIT[nx].id); } });
     else if (r.ok) sg.push({ primary: true, icon: 'quiz', title: 'Quiz rápido', text: 'Probá lo que aprendiste', onClick: function () { stop(); backToList(); if (A.go) A.go('quiz'); } });
     if (r.ok) sg.push({ icon: 'retry', title: 'Otra vez', text: 'Para hacerlo más prolijo', onClick: start });
     sg.push({ icon: 'plane', title: 'Seguir volando libre', text: 'Misiones, instrumentos y mandos', onClick: function () { stop(); backToList(); if (A.showPractice) A.showPractice(); } });
-    V.appendChild(h('div', { class: 'detail-top' },
-      h('button', { type: 'button', class: 'btn btn--ghost btn--small back-btn', onclick: backToList }, A.icon('back'), 'Situaciones')));
-    V.appendChild(h('article', { class: 'card sit-debrief lp-card ' + (r.ok ? 'is-ok' : 'is-fail'), 'aria-labelledby': 'sit-title' },
-      h('p', { class: 'kicker' }, tipoBadge(x), ' Repaso de la situación'),
-      h('h2', { class: 'placard detail-title', id: 'sit-title', tabindex: '-1', text: r.ok ? '¡Bien resuelta!' : 'Esta vez no salió' }),
-      callout(r.ok ? 'ok' : 'cuidado', r.ok ? 'Lo lograste' : 'Qué pasó', r.mensaje || ''),
-      h('p', { class: 'soft small sit-time' }, ico('clock'), x.titulo + ' · ' + Math.floor(t / 60) + ' min ' + Math.round(t % 60) + ' s · el avión quedó en pausa para que lo leas con calma.'),
-      fold('Lo que hace un piloto', h('p', { class: 'sit-debrief-text', text: x.debrief || '' }), true),
-      errs.firstChild ? fold('Errores comunes', errs, false) : null,
-      h('div', { class: 'sg-wrap' }, h('p', { class: 'sg-k', text: 'Seguí con…' }), h('div', { class: 'sg-list' }, sg.map(function (s) { return A.sgCard ? A.sgCard(s) : null; })))));
+    var Rn = A.runnerEl({ cls: 'sit-runner sit-debrief ' + (r.ok ? 'is-ok' : 'is-fail'), titleId: 'sit-title', kicker: 'Repaso · ' + codeOf(x) + ' · ' + x.titulo, count: clockOf(t),
+      closeLabel: 'Volver a las situaciones', onClose: backToList, frac: r.ok ? 1 : clamp01(num(r.progress, 0)), title: r.ok ? '¡Bien resuelta!' : 'Esta vez no salió', text: '' });
+    Rn.appendChild(callout(r.ok ? 'ok' : 'cuidado', r.ok ? 'Lo lograste' : 'Qué pasó', r.mensaje || ''));
+    Rn.appendChild(h('p', { class: 'ctl-sub sit-time' }, ico('clock'), Math.floor(t / 60) + ' min ' + Math.round(t % 60) + ' s · el avión quedó en pausa para que lo leas con calma.'));
+    V.appendChild(Rn);
+    var errs = Array.isArray(x.errores) ? x.errores : [];
+    var list = [['Lo que hace un piloto', '', h('p', { class: 'sit-debrief-text', text: x.debrief || '' }), 'sit-f-deb', true]];
+    if (errs.length) list.push(['Errores comunes', errs.length + (errs.length === 1 ? ' error' : ' errores'), (function () { var ul = bullets(errs); ul.className = 'bullets bullets--warn'; return ul; })(), 'sit-f-err', false]);
+    secs(list);
+    V.appendChild(h('div', { class: 'sg-wrap' }, h('p', { class: 'sg-k', text: 'Seguí con…' }), h('div', { class: 'sg-list' }, sg.map(function (s) { return A.sgCard ? A.sgCard(s) : null; }))));
   }
+  function clockOf(t) { t = Math.max(0, Math.floor(num(t, 0))); return Math.floor(t / 60) + ':' + ('0' + (t % 60)).slice(-2); }
+  function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
 
   function render(focusTitle) {
     if (!V) return;
@@ -303,7 +316,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     else if (R.phase === 'fin' && R.x) renderFin();
     else { R.phase = 'lista'; renderList(); }
     if (A.annotate && R.phase !== 'run') {          // glossary popovers only in the reading text, not in titles or kickers
-      var txt = V.querySelectorAll('.sit-intro, .sit-ctx, .callout-body, .acc-body, .sit-debrief-text, .lcard-d');
+      var txt = V.querySelectorAll('.sit-intro, .runner-text, .callout-body, .acc-body, .sit-debrief-text, .sit-brief .ctl-sub');
       for (var q = 0; q < txt.length; q++) A.annotate(txt[q]);
     }
     var s = A.S();
@@ -345,6 +358,12 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       if (R.phase === 'run') stop('Cambiaste de escenario: la situación se cortó.');
       else if (R.phase === 'fin') { R.pausedByUs = false; teardown(); R.phase = 'brief'; render(false); }
     },
-    open: open
+    open: open,
+    /** UP / "volver a la lista" (contract v6): ends a run or debrief and shows the list of situations. */
+    toList: function () {
+      var was = R.phase;
+      backToList();
+      if (was === 'run' && A) A.showToast({ text: 'Saliste de la situación.', kind: 'info' });
+    }
   };
 })(root.C150);

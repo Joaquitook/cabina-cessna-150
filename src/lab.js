@@ -1199,7 +1199,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       var done = L.done.indexOf(x.id) >= 0;
       ul.appendChild(h('li', null, h('button', {
         type: 'button', class: 'lab-exp' + (cur ? ' is-current' : ''), 'aria-current': cur ? 'true' : null,
-        onclick: function () { startExperiment(x.id); }
+        onclick: function () { if (A.navDetail) A.navDetail('aire/' + x.id, function () { startExperiment(x.id); }); else startExperiment(x.id); }
       },
         h('span', { class: 'lab-exp-n', text: 'E' + (i + 1) }),
         h('span', { class: 'lab-exp-title', text: x.titulo }),
@@ -1224,7 +1224,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     L.el.runHint = h('p', { class: 'lab-run-hint', hidden: true, text: 'Tocaste un mando: ¡bien! Probá libremente; "Repetir" vuelve a poner el paso.' });
     R.appendChild(h('div', { class: 'lab-run-top' },
       h('p', { class: 'lab-run-kicker' }, h('span', { text: 'Experimento E' + (idx + 1) + ' · ' + ex.titulo }), h('span', { class: 'lab-run-count', text: (i + 1) + ' / ' + n })),
-      h('button', { type: 'button', class: 'icon-btn icon-btn--small lab-run-close', 'aria-label': 'Salir del experimento', title: 'Salir del experimento', onclick: stopExperiment },
+      h('button', { type: 'button', class: 'icon-btn icon-btn--small lab-run-close', 'aria-label': 'Salir del experimento', title: 'Salir del experimento', onclick: function () { if (!(A.navUp && A.navUp())) stopExperiment(); } },
         A.icon('close'))));
     R.appendChild(h('div', { class: 'lab-run-prog', 'aria-hidden': 'true' }, h('span', { style: { width: ((i + 1) / n * 100).toFixed(1) + '%' } })));
     R.appendChild(h('h3', { class: 'lab-run-title', tabindex: '-1', text: st.titulo }));
@@ -1237,7 +1237,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       h('button', { type: 'button', class: 'btn btn--small', disabled: i === 0 ? true : null, onclick: function () { applyStep(i - 1); } }, A.icon('back'), 'Anterior'),
       h('button', { type: 'button', class: 'btn btn--small btn--ghost', onclick: function () { applyStep(i); } }, A.icon('retry'), 'Repetir'),
       last
-        ? h('button', { type: 'button', class: 'btn btn--small btn--primary', onclick: function () { markDone(ex.id); stopExperiment(); } }, A.icon('check'), 'Terminar')
+        ? h('button', { type: 'button', class: 'btn btn--small btn--primary', onclick: function () { markDone(ex.id); if (!(A.navUp && A.navUp())) stopExperiment(); } }, A.icon('check'), 'Terminar')
         : h('button', { type: 'button', class: 'btn btn--small btn--primary', onclick: function () { applyStep(i + 1); } }, 'Siguiente', A.icon('next'))));
     R.appendChild(dots);
     if (A.annotate) A.annotate(R);

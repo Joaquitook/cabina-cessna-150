@@ -336,7 +336,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   function see3d(e, K, close) {
     var UI = C150.UI;
     if (!e.control || !UI || typeof UI.showControl !== 'function') return null;
-    return K.button({ label: 'Verlo en 3D', icon: 'target', variant: 'primary', size: 'small', onClick: function () { if (close) close(); UI.showControl(e.control); } });
+    return K.button({ label: 'Verlo en 3D', icon: 'target', variant: 'primary', size: 'small', onClick: function () { if (close) close(); if (typeof UI.lookAt === 'function') UI.lookAt(e.control); else UI.showControl(e.control); } });
   }
   Glossary.pop = function (btn) {
     var K = C150.Kit;

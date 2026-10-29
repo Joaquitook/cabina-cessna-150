@@ -77,20 +77,20 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       cur = null;
       setTimeout(function () { runTour(level, opts); }, reduced() ? 0 : 280);
     }
-    function option(icon, title, sub, level) {
+    function option(icon, title, sub, level, tag) {
       return h('button', { type: 'button', 'class': 'ob-choice', onclick: function () { choose(level); } },
         h('span', { 'class': 'ob-choice-ico', 'aria-hidden': 'true' }, Kit.icon(icon)),
-        h('span', { 'class': 'ob-choice-txt' }, h('span', { 'class': 'ob-choice-t', text: title }), h('span', { 'class': 'ob-choice-d', text: sub })),
+        h('span', { 'class': 'ob-choice-txt' }, tag ? h('span', { 'class': 'ob-choice-k', text: tag }) : null, h('span', { 'class': 'ob-choice-t', text: title }), h('span', { 'class': 'ob-choice-d', text: sub })),
         h('span', { 'class': 'ob-choice-go', 'aria-hidden': 'true' }, Kit.icon('arrow-right')));
     }
-    var first = option('star', 'Nunca volé', 'No sé nada de aviones: empezamos desde lo más básico, con una guía paso a paso.', 'cero');
+    var first = option('star', 'Nunca volé', 'No sé nada de aviones: empezamos desde lo más básico, con una guía paso a paso.', 'cero', 'Nivel 1 · desde cero');
     first.setAttribute('data-autofocus', '1');
     var body = h('div', { 'class': 'ob-welcome' },
       h('p', { 'class': 'ob-lead', text: 'Una cabina de Cessna 150 en 3D para aprender qué es cada mando, cómo hace un avión para volar y practicar sin ningún riesgo.' }),
       h('p', { 'class': 'ob-ask', id: 'ob-ask', text: '¿Cuánto sabés de aviones?' }),
       h('div', { 'class': 'ob-choices', role: 'group', 'aria-labelledby': 'ob-ask' },
         first,
-        option('cabin', 'Ya sé algo', 'Conozco algunos mandos o ya tuve una clase: voy directo a la cabina.', 'algo')),
+        option('cabin', 'Ya sé algo', 'Conozco algunos mandos o ya tuve una clase: voy directo a la cabina.', 'algo', 'Nivel 2 · ya sé algo')),
       h('p', { 'class': 'ob-note', text: 'Después te muestro la pantalla en 5 pasos cortos. Lo podés volver a ver desde el botón de ayuda (?).' }));
     dlg = Kit.dialog({
       kicker: 'Bienvenido a bordo', title: 'Cabina Cessna 150', body: body, label: 'Bienvenida',
@@ -217,9 +217,11 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       }
     }
     function onResize() { if (!closed) place(); }
+    var navTok = null;
     function close(skipped) {
       if (closed) return;
       closed = true;
+      if (navTok && C150.Nav && isFn(C150.Nav.overlayClosed)) { C150.Nav.overlayClosed(navTok); navTok = null; }
       doc.removeEventListener('keydown', onKey, true);
       root.removeEventListener('resize', onResize);
       root.removeEventListener('orientationchange', onResize);
@@ -238,6 +240,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     root.addEventListener('resize', onResize);
     root.addEventListener('orientationchange', onResize);
     cur = { tour: { close: close } };
+    if (C150.Nav && isFn(C150.Nav.overlayOpen) && C150.Nav.mounted && C150.Nav.mounted()) navTok = C150.Nav.overlayOpen(function () { close(true); });   // the system Back button closes the tutorial
     go(0);
     void el.offsetWidth;
     el.classList.add('is-on');

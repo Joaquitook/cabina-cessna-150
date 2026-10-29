@@ -8,6 +8,7 @@
 <div id="app" class="app">
   <a class="skip-link" id="skip-link" href="#panel">Saltar al contenido</a>
   <h1 class="sr-only">Cabina Cessna 150: aprendé a volar un Cessna 150 en 3D</h1>
+  <p id="nav-live" class="sr-only" role="status" aria-live="polite"></p>
   <header class="topbar">
     <button type="button" class="brand" id="brand" data-go="inicio" aria-label="Cabina Cessna 150: ir al inicio" title="Ir al inicio">
       <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
@@ -102,14 +103,37 @@
             <span class="sheet-chev" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><use href="#i-chevron-up"/></svg></span>
           </span>
         </div>
-        <div id="subtabs-lecciones" class="subtabs" role="tablist" aria-label="Secciones de Lecciones" data-group="lecciones" hidden>
-          <button type="button" class="subtab" role="tab" id="tab-recorrido" data-mode="recorrido" aria-controls="panel-recorrido" aria-selected="false" tabindex="-1">Recorrido guiado</button>
-          <button type="button" class="subtab" role="tab" id="tab-basico" data-mode="basico" aria-controls="panel-basico" aria-selected="false" tabindex="-1">Lecciones</button>
+        <div id="subtabs-lecciones" class="subtabs modes" role="tablist" aria-label="Secciones de Lecciones" data-group="lecciones" hidden>
+          <button type="button" class="subtab mode-btn" role="tab" id="tab-recorrido" data-mode="recorrido" aria-controls="panel-recorrido" aria-selected="false" tabindex="-1"><span class="mode-t">Recorrido guiado</span><span class="mode-s">Tu primer paseo</span></button>
+          <button type="button" class="subtab mode-btn" role="tab" id="tab-basico" data-mode="basico" aria-controls="panel-basico" aria-selected="false" tabindex="-1"><span class="mode-t">Lecciones</span><span class="mode-s">Cómo vuela</span></button>
         </div>
-        <div id="subtabs-practicar" class="subtabs" role="tablist" aria-label="Secciones de Practicar" data-group="practicar" hidden>
-          <button type="button" class="subtab" role="tab" id="tab-checklists" data-mode="checklists" aria-controls="panel-checklists" aria-selected="false" tabindex="-1">Checklists</button>
-          <button type="button" class="subtab" role="tab" id="tab-volar" data-mode="volar" aria-controls="panel-volar" aria-selected="false" tabindex="-1">Misiones y situaciones</button>
-          <button type="button" class="subtab" role="tab" id="tab-quiz" data-mode="quiz" aria-controls="panel-quiz" aria-selected="false" tabindex="-1">Quiz</button>
+        <div id="subtabs-practicar" class="subtabs modes modes--3" role="tablist" aria-label="Secciones de Practicar" data-group="practicar" hidden>
+          <button type="button" class="subtab mode-btn" role="tab" id="tab-checklists" data-mode="checklists" aria-controls="panel-checklists" aria-selected="false" tabindex="-1"><span class="mode-t">Checklists</span><span class="mode-s">Paso a paso</span></button>
+          <button type="button" class="subtab mode-btn" role="tab" id="tab-volar" data-mode="volar" aria-controls="panel-volar" aria-selected="false" tabindex="-1"><span class="mode-t">Misiones y situaciones</span><span class="mode-s">A volar</span></button>
+          <button type="button" class="subtab mode-btn" role="tab" id="tab-quiz" data-mode="quiz" aria-controls="panel-quiz" aria-selected="false" tabindex="-1"><span class="mode-t">Quiz</span><span class="mode-s">Probá lo que sabés</span></button>
+        </div>
+        <div id="navbar" class="navbar" hidden>
+          <div id="nav-return" class="nav-return" hidden>
+            <button type="button" class="nav-return-btn" id="nav-return-btn">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-back"/></svg>
+              <span class="nav-return-k">Volver a</span>
+              <span class="nav-return-t" id="nav-return-t"></span>
+            </button>
+            <button type="button" class="nav-return-x icon-btn icon-btn--small" id="nav-return-x" aria-label="Quitar este atajo para volver" title="Quitar este atajo">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg>
+            </button>
+          </div>
+          <div id="nav-up" class="nav-up" hidden>
+            <button type="button" class="nav-up-btn" id="nav-up-btn" aria-label="Subir a la lista" title="Subir a la lista (Esc)">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-chevron-left"/></svg>
+            </button>
+            <ol class="nav-crumbs" id="nav-crumbs" aria-label="Dónde estás"></ol>
+          </div>
+          <div id="nav-pause" class="nav-pause" role="status" hidden>
+            <span class="nav-pause-ico" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><use href="#i-pause"/></svg></span>
+            <span class="nav-pause-t" id="nav-pause-t">Pausado: el avión quedó quieto mientras estabas en otra pestaña.</span>
+            <button type="button" class="btn btn--primary btn--small" id="nav-pause-go"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-play"/></svg><span>Continuar</span></button>
+          </div>
         </div>
         <p id="panel-live" class="panel-live" role="status" aria-live="polite" hidden></p>
       </div>
@@ -210,6 +234,7 @@
 <script data-inline="icons.js"></script>
 <script data-inline="kit.js"></script>
 <script data-inline="progress.js"></script>
+<script data-inline="nav.js"></script>
 <script data-inline="glossary.js"></script>
 <script data-inline="search.js"></script>
 <script data-inline="home.js"></script>

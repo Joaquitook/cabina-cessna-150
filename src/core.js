@@ -312,6 +312,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   var listeners = {}, lastError = null, reported = {};
   var selected = null, hovered = { id: null, sub: null }, targets = {}, pickFn = null;
   var fly = null;
+  var curPreset = null, curScenario = null;     // contract v6 (navigation): last camera preset framed / sim scenario applied (getViewState)
   var ptr = null, pointersDown = {}, pointerCount = 0;
   var hoverPos = { x: 0, y: 0, inside: false, dirty: false };
   var axes = {};
@@ -884,6 +885,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     if (userBusy()) { pendingFocus = { kind: 'control', id: id, wait: FOCUS_AFTER_RELEASE }; return true; }
     if (layout !== 'dos' && mainView !== 'cockpit') setMainView('cockpit');
     flyTo(v.position, v.target, false);
+    curPreset = null;
     emit('preset', null);
     return true;
   }
@@ -895,6 +897,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     if (userBusy()) { pendingFocus = { kind: 'preset', name: name, keepView: keep, wait: FOCUS_AFTER_RELEASE }; return true; }
     if (layout !== 'dos' && mainView !== 'cockpit' && !keep) setMainView('cockpit');
     flyTo(p.position, p.target, false);
+    curPreset = name;
     emit('preset', name);
     return true;
   }
@@ -1519,6 +1522,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     if (mirror) { mirror = null; mirrorHaze(false); emit('mirror', false); }   // the next frame starts a fresh mirror if a pose still runs
     if (peek.mode === 'vuelo') { endFlightCaption(); peek.trk = {}; }         // a new airplane: nothing the student did
     if (Sim && Sim.applyPreset) Sim.applyPreset(state, name);
+    curScenario = name;
     cancelMomentary();
     releaseAllKeys();
     frameAcc = 0;
@@ -2032,7 +2036,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       controls.rotateSpeed = 0.5; controls.zoomSpeed = 0.8; controls.panSpeed = 0.6;
       controls.minDistance = MIN_DIST; controls.maxDistance = MAX_DIST;
       controls.enablePan = true; controls.screenSpacePanning = true;
-      controls.addEventListener('start', function () { fly = null; stopIdleOrbit(); emit('preset', null); });
+      controls.addEventListener('start', function () { fly = null; stopIdleOrbit(); curPreset = null; emit('preset', null); });
       if (ext) {
         extControls = new T.OrbitControls(ext.camera, canvas);
         if (ext.target && ext.target.isVector3) extControls.target = ext.target;
@@ -2325,6 +2329,49 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     if (peek.shown >= FLY_SHOW_MIN && peek.idle >= FLY_LINGER) endFlightCaption();
   }
 
+  /* ------------------------------------------------------------------ view state (contract v6: navigation "look" / restore) */
+  /**
+   * A plain snapshot of everything the student SEES of the 3D scene (not the sim): main view + layout, the cockpit camera
+   * (pos / orbit target; the destination while a fly-to runs), the exterior camera, the framed preset, the selection and
+   * target highlights, the exterior backdrop and the airflow layers (not while an air peek owns them). Used by C150.Nav to
+   * put the camera back after a "Mostrámelo en 3D" and to give every tab its own 3D context.
+   */
+  function getViewState() {
+    if (!inited || !camera) return null;
+    var tgtNow = controls ? controls.target : camTarget;
+    var s = {
+      main: mainView, layout: layout,
+      cam: { pos: (fly ? fly.p1 : camera.position).toArray(), target: (fly ? fly.t1 : tgtNow).toArray() },
+      ext: (ext && ext.camera && ext.target) ? { pos: ext.camera.position.toArray(), target: ext.target.toArray(), up: ext.camera.up.toArray() } : null,
+      preset: curPreset, selected: selected, targets: Object.keys(targets),
+      exteriorView: ext ? (ext.view || null) : null, backdrop: ext ? (ext.backdrop || 'estudio') : null,
+      scenario: curScenario, air: null
+    };
+    if (flow && !peek.on) { try { s.air = flow.get(); } catch (e) { reportOnce('airflow.get', e); } }
+    return s;
+  }
+  /** Brings the scene back to a getViewState() snapshot. opts.smooth (default true): fly there; false = jump. Reduced motion jumps anyway. */
+  function setViewState(s, opts) {
+    if (!s || !inited || !camera) return false;
+    var instant = !!(opts && opts.smooth === false);
+    pendingFocus = null;
+    if (s.layout && LAYOUTS[s.layout] && s.layout !== layout) setLayout(s.layout);
+    else if (s.main && layout !== 'dos' && s.main !== mainView) setMainView(s.main, true);
+    if (s.backdrop && ext && (ext.backdrop || 'estudio') !== s.backdrop) setBackdrop(s.backdrop);
+    if (s.air && flow && !peek.on) {
+      var a = {}, k;
+      for (k in s.air) if (k !== 'focus') a[k] = s.air[k];
+      setAirflow(a);
+      try { if (flow.focus) flow.focus(s.air.focus || null); } catch (e) { reportOnce('airflow.focus', e); }
+    }
+    if (s.cam && s.cam.pos && s.cam.target) flyTo(new T.Vector3().fromArray(s.cam.pos), new T.Vector3().fromArray(s.cam.target), instant);
+    if (s.ext && ext && ext.setView) { try { ext.setView({ pos: s.ext.pos, target: s.ext.target, up: s.ext.up }); } catch (e2) { reportOnce('exterior.setView', e2); } }
+    setTargetHighlight(s.targets || []);
+    if ('selected' in s && (s.selected || null) !== selected) select(s.selected || null);
+    if ('preset' in s) { curPreset = s.preset || null; emit('preset', curPreset); }
+    return true;
+  }
+
   /* ------------------------------------------------------------------ air lab hooks (airflow.js, exterior backdrops) */
   /** flow.set(opts) on the exterior airflow → its settings, or null without the module. */
   function setAirflow(o) {
@@ -2511,6 +2558,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     },
     setAirflow: setAirflow,
     getAirflow: function () { return flow ? flow.get() : null; },
+    getViewState: getViewState,
+    setViewState: setViewState,
     setBackdrop: setBackdrop,
     getBackdrop: function () { return ext ? (ext.backdrop || 'estudio') : null; },
     setExteriorView: setExteriorView,

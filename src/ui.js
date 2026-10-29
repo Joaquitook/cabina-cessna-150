@@ -516,18 +516,33 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     return null;
   }
 
+  /* ---- 3D context per tab (contract v6): what the student sees of the 3D scene is saved when a tab is left and given back when it is
+   *  entered again (only for the tabs whose enter() does not frame the camera itself); AIRE's tunnel / backdrop / airflow never leak. */
+  var tabCtx = {};
+  var preAire = null;
+  var CTX_MODES = { explorar: 1, volar: 1, quiz: 1 };
+  var navQuiet = 0;                    // > 0 while Nav (popstate, show) performs a change: the user-level wrappers must not write history
+  function restoreCtx(v) { if (v && coreReady) { cc('setViewState', v, { smooth: false }); syncMainView(); } }
+
+  /** RAW tab switch (no history): the user-level entry points are navGo / navOpen (IR / ABRIR) below. */
   function setMode(name, opts) {
     name = resolveMode(name) || 'inicio';
-    if (name === mode) { if (!(opts && opts.fromHash)) syncNav(); return; }
-    var panel = $('panel');
+    if (name === mode) { syncNav(); return; }
+    var panel = $('panel'), ctxLeft = null;
     if (mode) {
       scrollMem[mode] = panel.scrollTop;
+      ctxLeft = coreReady ? cc('getViewState') : null;
+      if (ctxLeft) tabCtx[mode] = ctxLeft;
       var prev = modeImpl[mode];
       releaseAllHolds();
+      navProv(mode, 'pause');
       if (prev && prev.exit) safe(prev.exit, 'exit ' + mode);
       $('panel-' + mode).hidden = true;
+      if (mode === 'aire' && preAire) { restoreCtx(preAire); preAire = null; }
     }
+    if (C150.Nav && isFn(C150.Nav.clearLook)) C150.Nav.clearLook();
     mode = name;
+    if (name === 'aire') preAire = ctxLeft || (coreReady ? cc('getViewState') : null);
     var app = $('app');
     if (app) {
       app.setAttribute('data-mode', name);               // hook for per-mode CSS
@@ -540,6 +555,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     var impl = modeImpl[name];
     if (!rendered[name] && impl && impl.render) { rendered[name] = true; safe(function () { impl.render(sec); }, 'render ' + name); }
     if (impl && impl.enter) safe(impl.enter, 'enter ' + name);
+    if (CTX_MODES[name] && tabCtx[name] && coreReady) cc('setViewState', tabCtx[name], { smooth: true });
+    navProv(name, 'resume');
     panel.scrollTop = scrollMem[name] || 0;
     hidePeek();
     syncAirPeek();
@@ -547,28 +564,141 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     var g = groupDef(groupOf(name));
     if (g && g.first) store.set('sub.' + g.id, name);
     store.set('lastMode', name);
-    if (!(opts && opts.fromHash)) {
-      try { root.history.replaceState(null, '', '#' + hashFor(name)); } catch (e) { /* sin historial (sandbox) */ }
-    }
     kick();
   }
 
-  /** Route string (same as the URL hash, without '#'): 'cabina', 'lecciones/basico', 'cabina/yoke', 'aire/<expId>', 'escuela/<lessonId>'. */
+  /** RAW route (same strings as the URL hash, without '#'): 'cabina', 'lecciones/basico', 'cabina/yoke', 'basico/<lessonId>',
+   *  'checklists/<id>', 'aire/<expId>', 'escuela/<lessonId>'. No history is written here; Nav calls it to show a route. */
   function go(path, opts) {
     path = String(path || '').replace(/^#\/?/, '');
     var parts = path.split('/'), head = (parts[0] || '').toLowerCase(), rest = parts.slice(1).join('/');
     var m = resolveMode(head);
     if (!m) return false;
     var g = groupDef(groupOf(m));
-    if (rest && g && g.modes.indexOf(rest) >= 0) m = rest;                       // 'lecciones/basico'
+    var sub = rest.split('/')[0];
+    if (rest && g && g.modes.indexOf(sub) >= 0) { m = sub; rest = rest.split('/').slice(1).join('/'); }       // 'lecciones/basico[/id]'
     setMode(m, opts);
     if (rest) {
-      if (m === 'explorar' && CTRL[rest]) openControl(rest, 'list');
+      if (m === 'explorar' && CTRL[rest]) openControlRaw(rest, 'list');
       else if (m === 'aire' && C150.Lab && isFn(C150.Lab.startExperiment)) safe(function () { C150.Lab.startExperiment(rest); }, 'Lab.startExperiment');
+      else if (m === 'basico') { var li = lessonIndexById(rest); if (li >= 0 && !(LB.open && LB.idx === li)) lbOpenRaw(li); }
+      else if (m === 'checklists') { for (var ci = 0; ci < CHECKLISTS.length; ci++) if (CHECKLISTS[ci].id === rest) { if (!(CL.open && CL.cur && CL.cur.idx === ci)) clOpenRaw(ci); break; } }
+      else if (m === 'volar' && sitOk() && isFn(C150.Situations.open)) {
+        var cur = isFn(C150.Situations.current) ? C150.Situations.current() : null;
+        if (!(cur === rest && sitPhase() !== 'lista')) { voSetTab('situaciones'); safe(function () { C150.Situations.open(rest); }, 'Situations.open'); }
+      }
       else if (m === 'escuela' && C150.Escuela && isFn(C150.Escuela.go)) safe(function () { C150.Escuela.go(rest); }, 'Escuela.go');
     }
     return true;
   }
+
+  /* ================================================================== NAVIGATION (contract v6, src/nav.js, docs/NAVEGACION.md)
+   * IR (navGo) top nav / sub-tabs / Home tiles · ABRIR (navOpen) a detail somewhere else, with the "← Volver a …" bar ·
+   * MIRAR (navLook) only the camera moves, with the "Volver a la vista anterior" chip · detail / replace inside a tab.
+   * Every panel registers a provider (see registerNavProviders) so Back / Forward / UP restore the exact state. */
+  function NAV() { return C150.Nav || null; }
+  function navOn() { var n = NAV(); return !!(n && isFn(n.mounted) && n.mounted() && navQuiet === 0); }
+  function quiet(fn) { return function () { navQuiet++; try { if (isFn(fn)) fn(); } finally { navQuiet--; } }; }
+  /** 'lecciones' / 'lecciones/basico' / 'cabina/yoke' / old alias → canonical route ('basico', 'cabina/yoke'), or null. */
+  function routeFor(path) {
+    path = String(path || '').replace(/^#\/?/, '');
+    var parts = path.split('/'), head = (parts[0] || '').toLowerCase(), rest = parts.slice(1).join('/');
+    var m = resolveMode(head);
+    if (!m) return null;
+    var g = groupDef(groupOf(m)), sub = rest.split('/')[0];
+    if (rest && g && g.modes.indexOf(sub) >= 0) { m = sub; rest = rest.split('/').slice(1).join('/'); }
+    return hashFor(m) + (rest ? '/' + rest : '');
+  }
+  function navProvider(m) { var n = NAV(); return (n && isFn(n.provider)) ? n.provider(m) : null; }
+  function navProv(m, fn) {
+    var p = navProvider(m);
+    if (p && isFn(p[fn])) safe(function () { p[fn](); }, 'nav ' + fn + ' ' + m);
+  }
+  function navRoute() {
+    var p = navProvider(mode);
+    var r = p && isFn(p.route) ? safe(function () { return p.route(); }, 'nav route') : null;
+    return r || hashFor(mode || 'inicio');
+  }
+  function navLabel() {
+    var p = navProvider(mode);
+    var l = p && isFn(p.label) ? safe(function () { return p.label(); }, 'nav label') : '';
+    return l || (MODE_INFO[mode] || {}).title || '';
+  }
+  function navCapture() {
+    var p = navProvider(mode), pn = $('panel');
+    return {
+      route: navRoute(), mode: mode, label: navLabel(), scroll: pn ? pn.scrollTop : 0,
+      prov: p && isFn(p.capture) ? (safe(function () { return p.capture(); }, 'nav capture ' + mode) || null) : null,
+      view: coreReady ? (cc('getViewState') || null) : null
+    };
+  }
+  /** Brings a location back exactly: tab, the panel's inner state, scroll and the 3D view. */
+  function restoreSnap(snap) {
+    setMode(snap.mode);
+    var p = navProvider(snap.mode);
+    if (p && isFn(p.restore) && snap.prov) safe(function () { p.restore(snap.prov); }, 'nav restore ' + snap.mode);
+    var n = NAV(), pn = $('panel');
+    if (n && isFn(n.refresh)) n.refresh(true);                       // the bars first: they change the head's height
+    if (pn) { pn.scrollTop = num(snap.scroll, 0); setTimeout(function () { if (mode === snap.mode) pn.scrollTop = num(snap.scroll, 0); }, 120); }
+    if (snap.view && coreReady) cc('setViewState', snap.view, { smooth: true });
+    sheetEnsure('half');
+    kick();
+  }
+  function navShow(route, snap, meta) {
+    var K = C150.Kit;
+    if (K && isFn(K.closePopover)) K.closePopover();                  // a popover (glossary, status, scenario) never outlives a navigation
+    quiet(function () {
+      if (meta && meta.kind === 'pop' && snap && snap.mode) restoreSnap(snap);
+      else if (!go(route)) setMode('inicio');
+    })();
+    var n = NAV();
+    if (n && isFn(n.refresh)) n.refresh(true);
+  }
+  /** UP: the panel's own "go to the list" (keeps activities alive). */
+  function navUp() {
+    var p = navProvider(mode), done = false;
+    if (!p || !isFn(p.inDetail) || !p.inDetail() || !isFn(p.up)) return false;
+    quiet(function () { done = !!safe(function () { return p.up(); }, 'nav up'); })();
+    if (done) { scrollPanelTop(); kick(); }
+    return done;
+  }
+
+  function navUpTap() {
+    var n = NAV(), p = navProvider(mode);
+    if (!p || !isFn(p.inDetail) || !p.inDetail()) return false;
+    if (navOn() && n && isFn(n.up)) return !!n.up();
+    return navUp();
+  }
+  /** IR: ordinary navigation (top nav, sub-tabs, brand). Each tab remembers its own state. */
+  function navGo(path, o) {
+    var r = routeFor(path);
+    if (!r) return false;
+    if (!navOn()) { go(r); return true; }
+    NAV().go(r, o);
+    return true;
+  }
+  /** ABRIR: a detail somewhere else (lesson → ficha, ficha → AIRE, search result, Home card…): the current place stays on the stack and the
+   *  destination shows "← Volver a <returnLabel>". o: {returnLabel, run} (run is called right after the route is shown). */
+  function navOpen(path, o) {
+    o = o || {};
+    var r = routeFor(path);
+    if (!r) return false;
+    if (!navOn()) { var okGo = go(r); if (isFn(o.run)) o.run(); return okGo; }
+    NAV().push(r, { returnLabel: o.returnLabel || navLabel(), run: quiet(function () { go(r); if (isFn(o.run)) o.run(); }) });
+    return true;
+  }
+  /** Same tab: open a card / lesson / run (kind 'detail': UP == Back) or change it in place (kind 'replace': prev / next). */
+  function navDetail(kind, route, fn) {
+    if (!navOn()) { fn(); return; }
+    NAV()[kind](route, { run: quiet(fn) });
+  }
+  /** MIRAR: only the 3D moves; the tab never changes. Shows the chip "Volver a la vista anterior". */
+  function navLook(fn, label) {
+    var n = NAV();
+    if (!n || !isFn(n.look) || !coreReady) { fn(); return; }
+    n.look(fn, { label: label || '' });
+  }
+  function navClearLook() { var n = NAV(); if (n && isFn(n.clearLook)) n.clearLook(); }
 
   /** Nav buttons (aria-current), sub-tabs, bottom-sheet header, window title, ring: everything that mirrors "where am I". */
   function syncNav() {
@@ -711,7 +841,9 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     [['1', '8'], 'Posiciones de la cámara (del 1 al 8)'],
     [['C'], 'Cambiar la vista grande: cabina o avión desde afuera'],
     [['P'], 'Pausa'],
-    [['Esc'], 'Deseleccionar']
+    [['Esc'], 'Cerrar lo que esté abierto; si no, subir a la lista (y deseleccionar)'],
+    [['Alt', '←'], 'Volver atrás (también el botón Atrás del navegador o del celular)'],
+    [['Alt', '→'], 'Ir adelante']
   ];
   function keysTable() {
     var tb = h('tbody');
@@ -727,11 +859,14 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   }
 
   var helpReturn = null;
+  var helpTok = null;
   function openHelp() {
     var m = $('help');
     if (!m.hidden) return;
     helpReturn = doc.activeElement;
     m.hidden = false;
+    var nv = NAV();
+    if (nv && isFn(nv.overlayOpen) && nv.mounted && nv.mounted()) helpTok = nv.overlayOpen(function () { closeHelp(); });
     m.querySelector('.modal-card').focus();
     doc.addEventListener('keydown', helpKeys, true);
   }
@@ -739,6 +874,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     var m = $('help');
     if (m.hidden) return;
     m.hidden = true;
+    if (helpTok) { var nv = NAV(); if (nv && isFn(nv.overlayClosed)) nv.overlayClosed(helpTok); helpTok = null; }
     doc.removeEventListener('keydown', helpKeys, true);
     if (helpReturn && helpReturn.focus) safe(function () { helpReturn.focus(); });
   }
@@ -814,9 +950,12 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     items.forEach(function (it) {
       it.addEventListener('click', function () {
         var g = it.getAttribute('data-group');
-        if (groupOf(mode) === g) { scrollPanelTop(); sheetEnsure('half'); syncNav(); return; }   // already here: back to the top / open the sheet
-        setMode(g);
         sheetEnsure('half');
+        if (groupOf(mode) === g) {                                    // re-tap: inside a detail → UP to the tab's list; again → back to the top
+          if (!navUpTap()) { scrollPanelTop(); syncNav(); }
+          return;
+        }
+        navGo(g);
       });
       it.addEventListener('keydown', function (e) {
         var vis = items.filter(function (x) { return !x.hidden; }), i = vis.indexOf(it), j = -1;
@@ -831,7 +970,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     });
     var subs = Array.prototype.slice.call(doc.querySelectorAll('.subtab'));
     subs.forEach(function (t) {
-      t.addEventListener('click', function () { setMode(t.getAttribute('data-mode')); });
+      t.addEventListener('click', function () { navGo(t.getAttribute('data-mode')); });
       t.addEventListener('keydown', function (e) {
         var sibs = Array.prototype.slice.call(t.parentNode.querySelectorAll('.subtab')), i = sibs.indexOf(t), j = -1;
         if (e.key === 'ArrowRight') j = (i + 1) % sibs.length;
@@ -840,7 +979,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         else if (e.key === 'End') j = sibs.length - 1;
         if (j < 0) return;
         e.preventDefault(); e.stopPropagation();
-        setMode(sibs[j].getAttribute('data-mode'));
+        navGo(sibs[j].getAttribute('data-mode'));
         sibs[j].focus();
       });
     });
@@ -852,9 +991,9 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       if (cur) cur.focus();
     });
     var brand = $('brand');
-    if (brand) brand.addEventListener('click', function () { setMode('inicio'); sheetEnsure('half'); });
+    if (brand) brand.addEventListener('click', function () { navGo('inicio'); sheetEnsure('half'); });
     var ring = $('btn-progress');
-    if (ring) ring.addEventListener('click', function () { setMode('inicio'); sheetEnsure('half'); });
+    if (ring) ring.addEventListener('click', function () { navGo('inicio'); sheetEnsure('half'); });
     var sb = $('btn-search');
     if (sb) sb.addEventListener('click', function () { openSearch(); });
     doc.addEventListener('keydown', function (e) {
@@ -863,9 +1002,12 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       if ((k === 'k' || k === 'K') && (e.ctrlKey || e.metaKey) && searchOk()) { e.preventDefault(); openSearch(); }
       else if (k === '/' && !e.ctrlKey && !e.metaKey && !e.altKey && searchOk()) { e.preventDefault(); openSearch(); }
     });
-    root.addEventListener('hashchange', function () {
+    root.addEventListener('hashchange', function () {                // typed / pasted hashes; Back and Forward arrive through Nav's popstate
       var h2 = (root.location.hash || '').slice(1);
-      if (h2) go(h2, { fromHash: true });
+      if (!h2) return;
+      var n = NAV();
+      if (n && isFn(n.mounted) && n.mounted()) { if (h2 !== n.currentRoute()) navGo(h2); return; }
+      go(h2);
     });
     syncSearchBtn();
   }
@@ -1028,7 +1170,9 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   var INI = { view: null };
   function homeApi() {
     var api = labApi();
-    api.go = go; api.progress = PG(); api.kit = C150.Kit; api.showControl = UI.showControl; api.openLab = UI.openLab;
+    api.go = function (p) { return navOpen(p, { returnLabel: 'Inicio' }); };            // Home cards are ABRIR: Back lands on Inicio
+    api.open = api.go; api.look = lookAtControl;
+    api.progress = PG(); api.kit = C150.Kit; api.showControl = UI.showControl; api.openLab = UI.openLab;
     api.groups = GROUPS; api.escuela = escuelaOk(); api.sheetEnsure = sheetEnsure;
     return api;
   }
@@ -1050,11 +1194,11 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     v.appendChild(h('div', { class: 'hl-ring' }, ring, h('div', null,
       h('p', null, h('strong', { text: next ? 'Vas por el ' + sum.porcentaje + ' %' : '¡Terminaste el camino!' })),
       h('p', { class: 'soft small', text: next ? 'Lo que sigue: ' + next.titulo + '.' : 'Ya recorriste todas las etapas. Volvé cuando quieras a repasar.' }),
-      next ? K.button({ label: sum.porcentaje ? 'Seguir' : 'Empezar', variant: 'primary', size: 'small', iconRight: 'arrow-right', onClick: function () { go(next.ruta); sheetEnsure('half'); } }) : null)));
+      next ? K.button({ label: sum.porcentaje ? 'Seguir' : 'Empezar', variant: 'primary', size: 'small', iconRight: 'arrow-right', onClick: function () { navOpen(next.ruta, { returnLabel: 'Inicio' }); sheetEnsure('half'); } }) : null)));
     if (last && !last.hecho) {
       v.appendChild(K.card({
         variant: 'flat', icon: 'play', title: 'Continuar donde dejaste', sub: last.titulo,
-        onClick: function () { go(last.ruta); sheetEnsure('half'); }
+        onClick: function () { navOpen(last.ruta, { returnLabel: 'Inicio' }); sheetEnsure('half'); }
       }));
     }
     var ul = h('ul', { class: 'stage-list', 'aria-label': 'Etapas de tu camino' });
@@ -1070,7 +1214,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
             h('span', { class: 'count', text: st.hecho + '/' + st.total })),
           K.button({
             label: st.completa ? 'Repasar' : (started ? 'Continuar' : 'Empezar'), size: 'small', variant: isNext ? 'primary' : 'secondary',
-            iconRight: 'arrow-right', onClick: function () { go(st.ruta); sheetEnsure('half'); }
+            iconRight: 'arrow-right', onClick: function () { navOpen(st.ruta, { returnLabel: 'Inicio' }); sheetEnsure('half'); }
           })));
       ul.appendChild(li);
     });
@@ -1271,7 +1415,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
 
   /** True while the cockpit is mirroring an exterior movement (lesson animation or held pose, contract v3). */
   function mirroring() {
-    if (LB && LB.idx >= 0 && !LB.finished && mode === 'basico') return true;
+    if (LB && LB.open && !LB.finished && mode === 'basico') return true;
     var a = cc('getAnimState');
     return !!(a && a.active);
   }
@@ -1329,7 +1473,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     userLayout = name;
     store.set('layout', name);
     LB.layoutForced = false;            // a choice during a lesson wins over the lesson's 'dos'
-    LB.userChose = LB.idx >= 0 && mode === 'basico';
+    LB.userChose = LB.open && mode === 'basico';
     applyLayout(name);
   }
   function syncLayoutSwitch() {
@@ -1595,7 +1739,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   }
   /** Ends the demonstration (pose / animation) wherever it came from; a lesson step keeps its buttons in sync. */
   function endDemo() {
-    var inLesson = mode === 'basico' && LB.idx >= 0;
+    var inLesson = mode === 'basico' && LB.open;
     if (inLesson) { LB.pose = null; LB.auto = false; LB.poseCaption = ''; }
     clearExteriorPose();
     cc('playExterior', null);
@@ -1658,10 +1802,15 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       };
     }
   };
-  function lookAt3D(id) {
-    if (mainView === 'exterior' && layoutMode !== 'dos') { cc('setMainView', 'cockpit'); syncMainView(); }
-    focusControl(id, true);
+  /** MIRAR: the camera goes to a control and the tab never changes; "Volver a la vista anterior" (chip over the dock) brings the view back. */
+  function lookAtControl(id) {
+    if (!CTRL[id]) return;
+    navLook(function () {
+      if (mainView === 'exterior' && layoutMode !== 'dos') { cc('setMainView', 'cockpit'); syncMainView(); }
+      focusControl(id, true);
+    }, ctrlName(id));
   }
+  function lookAt3D(id) { lookAtControl(id); }
   function openStatusInfo(key, anchor) {
     var K = C150.Kit, s = S();
     if (!K || !isFn(K.popover) || !s || !STATUS_INFO[key]) return;
@@ -1669,7 +1818,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     info.paras.forEach(function (t) { body.push(h('p', { text: t })); });
     var acts = [];
     if (info.go && CTRL[info.go[0]]) acts.push(K.button({ label: info.go[1], icon: 'target', size: 'small', variant: 'primary', onClick: function () { if (pop) pop.close(); lookAt3D(info.go[0]); } }));
-    if (info.extra) acts.push(K.button({ label: info.extra[0], icon: 'plane', size: 'small', onClick: function () { if (pop) pop.close(); info.extra[1](); } }));
+    if (info.extra) acts.push(K.button({ label: info.extra[0], icon: 'plane', size: 'small', onClick: function () { if (pop) pop.close(); navLook(info.extra[1], 'el avión'); } }));
     if (acts.length) body.push(h('div', { class: 'pop-actions' }, acts));
     pop = K.popover(anchor, { title: info.title, content: body, label: info.title });
   }
@@ -1736,7 +1885,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         c = id && CTRL[id];
         return c ? { k: mode === 'explorar' ? 'Elegiste' : 'Mirá este control', t: c.nombre, v: ctrlLiveValue(id, s) } : null;
       case 'basico': {
-        if (LB.idx < 0 || LB.finished) return null;
+        if (!LB.open || LB.finished) return null;
         var L = LESSONS[LB.idx], n = arr(L && L.pasos).length, kinds = LESSON_NUMS[L && L.id] || ['bank', 'pitch'];
         return { k: 'Lección ' + (LB.idx + 1) + ' · paso ' + (LB.i + 1) + ' de ' + n, t: '', nums: kinds.map(function (kd) { return numCell(kd, s); }) };
       }
@@ -1819,7 +1968,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         return st ? { key: 'r:' + TR.i, items: [shortText(st.titulo, 64), shortText(st.texto, 100, true)] } : null;
       }
       case 'basico': {
-        if (LB.idx < 0 || LB.finished) return null;
+        if (!LB.open || LB.finished) return null;
         var p = lbStep();
         if (!p) return null;
         var cap = LB.poseCaption || captionText;
@@ -1947,7 +2096,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       text: function () { return 'Arrastrá con el mouse o el dedo sobre la cabina para mirar alrededor. Con la rueda del mouse (o pellizcando) te acercás.'; } },
     { id: 'cab-acelerador', when: function () { return mode === 'explorar' && !EX.id && coachSeenCount() === 0 && !!CTRL.throttle; },
       text: function () { return 'Tocá la perilla negra grande, abajo en el centro: es el acelerador.'; },
-      action: ['Mostrámelo', function () { openControl('throttle', 'list'); sheetEnsure('half'); }] },
+      action: ['Mostrámelo', function () { lookAtControl('throttle'); }] },
     { id: 'cab-siguiente', when: function () { return mode === 'explorar' && !EX.id && coachSeenCount() > 0 && !!coachNextEssential(); },
       text: function () { return 'Seguí con «' + ctrlName(coachNextEssential()) + '»: es un control esencial que todavía no viste.'; },
       action: ['Verlo', function () { var id = coachNextEssential(); if (id) { openControl(id, 'list'); sheetEnsure('half'); } }] },
@@ -1955,12 +2104,12 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       text: function () { return 'Probá «' + ctrlName(EX.id) + '» en la sección Probalo de la ficha, o tocalo otra vez acá en la cabina. Mirá cómo reacciona el avión.'; } },
     { id: 'cab-instrumento', when: function () { return mode === 'explorar' && !!EX.id && !(CTRL[EX.id] && CTRL[EX.id].probar); },
       text: function () { return '«' + ctrlName(EX.id) + '» sólo se mira: cambia solo cuando el motor anda o el avión vuela. Probá volar en Practicar.'; },
-      action: ['Ir a volar', function () { go('practicar/volar'); sheetEnsure('half'); }] },
+      action: ['Ir a volar', function () { navOpen('practicar/volar'); sheetEnsure('half'); }] },
     { id: 'rec-pasos', when: function () { return mode === 'recorrido'; },
       text: function () { return 'Seguí los pasos del recorrido en el panel: te llevo por la cabina, control por control, como en la primera clase.'; } },
-    { id: 'lec-elegir', when: function () { return mode === 'basico' && LB.idx < 0; },
+    { id: 'lec-elegir', when: function () { return mode === 'basico' && !LB.open; },
       text: function () { return 'Elegí una lección en el panel: te la voy mostrando en el avión con animaciones.'; } },
-    { id: 'lec-acciones', when: function () { return mode === 'basico' && LB.idx >= 0 && !LB.finished; },
+    { id: 'lec-acciones', when: function () { return mode === 'basico' && LB.open && !LB.finished; },
       text: function () { return 'Usá los botones de la lección para mover los mandos del avión y mirá cómo reacciona.'; } },
     { id: 'chk-elegir', when: function () { return mode === 'checklists' && !CL.cur; },
       text: function () { return 'Elegí una checklist: son las listas de pasos del manual, en el orden en que se hacen en el avión.'; } },
@@ -2073,11 +2222,14 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
 
   /** Each builder returns an element and pushes updaters (fn(state)) into `live`. */
 
+  /* v5 · V2 — los "Probalo" con el lenguaje de AIRE (Kit.slider / .ctl / .detents / .quick) y fichas de interruptor con punto. */
+
+  /** Toggle chip with a dot (the panel version of the dock's .tchip): name + state in mono. */
   function switchBtn(name, get, set, onTxt, offTxt, live) {
-    var st = h('span', { class: 'switch-state' });
-    var b = h('button', { type: 'button', class: 'switch', role: 'switch', 'aria-checked': 'false' },
-      h('span', { class: 'switch-text' }, h('span', { class: 'switch-name', text: name }), st),
-      h('span', { class: 'switch-track', 'aria-hidden': 'true' }));
+    var st = h('span', { class: 'ctog-state' });
+    var b = h('button', { type: 'button', class: 'ctog', role: 'switch', 'aria-checked': 'false' },
+      h('span', { class: 'ctog-dot', 'aria-hidden': 'true' }),
+      h('span', { class: 'ctog-text' }, h('span', { class: 'ctog-name', text: name }), st));
     b.addEventListener('click', function () { set(!get()); upd(); });
     function upd() {
       var v = !!get();
@@ -2087,29 +2239,46 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     live.push(upd); upd();
     return b;
   }
+  function togGrid(btns, one) { return h('div', { class: 'ctog-grid' + (one ? ' ctog-grid--1' : '') }, btns); }
 
-  function rangeSlider(o, live) {
+  /** The AIRE control shell: mono label + big live readout on one line; the widget adds the rest below. */
+  function ctlShell(label, big) {
+    var val = h('output', { class: 'ctl-val' });
+    var sub = h('p', { class: 'ctl-sub' });
+    var el = h('div', { class: 'ctl' + (big === false ? '' : ' ctl--big') }, h('div', { class: 'ctl-top' }, h('span', { class: 'ctl-lbl', text: label }), val));
+    return { el: el, val: val, sub: sub };
+  }
+  /** Small mono caption above a group of controls ("PEDALES · TIMÓN DE DIRECCIÓN"). */
+  function ctlCap(text) { return h('p', { class: 'ctl-cap', text: text }); }
+  function ctlHint(text) { return h('p', { class: 'ctl-sub', text: text }); }
+  /** Segmented row of press-and-hold buttons (pedals, brakes, flaps DOWN): the .seg look of the app. */
+  function holdSeg(label, items) {
+    var seg = h('div', { class: 'seg seg--hold', role: 'group', 'aria-label': label });
+    items.forEach(function (it) {
+      var b = holdButton(it.content, it.down, it.up, '', it.label);
+      b.className = '';
+      seg.appendChild(b);
+    });
+    return seg;
+  }
+
+  /** AIRE slider (Kit.slider): big readout, ticks, quick chips and a live line, kept in step with the simulator. */
+  function ctlSlider(o, live) {
     var lastUser = 0, dragging = false;
-    var inp = h('input', { type: 'range', min: o.min, max: o.max, step: o.step, 'aria-label': o.label });
-    var out = h('div', { class: 'readout', 'aria-hidden': 'true' });
-    inp.value = num(o.get(), o.min);
-    inp.addEventListener('input', function () { lastUser = now(); o.set(parseFloat(inp.value)); upd(); });
-    inp.addEventListener('pointerdown', function () { dragging = true; });
-    inp.addEventListener('pointerup', function () { dragging = false; });
-    inp.addEventListener('pointercancel', function () { dragging = false; });
-    function upd() {
+    var api = C150.Kit.slider({
+      label: o.label, min: o.min, max: o.max, step: o.step, value: num(o.get(), o.min), format: o.format, big: o.big !== false, center: o.center,
+      ticks: o.ticks, ends: o.ends, quick: o.quick, sub: o.sub ? '' : undefined,
+      onInput: function (v) { lastUser = now(); o.set(v); }
+    });
+    api.input.addEventListener('pointerdown', function () { dragging = true; });
+    api.input.addEventListener('pointerup', function () { dragging = false; });
+    api.input.addEventListener('pointercancel', function () { dragging = false; });
+    live.push(function (s) {
       var v = num(o.get(), o.min);
-      if (!dragging && now() - lastUser > 400 && Math.abs(parseFloat(inp.value) - v) > 1e-6) inp.value = v;
-      var txt = o.format(v);
-      setText(out, txt);
-      setAttr(inp, 'aria-valuetext', txt);
-      var span = num(o.max, 1) - num(o.min, 0);
-      if (span > 0) inp.style.setProperty('--p', (clamp((parseFloat(inp.value) - num(o.min, 0)) / span, 0, 1) * 100).toFixed(1) + '%');
-    }
-    live.push(upd); upd();
-    return h('div', { class: 'slider' }, out, inp,
-      (o.ends && (o.ends[0] || o.ends[1])) ? h('div', { class: 'slider-ends', 'aria-hidden': 'true' },
-        h('span', { text: o.ends[0] || '' }), h('span', { text: o.ends[1] || '' })) : null);
+      if (!dragging && now() - lastUser > 400 && Math.abs(num(api.value, 0) - v) > 1e-6) api.set(v);
+      if (o.sub) api.setSub(o.sub(s, num(api.value, v)));
+    });
+    return api;
   }
 
   function engineText(s) {
@@ -2120,25 +2289,6 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   }
   function busOn(s) { return !!(s && s.elec && num(s.elec.busVolts, 0) > 8); }
 
-  /** Live value text for slider claves, in real units. */
-  function sliderText(clave, v, s) {
-    var e = (s && s.engine) || {}, sf = (s && s.surfaces) || {};
-    switch (clave) {
-      case 'throttle':
-        return 'Acelerador ' + pct(v) + ' · ' + (e.running || num(e.rpm, 0) > 50 ? Math.round(num(e.rpm, 0) / 10) * 10 + ' RPM' : 'motor apagado');
-      case 'mixture':
-        return 'Mezcla ' + (v < 0.04 ? 'IDLE CUT-OFF (corte)' : (v > 0.96 ? 'FULL RICH (rica)' : pct(v) + ' (empobrecida)'));
-      case 'carbHeat':
-        return 'Calef. carburador ' + (v < 0.04 ? 'COLD (fría)' : (v > 0.96 ? 'HOT (caliente)' : pct(v)));
-      case 'trim':
-        return 'Compensador ' + (Math.abs(v) < 0.04 ? 'TAKE OFF' : fmtSigned(v, 2) + (v > 0 ? ' nariz arriba' : ' nariz abajo')) +
-          ' · aleta ' + surfWord(num(sf.trimTab, 0));
-      case 'cabinHeat': case 'cabinAir':
-        return (v < 0.04 ? 'Cerrada' : (v > 0.96 ? 'Abierta del todo' : 'Abierta ' + pct(v)));
-      default:
-        return fmt(v, 2);
-    }
-  }
   /** "+ = trailing edge down" surface angle in words. */
   function surfWord(deg) {
     if (deg < -0.5) return 'arriba ' + fmt(-deg, 0) + '°';
@@ -2146,22 +2296,72 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     return 'al medio';
   }
 
+  /** What each slider shows: short readout, ticks, quick values and a live line (units in plain words). */
+  function sliderSpec(clave, min, max) {
+    var T = function (v, t) { return { v: v, t: t }; };
+    var pc = [T(0, '0 %'), T(0.5, '50 %'), T(1, '100 %')];
+    var lowHigh = function (lo, hi) { return function (v) { return v < 0.04 ? lo : (v > 0.96 ? hi : pct(v)); }; };
+    switch (clave) {
+      case 'throttle':
+        return { format: pct, ticks: pc, quick: [T(0, 'RALENTÍ'), T(0.5, 'MEDIA'), T(1, 'A FONDO')],
+          sub: function (s) {
+            var e = (s && s.engine) || {};
+            return (e.running || num(e.rpm, 0) > 50) ? 'Motor en marcha · ' + Math.round(num(e.rpm, 0) / 10) * 10 + ' RPM' : 'Motor apagado · 0 RPM';
+          } };
+      case 'mixture':
+        return { format: lowHigh('CORTE', 'RICA'), ticks: [T(0, 'CORTE'), T(0.5, '50 %'), T(1, 'RICA')], quick: [T(0, 'CORTE'), T(0.7, 'EMPOBRECIDA'), T(1, 'RICA')],
+          sub: function (s, v) {
+            return v < 0.04 ? 'IDLE CUT-OFF: sin nafta, el motor se apaga' : (v > 0.96 ? 'FULL RICH: toda la nafta, para arrancar y despegar'
+              : 'Empobrecida: menos nafta para el mismo aire');
+          } };
+      case 'carbHeat':
+        return { format: lowHigh('FRÍA', 'CALIENTE'), ticks: [T(0, 'FRÍA'), T(0.5, '50 %'), T(1, 'CALIENTE')], quick: [T(0, 'FRÍA'), T(1, 'CALIENTE')],
+          sub: function (s, v) {
+            return v < 0.04 ? 'COLD: aire de afuera, sin calentar' : (v > 0.96 ? 'HOT: aire caliente que derrite el hielo del carburador' : 'Aire calentado a medias');
+          } };
+      case 'trim':
+        return { center: true, format: function (v) { return Math.abs(v) < 0.04 ? 'TAKE OFF' : fmtSigned(v, 2); },
+          ticks: [T(min, 'NARIZ ABAJO'), T(0, 'TAKE OFF'), T(max, 'NARIZ ARRIBA')], quick: [T(-0.5, 'ABAJO'), T(0, 'TAKE OFF'), T(0.5, 'ARRIBA')],
+          sub: function (s, v) {
+            var sf = (s && s.surfaces) || {};
+            return 'Aleta del compensador: ' + surfWord(num(sf.trimTab, 0)) + (Math.abs(v) < 0.04 ? '' : (v > 0 ? ' · nariz arriba' : ' · nariz abajo'));
+          } };
+      case 'cabinHeat': case 'cabinAir':
+        return { format: lowHigh('CERRADA', 'ABIERTA'), ticks: [T(0, 'CERRADA'), T(0.5, '50 %'), T(1, 'ABIERTA')], quick: [T(0, 'CERRADA'), T(1, 'ABIERTA')],
+          sub: function (s, v) { return v < 0.04 ? 'Cerrada' : (v > 0.96 ? 'Abierta del todo' : 'Abierta ' + pct(v)); } };
+      default:
+        return { format: function (v) { return fmt(v, 2); } };
+    }
+  }
+
   function wSlider(p, c, live) {
-    var min = num(p.min, 0), max = num(p.max, 1);
-    return rangeSlider({
+    var min = num(p.min, 0), max = num(p.max, 1), sp = sliderSpec(p.clave, min, max);
+    return ctlSlider({
       min: min, max: max, step: num(p.paso, 0.01), label: c.nombre,
       get: function () { return num(getInput(p.clave), min); },
       set: function (v) { setInput(p.clave, clamp(v, min, max)); },
-      format: function (v) { return sliderText(p.clave, v, S()); },
-      ends: [p.etiquetaMin, p.etiquetaMax]
+      format: sp.format, ticks: sp.ticks, quick: sp.quick, center: sp.center, sub: sp.sub,
+      ends: (p.etiquetaMin || p.etiquetaMax) ? [p.etiquetaMin || '', p.etiquetaMax || ''] : null
     }, live);
   }
 
+  /** On / off switch: the big word is the state, the two-option .seg shows both positions (the full wording goes in the line below). */
   function wToggle(p, c, live) {
-    return switchBtn(c.nombre,
-      function () { return !!getInput(p.clave); },
-      function (v) { setInput(p.clave, v); },
-      p.on || 'Sí', p.off || 'No', live);
+    var shell = ctlShell(c.nombre), onT = p.on || 'Sí', offT = p.off || 'No';
+    var short = function (t) { return String(t).replace(/\s*\(.*\)\s*$/, ''); };
+    var off = h('button', { type: 'button', 'aria-pressed': 'false', onclick: function () { setInput(p.clave, false); upd(); } }, offT);
+    var on = h('button', { type: 'button', 'aria-pressed': 'false', onclick: function () { setInput(p.clave, true); upd(); } }, onT);
+    function upd() {
+      var v = !!getInput(p.clave);
+      setAttr(on, 'aria-pressed', v ? 'true' : 'false');
+      setAttr(off, 'aria-pressed', v ? 'false' : 'true');
+      setText(shell.val, short(v ? onT : offT));
+      setText(shell.sub, v ? onT : offT);
+    }
+    live.push(upd); upd();
+    shell.el.appendChild(h('div', { class: 'seg seg--two', role: 'group', 'aria-label': c.nombre }, off, on));
+    shell.el.appendChild(shell.sub);
+    return shell.el;
   }
 
   function wYoke(c, live, compact) {
@@ -2242,7 +2442,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     var note = h('div', { class: 'note', hidden: true },
       'La traba de comandos está puesta: el volante no se mueve. ',
       h('button', { type: 'button', class: 'btn btn--small', onclick: function () { setInput('controlLock', false); } }, 'Sacar la traba'));
-    var ro = compact ? null : h('div', { class: 'readout small' });
+    var ro = compact ? null : h('div', { class: 'ctl-sub ctl-sub--lines' });
     live.push(function (s) {
       var lk = !!s.controlLock;
       toggleClass(pad, 'is-locked', lk);
@@ -2259,33 +2459,32 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   }
 
   function wPedales(c, live) {
-    var ro = h('div', { class: 'readout small', style: { 'white-space': 'pre-line' } });
-    var brk = h('div', { class: 'readout small' });
-    var pedals = h('div', { class: 'w-group' },
-      h('div', { class: 'w-label', text: 'Pedales (timón de dirección)' }),
-      h('div', { class: 'btn-row btn-row--split' },
-        holdButton(['◀ ', 'Pedal izq'], function () { hold('rudder-pedals', 'left', true); }, function () { hold('rudder-pedals', 'left', false); }, '', 'Pisar el pedal izquierdo (mantené apretado)'),
-        holdButton(['Pedal der', ' ▶'], function () { hold('rudder-pedals', 'right', true); }, function () { hold('rudder-pedals', 'right', false); }, '', 'Pisar el pedal derecho (mantené apretado)')),
-      h('div', { class: 'w-row', style: { 'margin-top': '10px' } }, h('div', { style: { flex: '1' } }, rangeSlider({
-        min: -1, max: 1, step: 0.05, label: 'Pedales: izquierda a derecha',
+    var pedSub = h('p', { class: 'ctl-sub ctl-sub--lines' }), brkSub = h('p', { class: 'ctl-sub' });
+    var pedals = h('div', { class: 'ctl-group' },
+      ctlCap('Pedales · timón de dirección'),
+      holdSeg('Pedales: mantené apretado', [
+        { content: ['◀ ', 'Pedal izq'], down: function () { hold('rudder-pedals', 'left', true); }, up: function () { hold('rudder-pedals', 'left', false); }, label: 'Pisar el pedal izquierdo (mantené apretado)' },
+        { content: ['Pedal der', ' ▶'], down: function () { hold('rudder-pedals', 'right', true); }, up: function () { hold('rudder-pedals', 'right', false); }, label: 'Pisar el pedal derecho (mantené apretado)' }]),
+      ctlSlider({
+        min: -1, max: 1, step: 0.05, label: 'Pedales: izquierda a derecha', center: true,
         get: function () { return num(getInput('rudder'), 0); },
         set: function (v) { setInput('rudder', Math.abs(v) < 0.03 ? 0 : v); },
-        format: function (v) { return Math.abs(v) < 0.03 ? 'Pedales parejos' : (v < 0 ? 'Pedal izquierdo ' : 'Pedal derecho ') + pct(Math.abs(v)); },
-        ends: ['Izquierdo a fondo', 'Derecho a fondo']
-      }, live))),
-      ro);
-    var brakes = h('div', { class: 'w-group' },
-      h('div', { class: 'w-label', text: 'Frenos (puntas de los pies)' }),
-      h('div', { class: 'btn-row btn-row--split' },
-        holdButton('Freno izq', function () { hold('toe-brakes', 'left', true); }, function () { hold('toe-brakes', 'left', false); }, '', 'Freno izquierdo (mantené apretado)'),
-        holdButton('Los dos', function () { hold('toe-brakes', null, true); }, function () { hold('toe-brakes', null, false); }, '', 'Los dos frenos (mantené apretado)'),
-        holdButton('Freno der', function () { hold('toe-brakes', 'right', true); }, function () { hold('toe-brakes', 'right', false); }, '', 'Freno derecho (mantené apretado)')),
-      brk);
+        format: function (v) { return Math.abs(v) < 0.03 ? 'PAREJOS' : (v < 0 ? 'IZQ ' : 'DER ') + pct(Math.abs(v)); },
+        ticks: [{ v: -1, t: 'IZQ' }, { v: 0, t: 'AL MEDIO' }, { v: 1, t: 'DER' }], ends: ['Izquierdo a fondo', 'Derecho a fondo']
+      }, live),
+      pedSub);
+    var brakes = h('div', { class: 'ctl-group' },
+      ctlCap('Frenos · puntas de los pies'),
+      holdSeg('Frenos: mantené apretado', [
+        { content: 'Freno izq', down: function () { hold('toe-brakes', 'left', true); }, up: function () { hold('toe-brakes', 'left', false); }, label: 'Freno izquierdo (mantené apretado)' },
+        { content: 'Los dos', down: function () { hold('toe-brakes', null, true); }, up: function () { hold('toe-brakes', null, false); }, label: 'Los dos frenos (mantené apretado)' },
+        { content: 'Freno der', down: function () { hold('toe-brakes', 'right', true); }, up: function () { hold('toe-brakes', 'right', false); }, label: 'Freno derecho (mantené apretado)' }]),
+      brkSub);
     live.push(function (s) {
       var sf = s.surfaces || {}, rd = num(sf.rudder, 0), nw = num(s.noseWheelAngle, 0);
-      setText(ro, 'Timón de dirección: ' + (Math.abs(rd) < 0.5 ? 'al medio' : fmt(Math.abs(rd), 0) + '° a la ' + (rd < 0 ? 'izquierda' : 'derecha')) +
+      setText(pedSub, 'Timón de dirección: ' + (Math.abs(rd) < 0.5 ? 'al medio' : fmt(Math.abs(rd), 0) + '° a la ' + (rd < 0 ? 'izquierda' : 'derecha')) +
         '\nRueda de nariz: ' + (Math.abs(nw) < 0.5 ? 'recta' : fmt(Math.abs(nw), 0) + '° a la ' + (nw < 0 ? 'izquierda' : 'derecha')));
-      setText(brk, 'Freno izq ' + pct(s.brakeL) + ' · der ' + pct(s.brakeR) + (s.parkingBrake ? ' · estacionamiento PUESTO' : ''));
+      setText(brkSub, 'Freno izq ' + pct(s.brakeL) + ' · der ' + pct(s.brakeR) + (s.parkingBrake ? ' · estacionamiento PUESTO' : ''));
     });
     // toe-brakes card: brakes first; rudder-pedals card: pedals first
     return c.id === 'toe-brakes' ? h('div', null, brakes, pedals) : h('div', null, pedals, brakes);
@@ -2294,78 +2493,120 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   function wIgnition(p, c, live) {
     var vals = arr(p.valores).length ? p.valores : ['OFF', 'R', 'L', 'BOTH', 'START'];
     var NAMES = { OFF: 'Apagado', R: 'Sólo magneto derecho', L: 'Sólo magneto izquierdo', BOTH: 'Los dos magnetos', START: 'Arranque' };
-    var btns = {};
-    var seg = h('div', { class: 'seg', role: 'group', 'aria-label': 'Posición de la llave' });
+    var btns = {}, shell = ctlShell('Posición de la llave');
+    var det = h('div', { class: 'detents', role: 'group', 'aria-label': 'Posición de la llave', style: { 'grid-template-columns': 'repeat(' + vals.length + ', 1fr)' } });
     vals.forEach(function (v) {
       var b;
       if (v === 'START') {
-        b = holdButton('START', function () { hold('ignition', null, true); }, function () { hold('ignition', null, false); }, 'is-start', 'START: mantené apretado para arrancar');
-        b.className = 'is-start';
+        b = holdButton(h('span', { class: 'detent-n', text: 'START' }), function () { hold('ignition', null, true); }, function () { hold('ignition', null, false); }, 'is-start', 'START: mantené apretado para arrancar');
+        b.className = 'detent is-start';
       } else {
-        b = h('button', { type: 'button', 'aria-pressed': 'false', 'aria-label': v + ': ' + (NAMES[v] || v), onclick: function () { setIgnition(v); } }, v);
+        b = h('button', { type: 'button', class: 'detent', 'aria-pressed': 'false', 'aria-label': v + ': ' + (NAMES[v] || v), onclick: function () { setIgnition(v); } },
+          h('span', { class: 'detent-n', text: v }));
       }
-      btns[v] = b; seg.appendChild(b);
+      btns[v] = b; det.appendChild(b);
     });
-    var ro = h('div', { class: 'readout small' });
     live.push(function (s) {
       for (var k in btns) setAttr(btns[k], 'aria-pressed', s.ignition === k ? 'true' : 'false');
-      setText(ro, 'Llave: ' + (NAMES[s.ignition] || s.ignition) + ' · ' + engineText(s));
+      setText(shell.val, s.ignition || '');
+      setText(shell.sub, (NAMES[s.ignition] || s.ignition) + ' · ' + engineText(s));
     });
-    return h('div', null, seg, ro,
-      h('p', { class: 'probalo-hint', style: { margin: '6px 0 0' }, text: 'START es a resorte: mantenelo apretado y, al soltar, vuelve solo a BOTH.' }));
+    shell.el.appendChild(det); shell.el.appendChild(shell.sub);
+    shell.el.appendChild(ctlHint('START es a resorte: mantenelo apretado y, al soltar, vuelve solo a BOTH.'));
+    return shell.el;
   }
 
   function wMaster(c, live) {
-    var ro = h('div', { class: 'readout small' });
-    var box = h('div', { class: 'switch-grid' },
+    var shell = ctlShell('Corriente de la barra');
+    var box = togGrid([
       switchBtn('ALT · alternador', function () { return !!getInput('masterAlt'); }, function (v) { setMaster('alt', v); }, 'ON', 'OFF', live),
-      switchBtn('BAT · batería', function () { return !!getInput('masterBat'); }, function (v) { setMaster('bat', v); }, 'ON', 'OFF', live));
+      switchBtn('BAT · batería', function () { return !!getInput('masterBat'); }, function (v) { setMaster('bat', v); }, 'ON', 'OFF', live)]);
     live.push(function (s) {
       var el = s.elec || {};
-      setText(ro, 'Barra ' + fmt(num(el.busVolts, 0), 1) + ' V · Amperímetro ' + fmtSigned(num(el.ammeterAmps, 0), 0) + ' A');
+      setText(shell.val, fmt(num(el.busVolts, 0), 1) + ' V');
+      setText(shell.sub, 'Amperímetro ' + fmtSigned(num(el.ammeterAmps, 0), 0) + ' A');
     });
-    return h('div', null, box, ro,
-      h('p', { class: 'probalo-hint', style: { margin: '6px 0 0' }, text: 'Están unidos: si prendés ALT se prende BAT, y si apagás BAT se apaga ALT.' }));
+    shell.el.appendChild(box); shell.el.appendChild(shell.sub);
+    shell.el.appendChild(ctlHint('Están unidos: si prendés ALT se prende BAT, y si apagás BAT se apaga ALT.'));
+    return shell.el;
   }
 
+  /** Flaps: the real switch (UP stays, DOWN is a spring: hold it) plus detents that run the little electric motor to 0 / 10 / 20 / 30 / 40°. */
   function wFlaps(c, live) {
-    var up = h('button', { type: 'button', class: 'btn', 'aria-pressed': 'false', onclick: function () { setFlapSwitch(getInput('flapSwitch') === 'UP' ? 'OFF' : 'UP'); } }, 'Subir (UP)');
-    var dn = holdButton('Bajar (mantener)', function () { hold('flap-switch', null, true); }, function () { hold('flap-switch', null, false); }, 'btn--primary', 'Bajar flaps: mantené apretado');
-    var fill = h('span');
-    var ro = h('div', { class: 'readout readout--big' });
-    var warn = h('div', { class: 'note note--info', hidden: true, text: 'Los flaps son eléctricos: sin el master prendido no se mueven.' });
+    var shell = ctlShell('Flaps'), STOPS = [0, 10, 20, 30, 40], target = null;
+    var fill = h('span', { class: 'ctl-meter-fill' }), mark = h('i', { class: 'ctl-meter-mark', hidden: true });
+    var warn = h('p', { class: 'ctl-note', hidden: true, text: 'Los flaps son eléctricos: sin el master prendido no se mueven.' });
+    function stop() {
+      if (target === null) return;
+      target = null;
+      var i = activeHolds.indexOf(stop); if (i >= 0) activeHolds.splice(i, 1);
+      setFlapSwitch('OFF');
+    }
+    function motor(s) {
+      if (target === null) return;
+      if (!busOn(s)) { stop(); return; }
+      var d = target - num(s.flaps, 0);
+      if (Math.abs(d) < 0.7) { var t = target; stop(); s.flaps = t; kick(); return; }
+      var want = d > 0 ? 'DOWN' : 'UP';
+      if (s.flapSwitch !== want) setFlapSwitch(want);
+    }
+    function goTo(v) {
+      var s = S();
+      if (!s) return;
+      if (!busOn(s)) { warn.hidden = false; return; }
+      if (target === null) activeHolds.push(stop);
+      target = v;
+      motor(s);
+    }
+    var det = h('div', { class: 'detents', role: 'group', 'aria-label': 'Flaps: posiciones', style: { 'grid-template-columns': 'repeat(' + STOPS.length + ', 1fr)' } });
+    var dBtns = STOPS.map(function (v) {
+      var b = h('button', { type: 'button', class: 'detent', 'aria-pressed': 'false', 'aria-label': 'Flaps a ' + v + ' grados', onclick: function () { goTo(v); } }, h('span', { class: 'detent-n', text: v + '°' }));
+      det.appendChild(b);
+      return b;
+    });
+    var up = h('button', { type: 'button', 'aria-pressed': 'false', onclick: function () { stop(); setFlapSwitch(getInput('flapSwitch') === 'UP' ? 'OFF' : 'UP'); } }, 'Subir (UP)');
+    var dn = holdButton('Bajar (mantener)', function () { stop(); hold('flap-switch', null, true); }, function () { hold('flap-switch', null, false); }, '', 'Bajar flaps: mantené apretado');
+    dn.className = '';
+    var seg = h('div', { class: 'seg seg--hold', role: 'group', 'aria-label': 'Interruptor de flaps' }, up, dn);
     live.push(function (s) {
+      motor(s);
       var f = clamp(num(s.flaps, 0), 0, 40);
-      setAttr(up, 'aria-pressed', s.flapSwitch === 'UP' ? 'true' : 'false');
       fill.style.width = (f / 40 * 100).toFixed(1) + '%';
-      var sw = s.flapSwitch === 'UP' ? 'UP' : (s.flapSwitch === 'DOWN' ? 'DOWN' : 'OFF (al medio)');
-      setText(ro, 'Flaps ' + Math.round(f) + '° · interruptor ' + sw);
+      mark.hidden = target === null;
+      if (target !== null) mark.style.left = (target / 40 * 100).toFixed(1) + '%';
+      dBtns.forEach(function (b, i) {
+        setAttr(b, 'aria-pressed', Math.abs(f - STOPS[i]) < 1.5 ? 'true' : 'false');
+        toggleClass(b, 'is-moving', target === STOPS[i]);
+      });
+      setAttr(up, 'aria-pressed', s.flapSwitch === 'UP' ? 'true' : 'false');
+      setText(shell.val, Math.round(f) + '°');
+      setText(shell.sub, 'Interruptor: ' + (s.flapSwitch === 'UP' ? 'UP' : (s.flapSwitch === 'DOWN' ? 'DOWN' : 'OFF (al medio)')) + (target !== null ? ' · yendo a ' + target + '°' : ''));
       warn.hidden = busOn(s);
     });
-    return h('div', null,
-      h('div', { class: 'btn-row btn-row--split', style: { 'margin-top': '0' } }, up, dn),
-      h('div', { style: { margin: '12px 0 4px' } }, h('div', { class: 'flapbar', 'aria-hidden': 'true' }, fill),
-        h('div', { class: 'flapticks', 'aria-hidden': 'true' }, h('span', { text: '0°' }), h('span', { text: '10°' }), h('span', { text: '20°' }), h('span', { text: '30°' }), h('span', { text: '40°' }))),
-      ro, warn,
-      h('p', { class: 'probalo-hint', style: { margin: '6px 0 0' }, text: 'DOWN es a resorte: bajan sólo mientras lo mantenés. UP queda trabado y los sube hasta 0°.' }));
+    shell.el.appendChild(h('div', { class: 'ctl-meter', 'aria-hidden': 'true' }, fill, mark));
+    shell.el.appendChild(det); shell.el.appendChild(shell.sub); shell.el.appendChild(warn);
+    shell.el.appendChild(ctlCap('Interruptor de la cabina'));
+    shell.el.appendChild(seg);
+    shell.el.appendChild(ctlHint('DOWN es a resorte: bajan sólo mientras lo mantenés. UP queda trabado y los sube hasta 0°.'));
+    return shell.el;
   }
 
   function wPrimer(p, c, live) {
-    var ro = h('div', { class: 'readout small' });
+    var shell = ctlShell('Cebador (primer)');
     var pump = h('button', {
-      type: 'button', class: 'btn btn--primary',
-      onclick: function () {
-        if (has('operate')) operate('primer'); else simAction('primeStroke');
-      }
+      type: 'button', class: 'btn btn--primary btn--small',
+      onclick: function () { if (has('operate')) operate('primer'); else simAction('primeStroke'); }
     }, p.etiqueta || 'Dar un bombeo');
     live.push(function (s) {
-      var e = s.engine || {};
-      setText(ro, 'Bombeos: ' + num(e.primeCharges, 0) + (e.flooded ? ' · ¡motor ahogado!' : '') + (e.running ? ' · motor en marcha' : ''));
+      var e = s.engine || {}, n = num(e.primeCharges, 0);
+      setText(shell.val, n + (n === 1 ? ' bombeo' : ' bombeos'));
+      setText(shell.sub, (e.flooded ? '¡Motor ahogado! ' : '') + (e.running ? 'Motor en marcha' : 'Motor apagado'));
     });
-    return h('div', null,
-      h('div', { class: 'btn-row', style: { 'margin-top': '0' } }, pump), ro,
-      h('div', { style: { 'margin-top': '10px' } }, switchBtn('Cebador trabado', function () { return !!getInput('primerLocked'); },
-        function (v) { setInput('primerLocked', v); }, 'Adentro y trabado', 'Suelto (destrabado)', live)));
+    shell.el.appendChild(h('div', { class: 'ctl-row' }, pump));
+    shell.el.appendChild(togGrid(switchBtn('Cebador trabado', function () { return !!getInput('primerLocked'); },
+      function (v) { setInput('primerLocked', v); }, 'Adentro y trabado', 'Suelto (destrabado)', live), true));
+    shell.el.appendChild(shell.sub);
+    return shell.el;
   }
 
   var LIGHTS = [
@@ -2374,24 +2615,24 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     ['lights.landing', 'LDG · aterrizaje']
   ];
   function wLuces(c, live) {
-    var grid = h('div', { class: 'switch-grid' });
-    LIGHTS.forEach(function (l) {
-      grid.appendChild(switchBtn(l[1], function () { return !!getInput(l[0]); }, function (v) { setInput(l[0], v); }, 'ON', 'OFF', live));
-    });
-    var warn = h('div', { class: 'note note--info', hidden: true, text: 'Sin el master prendido las luces no encienden: prendé BAT (en la ficha del master o con la tecla M).' });
-    var ro = h('div', { class: 'readout small' });
+    var shell = ctlShell('Luces e interruptores', false);
+    var grid = togGrid(LIGHTS.map(function (l) {
+      return switchBtn(l[1], function () { return !!getInput(l[0]); }, function (v) { setInput(l[0], v); }, 'ON', 'OFF', live);
+    }));
+    var warn = h('p', { class: 'ctl-note', hidden: true, text: 'Sin el master prendido las luces no encienden: prendé BAT (en la ficha del master o con la tecla M).' });
     live.push(function (s) {
       warn.hidden = busOn(s);
-      setText(ro, 'Amperímetro ' + fmtSigned(num(s.elec && s.elec.ammeterAmps, 0), 0) + ' A');
+      setText(shell.val, 'Amp ' + fmtSigned(num(s.elec && s.elec.ammeterAmps, 0), 0) + ' A');
     });
-    return h('div', null, grid, warn, ro);
+    shell.el.appendChild(grid); shell.el.appendChild(warn);
+    return shell.el;
   }
 
   function wDoors(c, live) {
-    return h('div', null,
+    return togGrid([
       switchBtn('Puerta izquierda', function () { return !!getInput('doorLeftOpen'); }, function (v) { setInput('doorLeftOpen', v); }, 'Abierta', 'Cerrada', live),
       switchBtn('Puerta derecha', function () { return !!getInput('doorRightOpen'); }, function (v) { setInput('doorRightOpen', v); }, 'Abierta', 'Cerrada', live),
-      switchBtn('Ventanilla izquierda', function () { return !!getInput('windowLeftOpen'); }, function (v) { setInput('windowLeftOpen', v); }, 'Abierta', 'Cerrada', live));
+      switchBtn('Ventanilla izquierda', function () { return !!getInput('windowLeftOpen'); }, function (v) { setInput('windowLeftOpen', v); }, 'Abierta', 'Cerrada', live)]);
   }
 
   /* perilla: stepper with auto-repeat and a formatted value */
@@ -2409,6 +2650,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   function wPerilla(p, c, live) {
     var min = num(p.min, 0), max = num(p.max, 1), step = num(p.paso, 0.1);
     var wrap = p.clave === 'radio.obs';
+    var shell = ctlShell(c.nombre);
     function nudge(dir) {
       var v = num(getInput(p.clave), min) + dir * step;
       if (wrap) { var span = max - min + step; v = min + ((((v - min) % span) + span) % span); }
@@ -2417,35 +2659,34 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       setInput(p.clave, Number(v.toFixed(dec)));
       upd();
     }
-    var val = h('div', { class: 'readout readout--big stepper-val', 'aria-live': 'polite' });
-    var extra = h('div', { class: 'readout small' });
     function upd() {
       var s = S(); if (!s) return;
       var v = num(getPath(s, p.clave), min);
-      setText(val, knobFormat(p, v, s));
+      var parts = knobFormat(p, v, s).split(' · '), also = parts.slice(1).join(' · ');     // the big readout is the first part; the rest goes to the line below
+      setText(shell.val, parts[0]);
       if (p.clave === 'hiCorrection') {
         var a = s.air || {};
-        setText(extra, 'Direccional ' + heading3(a.hiHeading) + '° · Brújula ' + heading3(a.heading) + '°');
+        setText(shell.sub, 'Direccional ' + heading3(a.hiHeading) + '° · Brújula ' + heading3(a.heading) + '°');
       } else if (p.clave === 'altimeterSetting') {
         var al = s.air || {};
-        setText(extra, 'El altímetro marca ' + Math.round(num(al.indicatedAlt, 0) / 10) * 10 + ' ft (el aeródromo está a ' + Math.round(num(s.fieldElevation, 100)) + ' ft)');
+        setText(shell.sub, (also ? also + ' · ' : '') + 'El altímetro marca ' + Math.round(num(al.indicatedAlt, 0) / 10) * 10 + ' ft (el aeródromo está a ' + Math.round(num(s.fieldElevation, 100)) + ' ft)');
       } else if (p.clave === 'radio.obs') {
-        setText(extra, 'Curso elegido en el indicador VOR');
-      } else setText(extra, '');
-      extra.hidden = !extra.textContent;
+        setText(shell.sub, 'Curso elegido en el indicador VOR');
+      } else setText(shell.sub, also);
+      shell.sub.hidden = !shell.sub.textContent;
     }
     live.push(upd);
-    var row = h('div', { class: 'stepper', style: { width: '100%', 'justify-content': 'space-between' } },
-      repeatButton('−', function () { nudge(-1); }, '', 'Bajar'),
-      val,
-      repeatButton('+', function () { nudge(1); }, '', 'Subir'));
-    var quick = null;
+    var row = h('div', { class: 'ctl-step' },
+      repeatButton([h('span', { class: 'ctl-step-sym', 'aria-hidden': 'true', text: '−' }), h('span', { text: 'Bajar' })], function () { nudge(-1); }, 'ctl-step-btn', 'Bajar'),
+      repeatButton([h('span', { class: 'ctl-step-sym', 'aria-hidden': 'true', text: '+' }), h('span', { text: 'Subir' })], function () { nudge(1); }, 'ctl-step-btn', 'Subir'));
+    shell.el.appendChild(row);
+    shell.el.appendChild(shell.sub);
     if (p.clave === 'altimeterSetting') {
-      quick = h('div', { class: 'chips', style: { 'margin-top': '8px' } },
-        h('button', { type: 'button', class: 'chip', onclick: function () { setInput('altimeterSetting', 29.92); upd(); } }, 'Estándar: 1013 hPa'));
+      shell.el.appendChild(h('div', { class: 'quick', role: 'group', 'aria-label': 'Valores rápidos' },
+        h('button', { type: 'button', class: 'qbtn', onclick: function () { setInput('altimeterSetting', 29.92); upd(); } }, 'ESTÁNDAR · 1013 hPa')));
     }
     upd();
-    return h('div', null, row, extra, quick);
+    return shell.el;
   }
 
   /* radio: COM + NAV (flip-flop and knobs) and transponder */
@@ -2533,8 +2774,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     return c.id === 'transponder' ? h('div', null, xpdr, h('div', { class: 'w-group' }, comGroup)) : h('div', null, comGroup, xpdr);
   }
 
-  /** Probalo section for a control (null when the control is informational only). */
-  function buildProbalo(c, live, compact) {
+  /** Probalo section for a control (null when the control is informational only). `bare`: only the widgets (the sheet wraps them in a numbered section). */
+  function buildProbalo(c, live, compact, bare) {
     var p = c && c.probar;
     if (!p || !p.tipo) return null;
     var body = null;
@@ -2553,13 +2794,15 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       case 'puertas': body = wDoors(c, live); break;
     }
     if (!body) return null;
-    return h('div', { class: 'probalo', role: 'group', 'aria-label': 'Probalo: ' + c.nombre },
-      h('div', { class: 'probalo-head' },
-        h('h3', { class: 'placard' }, h('span', { class: 'probalo-ico', 'aria-hidden': 'true' }, kic('hand')), 'Probalo'),
-        compact ? null : h('span', { class: 'probalo-hint', text: 'o tocalo en la cabina 3D' })),
-      body);
+    var wrap = h('div', { class: 'probalo probalo--ctl' + (compact ? ' is-compact' : ''), role: 'group', 'aria-label': 'Probalo: ' + c.nombre });
+    if (!bare) {
+      wrap.appendChild(h('div', { class: 'probalo-head' },
+        h('h3', { class: 'ctl-cap ctl-cap--accent' }, h('span', { class: 'probalo-ico', 'aria-hidden': 'true' }, kic('hand')), 'Probalo'),
+        compact ? null : h('span', { class: 'probalo-hint', text: 'o tocalo en la cabina 3D' })));
+    }
+    wrap.appendChild(body);
+    return wrap;
   }
-
   /* ================================================================== shared card pieces */
 
   function sec(title, content) {
@@ -2591,7 +2834,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     if (Math.abs(v - Math.round(v)) < 1e-9) return fmt(v, 0);
     return Math.abs(v * 10 - Math.round(v * 10)) < 1e-9 ? fmt(v, 1) : fmt(v, 2);
   }
-  /** Small colour bars for instrument markings (semantic arc colours), grouped by unit. */
+  /** Instrument markings as horizontal coloured bars (the AIRE .bars look): one row per colour, its stretch drawn on the instrument's scale, grouped by unit. */
+  var RANGE_VAR = { blanco: 'var(--arc-white)', verde: 'var(--arc-green)', amarillo: 'var(--arc-yellow)', rojo: 'var(--arc-red)', azul: '#2F6FA8' };
   function rangesView(rangos) {
     var groups = {}, order = [];
     rangos.forEach(function (r) {
@@ -2600,55 +2844,28 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       if (!groups[u]) { groups[u] = []; order.push(u); }
       groups[u].push(r);
     });
-    var box = h('div', { class: 'ranges' });
+    var box = h('div', { class: 'ranges bars' });
     order.forEach(function (u) {
       var g = groups[u], lo = Infinity, hi = -Infinity;
       g.forEach(function (r) { lo = Math.min(lo, r.desde, r.hasta); hi = Math.max(hi, r.desde, r.hasta); });
       var span = hi - lo;
       if (span <= 0) span = Math.max(1, Math.abs(hi) * 0.4);
-      var a = lo - span * 0.06, b = hi + span * 0.06;
+      var a = lo - span * 0.04, b = hi + span * 0.04;
       if (hi === lo) { a = lo - span; b = hi + span; }
       function x(v) { return ((v - a) / (b - a) * 100); }
-      var lanes = [], segs = [], lines = [];
-      g.forEach(function (r) {
-        var f = Math.min(r.desde, r.hasta), t = Math.max(r.desde, r.hasta);
-        if (f === t) { lines.push(r); return; }
-        var lane = 0;
-        while (lanes[lane] && lanes[lane].some(function (s) { return f < s[1] && t > s[0]; })) lane++;
-        (lanes[lane] = lanes[lane] || []).push([f, t]);
-        segs.push({ r: r, f: f, t: t, lane: lane });
-      });
-      var nL = Math.max(1, lanes.length);
-      var scale = h('div', { class: 'range-scale', 'aria-hidden': 'true', style: { height: (6 + nL * 8) + 'px' } });
-      segs.forEach(function (s) {
-        scale.appendChild(h('span', {
-          class: 'range-seg c-' + (COLOR_NAME[s.r.color] ? s.r.color : 'blanco'),
-          style: { left: x(s.f).toFixed(2) + '%', width: (x(s.t) - x(s.f)).toFixed(2) + '%', top: (3 + s.lane * 8) + 'px', height: '6px', bottom: 'auto' }
-        }));
-      });
-      lines.forEach(function (r) {
-        scale.appendChild(h('span', { class: 'range-seg range-seg--line c-' + (COLOR_NAME[r.color] ? r.color : 'rojo'), style: { left: x(r.desde).toFixed(2) + '%' } }));
-      });
-      var vals = [];
-      g.forEach(function (r) { [r.desde, r.hasta].forEach(function (v) { if (vals.indexOf(v) < 0) vals.push(v); }); });
-      vals.sort(function (p, q) { return p - q; });
-      var ticks = h('div', { class: 'range-ticks', 'aria-hidden': 'true' }), lastX = -100;
-      vals.forEach(function (v) {
-        var px = x(v);
-        if (px - lastX < 10) return;
-        lastX = px;
-        ticks.appendChild(h('span', { style: { left: px.toFixed(2) + '%' }, text: nf(v) }));
-      });
-      var leg = h('ul', { class: 'range-legend' });
+      box.appendChild(h('p', { class: 'bars-cap', text: u ? 'Escala en ' + u + ' · de ' + nf(lo) + ' a ' + nf(hi) : 'Escala de ' + nf(lo) + ' a ' + nf(hi) }));
       g.forEach(function (r) {
         var col = COLOR_NAME[r.color] ? r.color : 'blanco';
-        leg.appendChild(h('li', null,
-          h('span', { class: 'swatch c-' + col, 'aria-hidden': 'true' }),
-          h('span', { class: 'range-num' }, h('span', { class: 'sr-only', text: COLOR_NAME[col] + ': ' }),
-            (r.desde === r.hasta ? nf(r.desde) : nf(r.desde) + '–' + nf(r.hasta)) + (u ? ' ' + u : '')),
-          h('span', { text: r.texto || '' })));
+        var f = Math.min(r.desde, r.hasta), t = Math.max(r.desde, r.hasta);
+        var fill = f === t
+          ? h('span', { class: 'range-line c-' + col, style: { left: x(f).toFixed(2) + '%' } })
+          : h('span', { class: 'range-fill c-' + col, style: { left: x(f).toFixed(2) + '%', width: Math.max(1.5, x(t) - x(f)).toFixed(2) + '%' } });
+        box.appendChild(h('div', { class: 'bar-row range-row', style: { '--c': RANGE_VAR[col] } },
+          h('span', { class: 'bar-name' }, h('span', { class: 'sr-only', text: 'Marca: ' }), COLOR_NAME[col]),
+          h('span', { class: 'bar-track', 'aria-hidden': 'true' }, fill),
+          h('span', { class: 'bar-val', text: (f === t ? nf(f) : nf(f) + '–' + nf(t)) + (u ? ' ' + u : '') })));
+        if (r.texto) box.appendChild(h('p', { class: 'range-txt', text: r.texto }));
       });
-      box.appendChild(h('div', null, scale, ticks, leg));
     });
     return box;
   }
@@ -2691,7 +2908,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     return d;
   }
 
-  var EX = { listView: null, detailView: null, ul: null, count: null, query: '', cat: '', id: null, live: [], visible: [], catBtns: [], listScroll: 0,
+  var EX = { listView: null, detailView: null, ul: null, count: null, query: '', cat: '', id: null, live: [], visible: [], catBtns: [], listScroll: 0, secOpen: {}, csOpen: {},
     seen: {}, prog: null, progText: null, start: null, catInfo: null, input: null, help: null };
 
   function exSeen() {
@@ -2734,20 +2951,25 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     }).map(function (o) { return o.c; });
   }
 
-  function exRow(c, showCat) {
-    var seen = !!EX.seen[c.id], k = CAT[c.categoria];
+  /* v5 · V2 — Cabina con el lenguaje de AIRE: un código por categoría (MOT, MAN…), secciones numeradas plegables, tarjetas con código. */
+  var CAT_CODE = { mandos: 'MAN', motor: 'MOT', combustible: 'COM', electrico: 'ELE', vuelo: 'VUE', sistemas: 'SIS', radio: 'RAD', cabina: 'CAB' };
+  function catCode(id) { return CAT_CODE[id] || String(id || '').slice(0, 3).toUpperCase(); }
+
+  /** One control as a compact row: category code chip, name + English name in mono, "esencial" tag and the done check. */
+  function exRow(c) {
+    var seen = !!EX.seen[c.id];
     return h('button', {
-      type: 'button', class: 'row row--ctl' + (seen ? ' is-seen' : ''), 'data-id': c.id, 'aria-current': EX.id === c.id ? 'true' : null,
+      type: 'button', class: 'cr' + (seen ? ' is-seen' : ''), 'data-id': c.id, 'aria-current': EX.id === c.id ? 'true' : null,
       onclick: function () { openControl(c.id, 'list'); }
     },
-      h('span', { class: 'row-ico', style: { '--cat': catColor(c) }, 'aria-hidden': 'true' }, kic(catIcon(c.categoria))),
-      h('span', { class: 'row-main' },
-        h('span', { class: 'row-name', text: c.nombre }),
-        c.ingles ? h('span', { class: 'row-sub', lang: 'en', text: c.ingles }) : null,
-        showCat && k ? h('span', { class: 'row-cat', text: k.nombre }) : null),
-      h('span', { class: 'row-end' },
-        c.prioridad === 1 ? kbadge('Esencial', 'accent') : null,
-        seen ? h('span', { class: 'row-check', title: 'Ya lo viste' }, kic('check'), h('span', { class: 'sr-only', text: 'Ya lo viste' })) : null));
+      h('span', { class: 'cr-code', style: { '--cat': catColor(c) }, 'aria-hidden': 'true', text: catCode(c.categoria) }),
+      h('span', { class: 'cr-main' },
+        h('span', { class: 'cr-name', text: c.nombre }),
+        c.ingles ? h('span', { class: 'cr-en', lang: 'en', text: c.ingles }) : null),
+      h('span', { class: 'cr-end' },
+        c.prioridad === 1 ? h('span', { class: 'cr-tag', text: 'Esencial' }) : null,
+        seen ? h('span', { class: 'cr-check', title: 'Ya lo viste' }, kic('check'), h('span', { class: 'sr-only', text: 'Ya lo viste' }))
+          : h('span', { class: 'cr-chev', 'aria-hidden': 'true' }, kic('chevron-right'))));
   }
 
   /** "Empezá por acá": the next essentials the student has not opened yet (hidden once they have them all). */
@@ -2760,25 +2982,24 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     return out;
   }
   function renderExStart() {
-    var box = EX.start;
+    var box = EX.start, K = C150.Kit;
     if (!box) return;
     clear(box);
-    var ids = (EX.query.trim() || EX.cat) ? [] : essentialsNext(3);
+    var ids = (EX.query.trim() || EX.cat) ? [] : essentialsNext(4);
     box.hidden = !ids.length;
     if (!ids.length) return;
     var first = !Object.keys(EX.seen).length;
-    box.appendChild(h('p', { class: 'ex-start-t' }, kic('flag'), first ? 'Empezá por acá' : 'Seguí con los esenciales'));
-    ids.forEach(function (id) {
-      var c = CTRL[id];
-      box.appendChild(h('button', { type: 'button', class: 'ex-start-btn', onclick: function () { openControl(id, 'list'); } },
-        h('span', { class: 'row-ico', style: { '--cat': catColor(c) }, 'aria-hidden': 'true' }, kic(catIcon(c.categoria))),
-        h('span', { class: 'ex-start-main' }, h('strong', { text: c.nombre }), h('span', { text: c.resumen || '' })),
-        kic('chevron-right')));
+    var items = ids.map(function (id, i) {
+      var c = CTRL[id], k = CAT[c.categoria];
+      return { code: catCode(c.categoria), title: c.nombre, sum: c.resumen || '', meta: (k ? k.nombre + ' · ' : '') + 'esencial',
+        tag: i === 0 ? (first ? 'Empezá acá' : 'Siguiente') : null, onClick: function () { openControl(id, 'list'); } };
     });
+    box.appendChild(K.section({ num: 'ES', title: first ? 'Empezá por acá' : 'Seguí con lo esencial', meta: ids.length + (ids.length === 1 ? ' pendiente' : ' pendientes'),
+      open: true, key: 'start', body: K.cardCarousel({ items: items, label: 'Controles esenciales para empezar' }) }));
   }
 
   function renderExList() {
-    var ul = EX.ul;
+    var ul = EX.ul, K = C150.Kit;
     clear(ul);
     var seenN = exSeen();
     var list = exFiltered();
@@ -2791,38 +3012,46 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     if (EX.catInfo) { setText(EX.catInfo, k0 && k0.descripcion ? k0.descripcion : ''); EX.catInfo.hidden = !(k0 && k0.descripcion); }
     if (!list.length) {
       var q = EX.query.trim();
-      ul.appendChild(h('li', { class: 'ex-empty' },
-        (C150.Kit && isFn(C150.Kit.emptyState))
-          ? C150.Kit.emptyState({ icon: 'search', title: 'No encontré ese control',
+      ul.appendChild(h('div', { class: 'ex-empty' },
+        (K && isFn(K.emptyState))
+          ? K.emptyState({ icon: 'search', title: 'No encontré ese control',
             text: CONTROLS.length ? 'Probá con otra palabra, por ejemplo “nafta”, “luces” o “velocidad”.' : 'Todavía no hay controles cargados.',
             action: (q && C150.Search && isFn(C150.Search.open)) ? { label: 'Buscar en toda la app', icon: 'search', variant: 'secondary', onClick: function () { C150.Search.open({ query: q }); } } : null })
           : h('p', { class: 'empty', text: 'No encontré nada con esa búsqueda.' })));
       return;
     }
-    var q2 = EX.query.trim(), grouped = !q2, lastCat = null;
-    list.forEach(function (c) {
-      if (grouped && c.categoria !== lastCat) {
-        lastCat = c.categoria;
-        var k = CAT[lastCat];
-        var inCat = list.filter(function (x) { return x.categoria === lastCat; });
-        var seenIn = inCat.filter(function (x) { return EX.seen[x.id]; }).length;
-        ul.appendChild(h('li', { class: 'rows-group rows-group--cat' },
-          h('span', { class: 'row-ico row-ico--sm', style: { '--cat': (k && k.color) || 'var(--fg-soft)' }, 'aria-hidden': 'true' }, kic(catIcon(lastCat))),
-          h('h3', { class: 'placard', text: k ? k.nombre : lastCat }),
-          h('span', { class: 'rows-group-n', text: seenIn + '/' + inCat.length })));
-      }
-      ul.appendChild(h('li', null, exRow(c, !grouped)));
+    if (EX.query.trim() || EX.cat) {                       // search / one category: a flat list (the chip of each row says which category)
+      var flat = h('ul', { class: 'cr-list', 'aria-label': 'Controles de la cabina' });
+      list.forEach(function (c) { flat.appendChild(h('li', null, exRow(c))); });
+      ul.appendChild(flat);
+      return;
+    }
+    var cats = [], byCat = {}, firstOpen = null;
+    list.forEach(function (c) { if (!byCat[c.categoria]) { byCat[c.categoria] = []; cats.push(c.categoria); } byCat[c.categoria].push(c); });
+    cats.forEach(function (id) {
+      if (firstOpen === null && byCat[id].some(function (x) { return x.prioridad === 1 && !EX.seen[x.id]; })) firstOpen = id;
+    });
+    if (firstOpen === null) firstOpen = cats[0];
+    cats.forEach(function (id) {
+      var k = CAT[id], inCat = byCat[id];
+      var seenIn = inCat.filter(function (x) { return EX.seen[x.id]; }).length;
+      var sl = h('ul', { class: 'cr-list', 'aria-label': k ? k.nombre : id });
+      inCat.forEach(function (c) { sl.appendChild(h('li', null, exRow(c))); });
+      var sec = K.section({ num: catCode(id), title: k ? k.nombre : id, meta: seenIn + '/' + inCat.length + ' vistos', key: 'cat-' + id,
+        open: EX.secOpen[id] !== undefined ? EX.secOpen[id] : id === firstOpen, body: sl, onToggle: function (o) { EX.secOpen[id] = o; } });
+      sec.style.setProperty('--cat', (k && k.color) || 'var(--fg-soft)');
+      ul.appendChild(sec);
     });
   }
 
   /** Opens a checklist by id (the welcome path links straight to "Antes de arrancar" / "Arranque"). */
   function openChecklist(id) {
-    setMode('checklists');
     for (var i = 0; i < CHECKLISTS.length; i++) { if (CHECKLISTS[i].id === id) { clOpen(i); return; } }
   }
 
   function exIntro() {
-    EX.prog = (C150.Kit && isFn(C150.Kit.progressBar)) ? C150.Kit.progressBar(0, { label: 'Controles que ya viste' }) : progressBar(0);
+    var K = C150.Kit;
+    EX.prog = K.progressBar(0, { label: 'Controles que ya viste' });
     EX.progText = h('span', { class: 'ex-prog-t' });
     EX.start = h('div', { class: 'ex-start' });
     var how = h('ul', { class: 'bullets how-list' },
@@ -2831,10 +3060,9 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       h('li', null, h('strong', { text: 'Arrastrá el fondo' }), ' para mirar alrededor; con la rueda del mouse o pellizcando te acercás.'),
       h('li', null, 'Atajos de teclado en ', h('button', { type: 'button', class: 'linklike', onclick: openHelp }, 'la ayuda'), '.'));
     return h('div', { class: 'ex-head' },
-      modeKicker('01 · Cabina'),
-      h('h2', { class: 'placard mode-title', text: 'Conocé la cabina' }),
-      h('p', { class: 'mode-sub', text: 'Tocá cualquier mando o instrumento en el 3D, o elegilo de la lista: te cuento qué es, para qué sirve y cómo se usa.' }),
-      h('div', { class: 'ex-prog' }, EX.prog, EX.progText),
+      K.pageHeader({ kicker: '01 · Cabina', title: 'Conocé la cabina',
+        sub: 'Tocá cualquier mando o instrumento en el 3D, o elegilo de la lista: te cuento qué es, para qué sirve y cómo se usa.',
+        children: h('div', { class: 'ex-prog' }, EX.prog, EX.progText) }),
       EX.start,
       acc('Cómo se usa la cabina 3D', how, { icon: 'hand' }));
   }
@@ -2855,10 +3083,12 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     kick();
   }
 
+  /** The control sheet, AIRE style: kicker "01 · CABINA · CATEGORÍA", big name, English name in mono, then numbered sections
+   *  (01 DÓNDE ESTÁ · 02 QUÉ HACE · 03 PROBALO · 04 QUÉ PASA EN EL AVIÓN · 05 CÓMO SE USA · 06 ERRORES COMUNES · 07 DATO …). */
   function renderDetail(c) {
     releaseAllHolds();
     EX.live = [];
-    var v = EX.detailView;
+    var v = EX.detailView, K = C150.Kit;
     clear(v);
     var k = CAT[c.categoria];
     var order = EX.visible.indexOf(c.id) >= 0 ? EX.visible : CONTROLS.map(function (x) { return x.id; });
@@ -2869,10 +3099,10 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     var parts = arr(c.partesAvion);
     var showBtn = h('button', {
       type: 'button', class: 'btn btn--primary',
-      onclick: function () { if (mainView === 'exterior') { cc('setMainView', 'cockpit'); syncMainView(); } focusControl(c.id, true); }
+      onclick: function () { navLook(function () { if (mainView === 'exterior') { cc('setMainView', 'cockpit'); syncMainView(); } focusControl(c.id, true); }, c.nombre); }
     }, kic('target'), h('span', { text: 'Mostrámelo en 3D' }));
     var extLbl = h('span', { text: 'Ver en el avión' });
-    var extBtn = parts.length ? h('button', { type: 'button', class: 'btn btn--secondary', onclick: function () { toggleOnAirplane(c); } }, kic('plane'), extLbl) : null;
+    var extBtn = parts.length ? h('button', { type: 'button', class: 'btn btn--secondary', onclick: function () { if (mainView === 'exterior') toggleOnAirplane(c); else navLook(function () { toggleOnAirplane(c); }, c.nombre); } }, kic('plane'), extLbl) : null;
     if (extBtn) EX.live.push(function () { setText(extLbl, mainView === 'exterior' ? 'Volver a la cabina' : 'Ver en el avión'); });
     var airExps = (C150.Lab && isFn(C150.Lab.experimentsFor)) ? arr(safe(function () { return C150.Lab.experimentsFor(c.id); })) : [];
     var airBtns = airExps.slice(0, 2).map(function (x) {
@@ -2895,14 +3125,17 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     }
     var steps = null;
     if (pasos.length) { steps = h('ol', { class: 'steps' }); pasos.forEach(function (p) { steps.appendChild(h('li', { text: p })); }); }
+    var usoBody = (steps || c.cuando) ? h('div', null, steps,
+      c.cuando ? h('p', { class: 'cs-when' }, h('span', { class: 'cs-when-k', text: 'Cuándo se usa' }), c.cuando) : null) : null;
     var errs = null;
     if (errores.length) { errs = h('ul', { class: 'bullets bullets--warn' }); errores.forEach(function (e) { errs.appendChild(h('li', { text: e })); }); }
+    var datoBody = (c.truco || c.dato) ? h('div', null, c.truco ? callK('tip', 'Truco', c.truco) : null, c.dato ? callK('dato', 'Dato curioso', c.dato) : null) : null;
     var relChips = null;
     if (rel.length) {
       relChips = h('div', { class: 'chips' });
       rel.forEach(function (id) {
-        var K = C150.Kit, r = CTRL[id];
-        relChips.appendChild((K && isFn(K.chip)) ? K.chip({ label: r.nombre, color: catColor(r), onClick: function () { openControl(id, 'list'); } }) : controlChip(id, function () { openControl(id, 'list'); }));
+        var r = CTRL[id];
+        relChips.appendChild(K.chip({ label: r.nombre, color: catColor(r), onClick: function () { openControl(id, 'related'); } }));
       });
     }
 
@@ -2910,49 +3143,66 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       if (!id) return h('span', { style: { flex: '1' } });
       return h('button', {
         type: 'button', class: 'btn btn--small detail-nav-btn' + (dir > 0 ? ' is-next' : ''), 'aria-label': (dir < 0 ? 'Anterior: ' : 'Siguiente: ') + ctrlName(id),
-        onclick: function () { openControl(id, 'list'); }
+        onclick: function () { openControl(id, 'pager'); }
       }, dir < 0 ? kic('chevron-left') : null,
         h('span', { class: 'dn-text' }, h('span', { class: 'dn-k', text: dir < 0 ? 'Anterior' : 'Siguiente' }), h('span', { class: 'dn-n', text: ctrlName(id) })),
         dir > 0 ? kic('chevron-right') : null);
     }
 
-    var accs = [];
-    function addAcc(title, ico, content, open) { if (content) accs.push(acc(title, content, { icon: ico, open: !!open })); }
-    addAcc('Dónde está', 'map', para(c.ubicacion), true);
-    addAcc('Qué hace', 'settings', para(c.queHace), true);
-    addAcc('Cada parte', 'layers', subList);
-    addAcc('Qué pasa en el avión', 'plane', para(c.enElAvion));
-    addAcc('Cómo se usa', 'list', steps);
-    addAcc('Cuándo se usa', 'clock', para(c.cuando));
-    addAcc('Errores comunes', 'warning', errs);
-    addAcc('Truco', 'bulb', para(c.truco));
-    addAcc('Dato curioso', 'star', para(c.dato));
-    addAcc('Marcas de colores', 'gauge', rangos.length ? rangesView(rangos) : null);
-    addAcc('En otros años y modelos', 'swap', para(c.otrosModelos));
+    // header
+    var head = K.pageHeader({ kicker: '01 · Cabina · ' + (k ? k.nombre : ''), title: c.nombre, sub: c.resumen || null,
+      children: h('div', { class: 'cs-actions' }, showBtn, extBtn, airBtns) });
+    var ttl = head.querySelector('.pg-title');
+    ttl.id = titleId; ttl.tabIndex = -1; ttl.classList.add('detail-title');
+    head.classList.add('cs-head');
+    var ref = head.querySelector('.pg-sub') || head.querySelector('.cs-actions');
+    [c.ingles ? h('p', { class: 'cs-en', lang: 'en', text: c.ingles }) : null,
+      h('div', { class: 'cs-tags' },
+        h('span', { class: 'cr-code', style: { '--cat': catColor(c) }, text: catCode(c.categoria) }),
+        c.prioridad === 1 ? h('span', { class: 'cr-tag', text: 'Esencial' }) : null,
+        EX.seen[c.id] ? h('span', { class: 'cs-seen' }, kic('check'), 'Visto') : null),
+      otros.length ? h('p', { class: 'cs-also' }, h('span', { class: 'cs-also-k', text: 'También le dicen' }), otros.join(' · ')) : null
+    ].forEach(function (n) { if (n) head.insertBefore(n, ref); });
 
-    v.appendChild(h('div', { class: 'detail-top' },
+    // numbered sections: only the ones this control has; what the student opened stays open on the next control
+    var secs = [], n = 0;
+    function addSec(title, meta, body, open, key) {
+      if (!body) return;
+      n++;
+      secs.push(K.section({ num: n, title: title, meta: meta || '', body: body, key: key,
+        open: EX.csOpen[key] !== undefined ? EX.csOpen[key] : !!open, onToggle: function (o) { EX.csOpen[key] = o; } }));
+    }
+    addSec('Dónde está', '', para(c.ubicacion), true, 'donde');
+    addSec('Qué hace', '', para(c.queHace), true, 'que-hace');
+    addSec('Cada parte', subs.length + (subs.length === 1 ? ' parte' : ' partes'), subList, false, 'partes');
+    addSec('Probalo', 'en vivo', buildProbalo(c, EX.live, false, true), true, 'probalo');
+    addSec('Qué pasa en el avión', '', para(c.enElAvion), false, 'avion');
+    addSec('Cómo se usa', pasos.length ? pasos.length + (pasos.length === 1 ? ' paso' : ' pasos') : '', usoBody, false, 'uso');
+    addSec('Errores comunes', errores.length + (errores.length === 1 ? ' error' : ' errores'), errs, false, 'errores');
+    addSec('Dato', '', datoBody, false, 'dato');
+    addSec('Marcas de colores', 'en el reloj', rangos.length ? rangesView(rangos) : null, false, 'marcas');
+    addSec('En otros años y modelos', '', para(c.otrosModelos), false, 'modelos');
+
+    v.appendChild(h('div', { class: 'detail-top cs-top' },
       h('button', { type: 'button', class: 'btn btn--ghost btn--small back-btn', onclick: closeDetail }, kic('back'), 'Todos los controles'),
       i >= 0 ? h('span', { class: 'detail-pos', 'aria-label': 'Control ' + (i + 1) + ' de ' + order.length, text: (i + 1) + ' / ' + order.length }) : null));
-    v.appendChild(h('article', { class: 'card ctl-card', 'aria-labelledby': titleId, style: { '--cat': catColor(c) } },
-      h('header', { class: 'ctl-head' },
-        h('div', { class: 'ctl-badges' },
-          h('span', { class: 'ctl-cat' }, h('span', { class: 'row-ico row-ico--sm', 'aria-hidden': 'true' }, kic(catIcon(c.categoria))), k ? k.nombre : ''),
-          c.prioridad === 1 ? kbadge('Esencial', 'accent', 'star') : null,
-          EX.seen[c.id] ? kbadge('Visto', 'ok', 'check') : null),
-        h('h2', { class: 'placard detail-title', id: titleId, tabindex: '-1', text: c.nombre }),
-        c.ingles ? h('p', { class: 'detail-en', lang: 'en', text: c.ingles }) : null,
-        otros.length ? h('p', { class: 'detail-also', text: 'También le dicen: ' + otros.join(' · ') }) : null,
-        c.resumen ? h('p', { class: 'lead ctl-lead', text: c.resumen }) : null,
-        h('div', { class: 'ctl-actions' }, showBtn, extBtn, airBtns)),
-      buildProbalo(c, EX.live, false),
-      accs.length ? h('div', { class: 'ctl-accs' }, accs) : null,
-      relChips ? h('div', { class: 'ctl-rel' }, h('h3', { class: 'placard placard--small', text: 'Relacionados' }), relChips) : null),
-      h('nav', { class: 'detail-nav', 'aria-label': 'Otros controles' }, navBtn(prevId, -1), navBtn(nextId, 1)));
+    v.appendChild(h('article', { class: 'cs', 'aria-labelledby': titleId, style: { '--cat': catColor(c) } },
+      head, secs,
+      relChips ? h('div', { class: 'cs-rel' }, ctlCap('Relacionados'), relChips) : null));
+    v.appendChild(h('nav', { class: 'detail-nav', 'aria-label': 'Otros controles' }, navBtn(prevId, -1), navBtn(nextId, 1)));
     var s = S();
     if (s) runLive(EX.live, s);
   }
 
+  /** User-level (contract v6): from another tab it is an ABRIR; list → card is a detail entry (UP == Back); card → card by prev / next
+   *  or a tap in 3D replaces the entry; a related chip adds one. */
   function openControl(id, source) {
+    if (!CTRL[id]) return;
+    if (!navOn()) { openControlRaw(id, source); return; }
+    if (mode !== 'explorar') { navOpen('cabina/' + id); return; }
+    navDetail(!EX.id || source === 'related' ? 'detail' : 'replace', 'cabina/' + id, function () { openControlRaw(id, source); });
+  }
+  function openControlRaw(id, source) {
     var c = CTRL[id];
     if (!c) return;
     if (!EX.listView) { setMode('explorar'); if (!EX.listView) return; }
@@ -2974,7 +3224,13 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     kick();
   }
 
+  /** User-level: "Todos los controles" / a tap on empty space. With Nav it is UP (== Back when the card was opened from the list). */
   function closeDetail() {
+    var n = NAV();
+    if (navOn() && n && isFn(n.up)) { if (isFn(n.pending) && n.pending() > 0) return; if (n.up()) return; }
+    closeDetailRaw();
+  }
+  function closeDetailRaw() {
     var was = EX.id;
     releaseAllHolds();
     EX.id = null;
@@ -2996,7 +3252,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
 
   modeImpl.explorar = {
     render: function (sec) {
-      EX.ul = h('ul', { class: 'rows rows--ctl', 'aria-label': 'Controles de la cabina' });
+      EX.ul = h('div', { class: 'cr-groups' });
       EX.count = h('p', { class: 'count', 'aria-live': 'polite' });
       var input = h('input', {
         type: 'search', placeholder: 'Buscar: acelerador, flaps, nafta…', 'aria-label': 'Buscar un control',
@@ -3012,7 +3268,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
           EX.catBtns.forEach(function (x) { setAttr(x.b, 'aria-pressed', x.id === EX.cat ? 'true' : 'false'); });
           renderExList();
         };
-        var b = (K && isFn(K.chip)) ? K.chip({ label: label, icon: iconName, selected: EX.cat === id, onClick: onClick })
+        var b = (K && isFn(K.chip)) ? K.chip({ label: label, color: color, selected: EX.cat === id, onClick: onClick })
           : h('button', { type: 'button', class: 'chip', 'aria-pressed': EX.cat === id ? 'true' : 'false', onclick: onClick }, label);
         EX.catBtns.push({ id: id, b: b });
         cats.appendChild(b);
@@ -3025,7 +3281,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       } }, kic('close'));
       input.addEventListener('input', function () { clearBtn.hidden = !input.value; });
       EX.listView = h('div', null, exIntro(),
-        h('div', { class: 'block ex-list-block' },
+        h('div', { class: 'ex-list-block' },
           h('div', { class: 'search ex-search' }, kic('search'), input, clearBtn),
           cats, EX.catInfo, EX.count, EX.ul));
       EX.detailView = h('div', { hidden: true });
@@ -3049,15 +3305,15 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   var GLOSSARY = arr(DATA.glossary).filter(function (g) { return g && g.termino; }).slice().sort(function (a, b) {
     return String(a.termino).localeCompare(String(b.termino), 'es');
   });
-  var LB = { listView: null, lessonView: null, idx: -1, i: 0, seen: {}, finished: false, done: arr(store.get('lessonsDone', [])),
+  var LB = { listView: null, lessonView: null, secOpen: {}, idx: -1, open: false, i: 0, seen: {}, finished: false, done: arr(store.get('lessonsDone', [])),
     pose: null, auto: false, loop: store.get('lessonLoop', false) === true, layoutForced: false, layoutBefore: null, userChose: false,
     actBtns: [], autoBtn: null, loopBtn: null, nowEl: null, poseCaption: '',
     air: store.get('lessonAir', true) !== false, airOn: false, airBtn: null };
 
   /* Panel header (same family as the AIRE lab): numbered mono kicker (the tab's place in the order) + big display title
    * + short lead, closed by a hairline. */
-  var MODE_KICKER = { 'Lo básico': '02 · Lecciones', Lecciones: '02 · Lecciones', Recorrido: '02 · Lecciones · Recorrido guiado',
-    'Recorrido guiado': '02 · Lecciones · Recorrido guiado', Checklists: '03 · Practicar · Checklists',
+  var MODE_KICKER = { 'Lo básico': '02 · Lecciones', Lecciones: '02 · Lecciones', Recorrido: '02 · Lecciones · Recorrido',
+    'Recorrido guiado': '02 · Lecciones · Recorrido', Checklists: '03 · Practicar · Checklists',
     Volar: '03 · Practicar · Misiones', 'Misiones y situaciones': '03 · Practicar · Misiones', Quiz: '03 · Practicar · Quiz' };
   function modeKicker(text) {
     return h('p', { class: 'mode-kicker' }, h('span', { class: 'mode-kicker-dot', 'aria-hidden': 'true' }), text);
@@ -3101,6 +3357,21 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       w.appendChild(h('i', { style: { '--x': ((i * 41 + 7) % 100) + '%', '--dx': (((i * 29) % 60) - 30) + 'px', '--dl': ((i % 8) * 0.07).toFixed(2) + 's', '--c': String(i % 4) } }));
     }
     return w;
+  }
+  /** "En curso" row on top of a list: the activity that was left half way (Continuar) and a small ✕ to forget it. */
+  function continueRow(o) {
+    return h('div', { class: 'cont', role: 'group', 'aria-label': 'Actividad en curso: ' + o.title },
+      h('button', { type: 'button', class: 'cont-main', onclick: o.onResume },
+        h('span', { class: 'cont-ico', 'aria-hidden': 'true' }, kic(o.icon || 'play')),
+        h('span', { class: 'cont-t' }, h('span', { class: 'cont-k', text: 'En curso' }), h('strong', { text: o.title }), o.text ? h('span', { class: 'cont-d', text: o.text }) : null),
+        h('span', { class: 'cont-go' }, 'Continuar', kic('chevron-right'))),
+      h('button', { type: 'button', class: 'cont-x', 'aria-label': o.exitLabel || 'Dejar esta actividad', title: o.exitLabel || 'Dejar esta actividad', onclick: function () { confirmLeave(o.exitLabel || 'Dejar esta actividad', o.confirm, o.onExit); } }, kic('close')));
+  }
+  /** One-line confirmation before throwing away progress (skipped when there is none to lose: text empty). */
+  function confirmLeave(title, text, onYes) {
+    var K = C150.Kit;
+    if (!text || !K || !isFn(K.dialog)) { if (isFn(onYes)) onYes(); return; }
+    K.dialog({ title: title, body: text, actions: [{ label: 'Seguir acá', variant: 'secondary' }, { label: 'Sí, dejarla', variant: 'primary', onClick: onYes }] });
   }
   /** "Seguí con…" suggestion: icon, title, one line, chevron. */
   function sgCard(s) {
@@ -3162,42 +3433,101 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   function lessonMin(l) { return Math.max(3, Math.round(arr(l.pasos).length * 1.5)); }
   function lessonLevel(l) { return LESSON_LEVEL[l.id] || 2; }
 
+  /* ---- v5 · V2 — Lecciones con el lenguaje de AIRE: secciones numeradas por nivel con tarjetas con código (L1…), el reproductor es el "runner" ---- */
+  var LESSON_LEVELS = [{ n: 1, title: 'Para empezar' }, { n: 2, title: 'Para entender mejor' }, { n: 3, title: 'Más fino' }];
+  /** The check chip of a finished card (cardCarousel only knows code, tag and meta). */
+  function cardDone(ul, k) {
+    var cards = ul.querySelectorAll('.card-h'), c = cards[k];
+    if (!c) return;
+    c.classList.add('is-done');
+    var top = c.querySelector('.card-h-top');
+    if (top) top.appendChild(h('span', { class: 'card-h-check', title: 'Hecha' }, kic('check'), h('span', { class: 'sr-only', text: 'Hecha' })));
+  }
+  /** v5 · V3 — a thin progress line at the foot of card k (best attempt of a mission, share of a checklist…). */
+  function cardBar(ul, k, frac, label) {
+    var cards = ul.querySelectorAll('.card-h'), c = cards[k];
+    if (!c || !(frac > 0)) return;
+    c.appendChild(h('span', { class: 'card-h-bar', role: 'img', 'aria-label': label || 'Avance' }, h('span', { style: { width: (clamp(frac, 0, 1) * 100).toFixed(0) + '%' } })));
+  }
+  /** A numbered AIRE section (Kit.section) whose open/closed state is remembered per key while the panel lives. */
+  var SEC_OPEN = {};
+  function secK(num, title, meta, body, key, openDef) {
+    var K = C150.Kit;
+    return K.section({ num: num, title: title, meta: meta || '', body: body, key: key,
+      open: SEC_OPEN[key] !== undefined ? SEC_OPEN[key] : (openDef !== false), onToggle: function (o) { SEC_OPEN[key] = o; } });
+  }
+
   function lbRenderList() {
-    var v = LB.listView;
+    var v = LB.listView, K = C150.Kit;
     clear(v);
     var doneN = LESSONS.filter(function (l) { return LB.done.indexOf(l.id) >= 0; }).length;
     v.appendChild(modeHead('Lecciones', 'Cada lección explica una idea de cómo vuela el avión, con animaciones y botones para probarla vos. Van de lo más simple a lo más fino: conviene hacerlas en orden.'));
     if (!LESSONS.length) { v.appendChild(emptyState('Las lecciones todavía no están cargadas.')); }
     else {
+      if (LB.idx >= 0 && !LB.finished && !LB.open && LESSONS[LB.idx]) {
+        var cl0 = LESSONS[LB.idx];
+        v.appendChild(continueRow({ icon: 'book', title: 'Lección «' + (cl0.titulo || '') + '»', text: 'Vas por el paso ' + (LB.i + 1) + ' de ' + arr(cl0.pasos).length,
+          onResume: lbResume, onExit: lbExit, exitLabel: 'Dejar esta lección' }));
+      }
       var nextIdx = -1;
       for (var q = 0; q < LESSONS.length; q++) if (LB.done.indexOf(LESSONS[q].id) < 0) { nextIdx = q; break; }
       v.appendChild(h('div', { class: 'lc-prog' }, pgBar(LESSONS.length ? doneN / LESSONS.length : 0, doneN + ' de ' + LESSONS.length + ' hechas', doneN === LESSONS.length)));
-      var ul = h('ul', { class: 'lc-list', 'aria-label': 'Lecciones' });
-      LESSONS.forEach(function (l, i) {
-        var done = LB.done.indexOf(l.id) >= 0, isNext = i === nextIdx, n = arr(l.pasos).length;
-        ul.appendChild(h('li', null, h('button', { type: 'button', class: 'lcard' + (done ? ' is-done' : '') + (isNext ? ' is-next' : ''), onclick: function () { lbOpen(i); } },
-          h('span', { class: 'lcard-n', 'aria-hidden': 'true' }, done ? kic('check') : ('0' + (i + 1)).slice(-2)),
-          h('span', { class: 'lcard-main' },
-            isNext ? h('span', { class: 'lcard-flag', text: LB.done.length ? 'Siguiente' : 'Empezá por acá' }) : null,
-            h('span', { class: 'lcard-t', text: l.titulo || 'Lección' }),
-            l.resumen ? h('span', { class: 'lcard-d', text: l.resumen }) : null,
-            h('span', { class: 'lcard-meta' }, metaItem('clock', lessonMin(l) + ' min'), metaItem('list', n + (n === 1 ? ' paso' : ' pasos')), diffDots(lessonLevel(l)),
-              done ? h('span', { class: 'lcard-ok' }, kic('check'), 'Hecha') : null)),
-          h('span', { class: 'lcard-go', 'aria-hidden': 'true' }, kic('chevron-right')))));
+      var secN = 0;
+      LESSON_LEVELS.forEach(function (lv) {
+        var items = [], idxs = [];
+        LESSONS.forEach(function (l, i) {
+          if (lessonLevel(l) !== lv.n) return;
+          var n = arr(l.pasos).length, running = i === LB.idx && !LB.finished;
+          items.push({ code: 'L' + (i + 1), title: l.titulo || 'Lección', sum: l.resumen || '', current: running,
+            meta: n + (n === 1 ? ' paso' : ' pasos') + ' · ' + lessonMin(l) + ' min',
+            tag: running ? 'En curso' : (i === nextIdx ? (LB.done.length ? 'Siguiente' : 'Empezá acá') : null),
+            onClick: function () { lbOpen(i); } });
+          idxs.push(i);
+        });
+        if (!items.length) return;
+        var hechas = idxs.filter(function (i) { return LB.done.indexOf(LESSONS[i].id) >= 0; }).length;
+        var ul = K.cardCarousel({ items: items, list: true, label: 'Lecciones: ' + lv.title.toLowerCase() });
+        idxs.forEach(function (i, k) { if (LB.done.indexOf(LESSONS[i].id) >= 0) cardDone(ul, k); });
+        secN++;
+        v.appendChild(K.section({ num: secN, title: lv.title, meta: hechas + '/' + items.length + ' hechas', open: LB.secOpen[lv.n] !== undefined ? LB.secOpen[lv.n] : true,
+          body: ul, key: 'lv' + lv.n, onToggle: function (o) { LB.secOpen[lv.n] = o; } }));
       });
-      v.appendChild(ul);
     }
     var g = glossaryBlock();
     if (g) v.appendChild(h('div', { class: 'lc-gloss' }, g));
   }
-
+  /** User-level: list → lesson is a detail entry (UP == Back); from another tab it is an ABRIR. */
   function lbOpen(idx) {
+    var L = LESSONS[idx];
+    if (!L) return;
+    if (!navOn()) { if (mode !== 'basico') setMode('basico'); lbOpenRaw(idx); return; }
+    if (mode !== 'basico') { navOpen('basico/' + L.id); return; }
+    navDetail('detail', 'basico/' + L.id, function () { lbOpenRaw(idx); });
+  }
+  function lbOpenRaw(idx) {
     if (!LESSONS[idx]) return;
-    LB.idx = idx; LB.i = 0; LB.seen = { 0: true }; LB.finished = false;
+    if (!LB.listView) { setMode('basico'); if (!LB.listView) return; }
+    if (idx === LB.idx && !LB.finished && LB.idx >= 0) { lbShowRaw(); return; }         // the lesson already in progress: go on where it was
+    LB.idx = idx; LB.i = 0; LB.seen = { 0: true }; LB.finished = false; LB.open = true;
     progTouch('leccion', LESSONS[idx].id);
     LB.listView.hidden = true;
     LB.lessonView.hidden = false;
     lbRenderStep(true);
+    scrollPanelTop();
+  }
+  /** "Continuar": back into the lesson that was left half way (same step). */
+  function lbResume() {
+    var L = LESSONS[LB.idx];
+    if (!L) return;
+    if (!navOn() || mode !== 'basico') { lbShowRaw(); return; }
+    navDetail('detail', 'basico/' + L.id, lbShowRaw);
+  }
+  function lbShowRaw() {
+    if (!LESSONS[LB.idx]) return;
+    LB.open = true;
+    LB.listView.hidden = true;
+    LB.lessonView.hidden = false;
+    lbRenderStep(!LB.finished);
     scrollPanelTop();
   }
 
@@ -3249,6 +3579,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
 
   function lbRun(p) {
     if (!p) return;
+    navClearLook();
     lbEnterLayout();
     var foco = p.foco && CTRL[p.foco] ? p.foco : null;
     // a movement seen from outside: the cockpit frames the horizon, the flight instruments and the yoke together
@@ -3274,7 +3605,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     lbView(p, enlarge && LB.auto);
     syncMainView();
     lbSyncActions();
-    if (LB.idx >= 0) lbAir(p);
+    if (LB.open) lbAir(p);
     kick();
   }
   /** Action button: hold that movement (pose) until another one or "Automático". */
@@ -3395,9 +3726,37 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     if (et) out.push({ icon: 'wind', title: 'Probalo en el Aire', text: 'Experimento: ' + et, onClick: function () { UI.openLab(exp); sheetEnsure('half'); } });
     if (ni < 0) {
       out.push({ primary: true, icon: 'checklist', title: 'Checklist “Antes de arrancar”', text: 'Practicá los pasos de verdad, en la cabina 3D', onClick: function () { openChecklist('antes-arrancar'); } });
-      out.push({ icon: 'quiz', title: 'Quiz rápido', text: 'Probá lo que aprendiste', onClick: function () { setMode('quiz'); scrollPanelTop(); } });
+      out.push({ icon: 'quiz', title: 'Quiz rápido', text: 'Probá lo que aprendiste', onClick: function () { navOpen('quiz'); } });
     }
     return out;
+  }
+
+  /** The AIRE runner (Kit .runner): kicker + count, ✕, progress bar, big step title and text. The caller appends actions, "Mirá:", nav and dots. */
+  function runnerEl(o) {
+    return h('article', { class: 'runner ' + (o.cls || ''), 'aria-labelledby': o.titleId },
+      h('div', { class: 'runner-top' },
+        h('p', { class: 'runner-kicker' }, h('span', { text: o.kicker }), h('span', { class: 'runner-count', text: o.count })),
+        h('button', { type: 'button', class: 'icon-btn icon-btn--small runner-close', 'aria-label': o.closeLabel, title: o.closeLabel, onclick: o.onClose }, kic('close'))),
+      h('div', { class: 'runner-prog', 'aria-hidden': 'true' }, h('span', { style: { width: (clamp(o.frac, 0, 1) * 100).toFixed(1) + '%' } })),
+      h('h2', { class: 'runner-title', id: o.titleId, tabindex: '-1', text: o.title }),
+      o.text ? h('p', { class: 'runner-text step-text', text: o.text }) : null);
+  }
+  /** One dot per step (the current one is a wide orange pill, the seen ones are dark). */
+  function runnerDots(n, cur, seen, onGo, label, titles) {
+    var w = h('div', { class: 'runner-dots', role: 'group', 'aria-label': label });
+    for (var k = 0; k < n; k++) {
+      (function (k) {
+        w.appendChild(h('button', {
+          type: 'button', class: 'runner-dot' + (k !== cur && seen && seen[k] ? ' is-seen' : ''), 'aria-current': k === cur ? 'step' : null,
+          'aria-label': 'Ir al paso ' + (k + 1) + (titles && titles[k] ? ': ' + titles[k] : ''), onclick: function () { onGo(k); }
+        }));
+      })(k);
+    }
+    return w;
+  }
+  /** "Mirá: …" callout of the runner (eye icon, sky-blue edge). */
+  function runnerMira(text) {
+    return text ? h('p', { class: 'runner-mira' }, kic('eye'), h('span', null, h('strong', { text: 'Mirá: ' }), text)) : null;
   }
 
   function lbRenderStep(run) {
@@ -3406,9 +3765,6 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     LB.actBtns = []; LB.autoBtn = null; LB.loopBtn = null; LB.nowEl = null;
     if (!L) return;
     var pasos = arr(L.pasos), n = pasos.length;
-    v.appendChild(h('div', { class: 'detail-top lp-top' },
-      h('button', { type: 'button', class: 'btn btn--ghost btn--small back-btn', onclick: lbBack }, icon('back'), 'Lecciones'),
-      h('span', { class: 'lp-count', text: 'Lección ' + (LB.idx + 1) + ' de ' + LESSONS.length })));
     if (LB.finished) {
       v.appendChild(doneCard({
         id: 'lb-done-title', kicker: 'Lección terminada', title: L.titulo || '¡Lección terminada!',
@@ -3423,32 +3779,32 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     var foco = p.foco && CTRL[p.foco] ? p.foco : null;
     var moves = p.vista === 'exterior' || arr(p.acciones).length > 0;
     var hint = moves
-      ? (lbWide() && canDos() ? (dosSideBySide() ? 'A la izquierda, la cabina: así se ve desde adentro. A la derecha, el avión desde afuera.'
-        : 'Arriba, la cabina: así se ve desde adentro. Abajo, el avión desde afuera.')
-        : 'Ves el avión desde afuera; el cuadrito muestra cómo se ve desde adentro: volante, horizonte e instrumentos.')
+      ? (lbWide() && canDos() ? (dosSideBySide() ? 'a la izquierda, la cabina: así se ve desde adentro; a la derecha, el avión desde afuera.'
+        : 'arriba, la cabina: así se ve desde adentro; abajo, el avión desde afuera.')
+        : 'ves el avión desde afuera; el cuadrito muestra cómo se ve desde adentro: volante, horizonte e instrumentos.')
       : '';
     if (foco) hint += (hint ? ' ' : '') + 'En la cabina, lo que titila es ' + ctrlName(foco) + '.';
     var last = LB.i >= n - 1;
     var titleId = 'lb-step-title';
     LB.nowEl = h('p', { class: 'lb-now', hidden: true }, h('span', { class: 'lb-now-k', text: 'Ahora' }), h('span', { class: 'lb-now-t' }));
-    v.appendChild(h('article', { class: 'card step-card lp-card', 'aria-labelledby': titleId },
-      h('p', { class: 'kicker', text: L.titulo || '' }),
-      h('div', { class: 'lp-prog' }, stepBar(n, LB.i, LB.seen, lbGo, 'Pasos de la lección'), h('span', { class: 'step-n', text: 'Paso ' + (LB.i + 1) + ' de ' + n })),
-      h('h2', { class: 'placard', id: titleId, tabindex: '-1', text: p.titulo || '' }),
-      p.texto ? h('p', { class: 'step-text', text: p.texto }) : null,
-      lbActions(p),
-      LB.nowEl,
-      hint ? callK('dato', 'Qué mirar', hint) : null,
-      foco ? h('div', { class: 'btn-row' },
-        h('button', { type: 'button', class: 'btn btn--small', onclick: function () { UI.showControl(foco); } }, kic('target'), 'Ver la ficha: ' + ctrlName(foco))) : null,
-      h('div', { class: 'btn-row btn-row--split lp-nav' },
-        h('button', { type: 'button', class: 'btn', disabled: LB.i === 0, onclick: function () { lbGo(LB.i - 1); } }, icon('back'), 'Anterior'),
-        last
-          ? h('button', { type: 'button', class: 'btn btn--primary', onclick: lbFinish }, 'Terminar la lección', icon('check'))
-          : h('button', { type: 'button', class: 'btn btn--primary', onclick: function () { lbGo(LB.i + 1); } }, 'Siguiente', icon('next')))));
+    var R = runnerEl({ cls: 'lb-runner', titleId: titleId, kicker: 'Lección L' + (LB.idx + 1) + ' · ' + (L.titulo || ''), count: (LB.i + 1) + ' / ' + n,
+      closeLabel: 'Volver a la lista de lecciones', onClose: lbBack, frac: (LB.i + 1) / n, title: p.titulo || '', text: p.texto });
+    [lbActions(p), LB.nowEl, runnerMira(hint)].forEach(function (x) { if (x) R.appendChild(x); });
+    if (foco) {
+      R.appendChild(h('div', { class: 'runner-links' },
+        h('button', { type: 'button', class: 'btn btn--small', onclick: function () { lookAtControl(foco); } }, kic('target'), 'Mostrámelo en 3D'),
+        h('button', { type: 'button', class: 'btn btn--small', onclick: function () { UI.showControl(foco); } }, kic('cabin'), 'Ver la ficha: ' + ctrlName(foco))));
+    }
+    R.appendChild(h('div', { class: 'runner-nav' },
+      h('button', { type: 'button', class: 'btn', disabled: LB.i === 0, onclick: function () { lbGo(LB.i - 1); } }, icon('back'), 'Anterior'),
+      last
+        ? h('button', { type: 'button', class: 'btn btn--primary', onclick: lbFinish }, 'Terminar la lección', icon('check'))
+        : h('button', { type: 'button', class: 'btn btn--primary', onclick: function () { lbGo(LB.i + 1); } }, 'Siguiente', icon('next'))));
+    R.appendChild(runnerDots(n, LB.i, LB.seen, lbGo, 'Pasos de la lección', pasos.map(function (x) { return x && x.titulo; })));
+    v.appendChild(R);
     if (run) lbRun(p);
     else lbSyncActions();
-    glossText(v, '.step-text, .callout-body, .lb-actions-title small');
+    glossText(v, '.step-text, .callout-body, .lb-actions-title small, .runner-mira > span');
   }
   function lbGo(k) {
     var L = LESSONS[LB.idx];
@@ -3469,13 +3825,25 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     var dt = $('lb-done-title');
     if (dt) safe(function () { dt.focus({ preventScroll: true }); });
   }
+  /** "Lecciones" button / UP: back to the list. A lesson half done stays in progress ("Continuar"); a finished one is closed. */
   function lbBack() {
+    var n = NAV();
+    if (navOn() && n && isFn(n.up) && n.up()) return;
+    lbBackRaw();
+  }
+  function lbBackRaw() {
     lbLeave();
-    LB.idx = -1;
+    if (LB.finished) LB.idx = -1;
+    LB.open = false;
     LB.lessonView.hidden = true;
     LB.listView.hidden = false;
     lbRenderList();
     scrollPanelTop();
+  }
+  /** "Dejar esta lección": forget the progress of the lesson in progress. */
+  function lbExit() {
+    LB.idx = -1; LB.finished = false;
+    if (LB.open) lbBackRaw(); else { lbRenderList(); kick(); }
   }
 
   modeImpl.basico = {
@@ -3487,7 +3855,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       lbRenderList();
     },
     enter: function () {
-      if (LB.idx >= 0 && !LB.finished) { var L = LESSONS[LB.idx]; if (L) lbRun(arr(L.pasos)[LB.i]); }
+      if (LB.open && !LB.finished) { var L = LESSONS[LB.idx]; if (L) lbRun(arr(L.pasos)[LB.i]); }
     },
     exit: function () { if (LB.idx >= 0) lbLeave(); },
     slow: function () {
@@ -3498,14 +3866,15 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     }
   };
   /** An exterior animation ended on its own (not looped): "Automático" is no longer running. */
-  function onAnimEnd() { if (LB.auto) { LB.auto = false; lbSyncActions(); if (LB.idx >= 0 && mode === 'basico') lbAir(lbStep()); } }
+  function onAnimEnd() { if (LB.auto) { LB.auto = false; lbSyncActions(); if (LB.open && mode === 'basico') lbAir(lbStep()); } }
 
   /* ================================================================== RECORRIDO (tour guiado) */
 
   var TOUR = arr(DATA.tour).filter(function (t) { return t && t.control; });
-  var TR = { view: null, i: clamp(num(store.get('tourStep', 0), 0), 0, Math.max(0, TOUR.length - 1)), finished: false };
+  var TR = { view: null, secOpen: false, i: clamp(num(store.get('tourStep', 0), 0), 0, Math.max(0, TOUR.length - 1)), finished: false };
 
-  function trFocus() {
+  function trFocus(isLook) {
+    if (isLook !== true) navClearLook();
     if (TR.finished) { cc('setTargetHighlight', null); cc('select', null); return; }
     var st = TOUR[TR.i];
     if (!st || !CTRL[st.control]) { cc('setTargetHighlight', null); return; }
@@ -3524,7 +3893,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     if (t) safe(function () { t.focus({ preventScroll: true }); });
   }
   function trRender() {
-    var v = TR.view;
+    var v = TR.view, K = C150.Kit;
     clear(v);
     v.appendChild(modeHead('Recorrido guiado', 'Tu primer día en la cabina: un paseo control por control, en el orden en que los vas a usar. En cada paso el control titila en el 3D.'));
     if (!TOUR.length) { v.appendChild(emptyState('El recorrido todavía no está cargado.')); return; }
@@ -3535,7 +3904,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         id: 'tr-done-title', kicker: 'Recorrido completo', title: '¡Ya conocés la cabina!',
         text: 'Pasaste por los ' + n + ' puntos de la cabina. Ahora toca entender por qué vuela el avión, y después practicar los pasos.',
         suggestions: [
-          { primary: true, icon: 'book', title: nl >= 0 ? 'Lección: ' + (LESSONS[nl].titulo || '') : 'Lecciones', text: 'Cómo vuela un avión, paso a paso', onClick: function () { setMode('basico'); scrollPanelTop(); if (nl >= 0) lbOpen(nl); } },
+          { primary: true, icon: 'book', title: nl >= 0 ? 'Lección: ' + (LESSONS[nl].titulo || '') : 'Lecciones', text: 'Cómo vuela un avión, paso a paso', onClick: function () { if (nl >= 0) lbOpen(nl); else navOpen('basico'); } },
           { icon: 'checklist', title: 'Checklist “Antes de arrancar”', text: 'Los primeros pasos antes de prender el motor', onClick: function () { openChecklist('antes-arrancar'); } }
         ],
         actions: [h('button', { type: 'button', class: 'btn btn--ghost', onclick: function () { trGo(0); } }, icon('retry'), 'Empezar de nuevo')]
@@ -3546,21 +3915,31 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     }
     var st = TOUR[TR.i], c = CTRL[st.control];
     var last = TR.i >= n - 1;
-    v.appendChild(h('article', { class: 'card step-card lp-card', 'aria-labelledby': 'tr-title' },
-      h('p', { class: 'kicker' }, c ? dot(catColor(c)) : null, c ? c.nombre : 'Control'),
-      h('div', { class: 'lp-prog' }, progressBar((TR.i + 1) / n), h('span', { class: 'step-n', text: 'Paso ' + (TR.i + 1) + ' de ' + n })),
-      h('h2', { class: 'placard', id: 'tr-title', tabindex: '-1', text: st.titulo || (c ? c.nombre : '') }),
-      st.texto ? h('p', { class: 'step-text', text: st.texto }) : null,
-      c ? h('div', { class: 'btn-row' },
-        h('button', { type: 'button', class: 'btn btn--small', onclick: trFocus }, kic('target'), 'Mostrámelo de nuevo'),
-        h('button', { type: 'button', class: 'btn btn--small', onclick: function () { UI.showControl(st.control); } }, 'Más detalles', icon('next'))) : null,
-      callK('tip', 'Si lo perdés de vista', 'El control de cada paso titila en la cabina. Tocá “Mostrámelo de nuevo” y la cámara va hacia él.'),
-      h('div', { class: 'btn-row btn-row--split lp-nav' },
-        h('button', { type: 'button', class: 'btn', disabled: TR.i === 0, onclick: function () { trGo(TR.i - 1); } }, icon('back'), 'Anterior'),
-        last
-          ? h('button', { type: 'button', class: 'btn btn--primary', onclick: function () { TR.finished = true; progMark('recorrido', 'tour'); store.set('tourStep', 0); trRender(); trFocus(); } }, 'Terminar el recorrido', icon('check'))
-          : h('button', { type: 'button', class: 'btn btn--primary', onclick: function () { trGo(TR.i + 1); } }, 'Siguiente', icon('next')))));
-    glossText(v, '.step-text, .callout-body', { control: st.control });
+    var R = runnerEl({ cls: 'tr-runner', titleId: 'tr-title', kicker: 'Paso R' + (TR.i + 1) + (c ? ' · ' + c.nombre : ''), count: (TR.i + 1) + ' / ' + n,
+      closeLabel: 'Volver al principio del recorrido', onClose: function () { trGo(0); }, frac: (TR.i + 1) / n, title: st.titulo || (c ? c.nombre : ''), text: st.texto });
+    if (c) {
+      R.appendChild(runnerMira('el control titila en la cabina. Si lo perdés de vista, tocá “Mostrámelo de nuevo” y la cámara va hacia él.'));
+      R.appendChild(h('div', { class: 'runner-links' },
+        h('button', { type: 'button', class: 'btn btn--small', onclick: function () { navLook(function () { trFocus(true); }, c.nombre); } }, kic('target'), 'Mostrámelo de nuevo'),
+        h('button', { type: 'button', class: 'btn btn--small', onclick: function () { UI.showControl(st.control); } }, 'Más detalles', icon('next'))));
+    }
+    R.appendChild(h('div', { class: 'runner-nav' },
+      h('button', { type: 'button', class: 'btn', disabled: TR.i === 0, onclick: function () { trGo(TR.i - 1); } }, icon('back'), 'Anterior'),
+      last
+        ? h('button', { type: 'button', class: 'btn btn--primary', onclick: function () { TR.finished = true; progMark('recorrido', 'tour'); store.set('tourStep', 0); trRender(); trFocus(); } }, 'Terminar el recorrido', icon('check'))
+        : h('button', { type: 'button', class: 'btn btn--primary', onclick: function () { trGo(TR.i + 1); } }, 'Siguiente', icon('next'))));
+    v.appendChild(R);
+    // every step as a card: jump straight to any control of the walk
+    var items = TOUR.map(function (x, j) {
+      var cj = CTRL[x.control];
+      return { code: 'R' + (j + 1), title: x.titulo || (cj ? cj.nombre : ''), sum: cj ? cj.nombre : '', meta: j < TR.i ? 'visto' : (j === TR.i ? 'estás acá' : 'por ver'),
+        current: j === TR.i, onClick: function () { trGo(j); } };
+    });
+    var cards = K.cardCarousel({ items: items, label: 'Todos los pasos del recorrido' });
+    for (var m = 0; m < TR.i; m++) cardDone(cards, m);
+    v.appendChild(K.section({ num: 'PA', title: 'Todos los pasos', meta: n + ' controles', open: !!TR.secOpen, body: cards, key: 'pasos',
+      onToggle: function (o) { TR.secOpen = o; } }));
+    glossText(v, '.step-text, .callout-body, .runner-mira > span', { control: st.control });
   }
 
   modeImpl.recorrido = {
@@ -3572,7 +3951,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   /* ================================================================== CHECKLISTS */
 
   var CHECKLISTS = arr(DATA.checklists).filter(function (c) { return c && arr(c.items).length; });
-  var CL = { listView: null, runView: null, announce: null, cur: null, live: [], lastDone: null, doneIds: arr(store.get('checklistsDone', [])) };
+  var CL = { listView: null, runView: null, announce: null, cur: null, open: false, live: [], lastDone: null, doneIds: arr(store.get('checklistsDone', [])) };
 
   function splitItem(t) {
     t = String(t || '');
@@ -3581,29 +3960,48 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   }
 
   function clMin(cl) { return Math.max(2, Math.round(arr(cl.items).length * 0.5)); }
+  /* v5 · V3 — Checklists con el lenguaje de AIRE: secciones numeradas por momento del vuelo, tarjetas con código (C1…) y el "runner" */
+  var CL_PHASES = [
+    { title: 'Antes de despegar', ids: ['antes-arrancar', 'arranque', 'prueba-motor'] },
+    { title: 'Aterrizar y cerrar', ids: ['antes-aterrizar', 'apagado'] }
+  ];
+  function clMeta(cl) { var n = arr(cl.items).length; return n + (n === 1 ? ' paso' : ' pasos') + ' · ' + clMin(cl) + ' min'; }
   function clRenderList() {
-    var v = CL.listView;
+    var v = CL.listView, K = C150.Kit;
     clear(v);
     v.appendChild(modeHead('Checklists', 'Una checklist es la lista de pasos que el piloto repite siempre, en el mismo orden, para no olvidarse de nada. Acá la hacés de verdad en la cabina 3D: cada paso se tilda solo cuando lo hacés bien.'));
     if (!CHECKLISTS.length) { v.appendChild(emptyState('Las checklists todavía no están cargadas.')); return; }
+    if (CL.cur && !CL.cur.finished && !CL.open) {
+      v.appendChild(continueRow({ icon: 'checklist', title: 'Checklist «' + (CL.cur.cl.titulo || '') + '»',
+        text: CL.cur.done.filter(Boolean).length + ' de ' + arr(CL.cur.cl.items).length + ' ítems hechos', onResume: clResume, onExit: clExit,
+        exitLabel: 'Dejar esta checklist', confirm: CL.cur.done.filter(Boolean).length ? 'Si la dejás, vas a perder los ítems que ya hiciste. ¿La dejamos?' : '' }));
+    }
     var doneN = CHECKLISTS.filter(function (c) { return CL.doneIds.indexOf(c.id) >= 0; }).length;
     var nextIdx = -1;
     for (var q = 0; q < CHECKLISTS.length; q++) if (CL.doneIds.indexOf(CHECKLISTS[q].id) < 0) { nextIdx = q; break; }
     v.appendChild(h('div', { class: 'lc-prog' }, pgBar(doneN / CHECKLISTS.length, doneN + ' de ' + CHECKLISTS.length + ' hechas', doneN === CHECKLISTS.length)));
-    var ul = h('ul', { class: 'lc-list', 'aria-label': 'Checklists' });
-    CHECKLISTS.forEach(function (cl, i) {
-      var done = CL.doneIds.indexOf(cl.id) >= 0, isNext = i === nextIdx, n = arr(cl.items).length;
-      ul.appendChild(h('li', null, h('button', { type: 'button', class: 'lcard' + (done ? ' is-done' : '') + (isNext ? ' is-next' : ''), onclick: function () { clOpen(i); } },
-        h('span', { class: 'lcard-n', 'aria-hidden': 'true' }, done ? kic('check') : ('0' + (i + 1)).slice(-2)),
-        h('span', { class: 'lcard-main' },
-          isNext ? h('span', { class: 'lcard-flag', text: CL.doneIds.length ? 'Siguiente' : 'Empezá por acá' }) : null,
-          h('span', { class: 'lcard-t', text: cl.titulo || cl.id }),
-          cl.descripcion ? h('span', { class: 'lcard-d', text: cl.descripcion }) : null,
-          h('span', { class: 'lcard-meta' }, metaItem('clock', clMin(cl) + ' min'), metaItem('checklist', n + (n === 1 ? ' paso' : ' pasos')),
-            done ? h('span', { class: 'lcard-ok' }, kic('check'), 'Hecha') : null)),
-        h('span', { class: 'lcard-go', 'aria-hidden': 'true' }, kic('chevron-right')))));
+    // sections = moments of the flight; a checklist that is not listed in CL_PHASES goes with the last group
+    var groups = CL_PHASES.map(function (p) {
+      return { title: p.title, idx: CHECKLISTS.map(function (c, i) { return p.ids.indexOf(c.id) >= 0 ? i : -1; }).filter(function (i) { return i >= 0; }) };
+    }).filter(function (g) { return g.idx.length; });
+    var listed = {};
+    groups.forEach(function (g) { g.idx.forEach(function (i) { listed[i] = true; }); });
+    var rest = CHECKLISTS.map(function (c, i) { return i; }).filter(function (i) { return !listed[i]; });
+    if (rest.length) { if (groups.length) groups[groups.length - 1].idx = groups[groups.length - 1].idx.concat(rest); else groups.push({ title: 'Checklists', idx: rest }); }
+    groups.forEach(function (g, gi) {
+      var items = g.idx.map(function (i) {
+        var cl = CHECKLISTS[i], running = !!(CL.cur && !CL.cur.finished && CL.cur.idx === i);
+        return { code: 'C' + (i + 1), title: cl.titulo || cl.id, sum: cl.descripcion || '', meta: clMeta(cl), current: running,
+          tag: running ? 'En curso' : (i === nextIdx ? (CL.doneIds.length ? 'Siguiente' : 'Empezá acá') : null), onClick: function () { clOpen(i); } };
+      });
+      var ul = K.cardCarousel({ items: items, list: true, label: 'Checklists: ' + g.title.toLowerCase() });
+      var hechas = 0;
+      g.idx.forEach(function (i, k) {
+        if (CL.doneIds.indexOf(CHECKLISTS[i].id) >= 0) { hechas++; cardDone(ul, k); }
+        else if (CL.cur && !CL.cur.finished && CL.cur.idx === i) cardBar(ul, k, CL.cur.done.filter(Boolean).length / Math.max(1, arr(CL.cur.cl.items).length), 'Ítems hechos');
+      });
+      v.appendChild(secK(gi + 1, g.title, hechas + '/' + g.idx.length + ' hechas', ul, 'cl-g' + gi));
     });
-    v.appendChild(ul);
     v.appendChild(acc('¿Por qué los pilotos usan checklists?', h('div', null,
       h('p', { text: 'Porque la memoria falla, incluso con mucha experiencia. Una lista escrita asegura que cada vuelo empiece igual y que no se salte nada importante, como sacar la traba de comandos o abrir la válvula de nafta.' }),
       h('p', { text: 'Se lee un ítem, se hace, se verifica, y recién entonces se pasa al siguiente. Eso es justo lo que practicás acá.' })), { icon: 'bulb' }));
@@ -3611,13 +4009,24 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     glossText(v, '.mode-sub, .acc-body, .callout-body');
   }
 
+  /** User-level: list → run is a detail entry (UP == Back); from another tab it is an ABRIR. */
   function clOpen(idx, forceFresh) {
     var cl = CHECKLISTS[idx];
     if (!cl) return;
+    if (!navOn()) { if (mode !== 'checklists') setMode('checklists'); clOpenRaw(idx, forceFresh); return; }
+    if (mode !== 'checklists') { navOpen('checklists/' + cl.id); return; }
+    navDetail('detail', 'checklists/' + cl.id, function () { clOpenRaw(idx, forceFresh); });
+  }
+  function clOpenRaw(idx, forceFresh) {
+    var cl = CHECKLISTS[idx];
+    if (!cl) return;
+    if (!CL.listView) { setMode('checklists'); if (!CL.listView) return; }
+    if (!forceFresh && CL.cur && CL.cur.idx === idx && !CL.cur.finished) { clShowRaw(); return; }   // the run in progress: go on where it was
     var carry = !forceFresh && !!cl.continuaDe && CL.lastDone === cl.continuaDe;
     if (!carry && cl.preset) applyPreset(cl.preset);
     progTouch('checklist', cl.id);
     CL.cur = { cl: cl, idx: idx, done: arr(cl.items).map(function () { return false; }), i: 0, finished: false, carried: carry, skipped: 0 };
+    CL.open = true;
     CL.listView.hidden = true;
     CL.runView.hidden = false;
     clRenderRun();
@@ -3626,23 +4035,51 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     setText(CL.announce, 'Checklist ' + (cl.titulo || '') + ': ' + arr(cl.items).length + ' ítems.');
   }
 
+  /** "Checklists" button / UP: back to the list. A run half done stays in progress ("Continuar"); a finished one is closed. */
   function clBack() {
+    var n = NAV();
+    if (navOn() && n && isFn(n.up) && n.up()) return;
+    clBackRaw();
+  }
+  function clBackRaw() {
     releaseAllHolds();
-    CL.cur = null;
+    if (CL.cur && CL.cur.finished) CL.cur = null;
     CL.live = [];
+    CL.open = false;
     cc('setTargetHighlight', null);
     CL.runView.hidden = true;
     CL.listView.hidden = false;
     clRenderList();
     scrollPanelTop();
   }
+  /** "Continuar": back into the run that was left half way. */
+  function clResume() {
+    if (!CL.cur) return;
+    if (!navOn() || mode !== 'checklists') { clShowRaw(); return; }
+    navDetail('detail', 'checklists/' + CL.cur.cl.id, clShowRaw);
+  }
+  function clShowRaw() {
+    if (!CL.cur) return;
+    CL.open = true;
+    CL.listView.hidden = true;
+    CL.runView.hidden = false;
+    clRenderRun();
+    clFocusCurrent();
+    scrollPanelTop();
+  }
+  /** "Dejar esta checklist": forget the progress of the run in progress. */
+  function clExit() {
+    CL.cur = null;
+    if (CL.open) clBackRaw(); else { clRenderList(); kick(); }
+  }
 
   /** Highlights the current item's control and flies the camera to it — never while the student is still moving
    *  something (that was the bug: the camera and the 3D drag jumped to the next control mid-drag). */
-  function clFocusCurrent() {
+  function clFocusCurrent(isLook) {
+    if (isLook !== true) navClearLook();
     whenIdle(function () {
       var cur = CL.cur;
-      if (mode !== 'checklists') return;
+      if (mode !== 'checklists' || !CL.open) return;
       if (!cur || cur.finished) { cc('setTargetHighlight', null); return; }
       var it = cur.cl.items[cur.i];
       var id = it && CTRL[it.control] ? it.control : null;
@@ -3671,35 +4108,68 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       parts[1] ? h('span', { class: 'stp-row-r', text: parts[1] }) : null);
   }
 
-  /** The current item, large: what to do, what to leave it at, where it is, why it matters, and the control to try. */
-  function clCurrent(cur) {
-    var it = cur.cl.items[cur.i] || {}, parts = splitItem(it.texto), c = CTRL[it.control], n = arr(cur.cl.items).length;
-    var auto = isFn(it.check);
-    var okEl = auto ? h('p', { class: 'cl-ok', hidden: true, role: 'status' }, icon('check'), h('span', { class: 'cl-ok-text' })) : null;
-    CL.okEl = okEl;
-    var actions = h('div', { class: 'stp-actions' });
-    if (c) actions.appendChild(h('button', { type: 'button', class: 'btn', onclick: clFocusCurrent }, kic('target'), 'Mostrámelo en 3D'));
-    if (!auto) actions.appendChild(h('button', { type: 'button', class: 'btn btn--primary cl-confirm', onclick: function () { clTick(false); } }, kic('check'), 'Hecho'));
-    var pb = c ? buildProbalo(c, CL.live, true) : null;
-    return h('section', { class: 'stp-cur', 'aria-label': 'Ítem actual', 'aria-current': 'step' },
-      h('p', { class: 'stp-k' }, h('span', { class: 'stp-now', text: 'Ahora' }), h('span', { class: 'stp-of', text: 'Ítem ' + (cur.i + 1) + ' de ' + n }),
-        c ? h('span', { class: 'stp-ctl' }, dot(catColor(c)), c.nombre) : null),
-      h('h3', { class: 'stp-name', id: 'stp-name', tabindex: '-1', text: parts[0] }),
-      parts[1] ? h('p', { class: 'stp-val' }, h('span', { class: 'stp-val-k', text: 'Dejalo en' }), h('strong', { text: parts[1] })) : null,
-      okEl,
-      auto ? h('p', { class: 'stp-hint' }, kic('hand'), 'Hacelo en la cabina 3D (o con “Probalo”). Cuando esté bien y lo sueltes, se tilda solo.')
-        : h('p', { class: 'stp-hint' }, kic('eye'), 'Este paso no se puede comprobar en el simulador: hacelo mentalmente y tocá “Hecho”.'),
-      actions,
-      it.detalle ? acc('¿Por qué importa?', h('p', { text: it.detalle }), { icon: 'bulb', open: !cc('isMobile') }) : null,
-      pb ? h('div', { class: 'cl-probalo' }, pb) : null,
-      auto ? h('div', { class: 'stp-skip' }, h('button', { type: 'button', class: 'btn btn--small btn--ghost', onclick: function () { clTick(true); } }, 'No me sale: saltear este ítem')) : null);
+  /** What each control reads as a live bar: [label, fraction 0..1, words]. The ones that are not here only get the readout (ctrlLiveValue). */
+  function pctWord(s, f) { return Math.round(f * 100) + ' %'; }
+  var CL_BAR = {
+    throttle: ['Potencia', function (s) { return num(s.throttle, 0); }, pctWord],
+    mixture: ['Mezcla', function (s) { return num(s.mixture, 0); }, function (s, f) { return f < 0.04 ? 'Corte' : (f > 0.96 ? 'Rica' : pctWord(s, f)); }],
+    'carb-heat': ['Calor', function (s) { return num(s.carbHeat, 0); }, function (s, f) { return f < 0.04 ? 'Fría' : (f > 0.96 ? 'Caliente' : pctWord(s, f)); }],
+    'trim-wheel': ['Compens.', function (s) { return (num(s.trim, 0) + 1) / 2; }, function (s) { return fmtSigned(num(s.trim, 0), 2); }],
+    'flap-switch': ['Flaps', function (s) { return num(s.flaps, 0) / 40; }, function (s) { return Math.round(num(s.flaps, 0)) + '°'; }],
+    'flap-indicator': ['Flaps', function (s) { return num(s.flaps, 0) / 40; }, function (s) { return Math.round(num(s.flaps, 0)) + '°'; }],
+    'cabin-heat': ['Apertura', function (s) { return num(s.cabinHeat, 0); }, pctWord],
+    'cabin-air': ['Apertura', function (s) { return num(s.cabinAir, 0); }, pctWord],
+    tachometer: ['Vueltas', function (s) { return num((s.engine || {}).rpm, 0) / 3000; }, function (s) { return Math.round(num((s.engine || {}).rpm, 0) / 10) * 10 + ''; }],
+    asi: ['Velocidad', function (s) { return Math.max(0, num((s.air || {}).ias, 0)) / 160; }, function (s) { return Math.round(Math.max(0, num((s.air || {}).ias, 0))) + ' kt'; }],
+    'parking-brake': ['Freno', function (s) { return s.parkingBrake ? 1 : 0; }, function (s) { return s.parkingBrake ? 'Puesto' : 'Suelto'; }],
+    'control-lock': ['Traba', function (s) { return s.controlLock ? 1 : 0; }, function (s) { return s.controlLock ? 'Puesta' : 'Sacada'; }],
+    'fuel-shutoff': ['Válvula', function (s) { return s.fuelValve ? 1 : 0; }, function (s) { return s.fuelValve ? 'Abierta' : 'Cerrada'; }]
+  };
+  /** "Ahora": the live value of the control this item is about, big, and as an AIRE bar when it is a position. null when there is nothing to read. */
+  function clMeter(id, live) {
+    var s0 = S(), K = C150.Kit, spec = CL_BAR[id];
+    if (!s0 || (!spec && !ctrlLiveValue(id, s0))) return null;
+    var read = h('output', { class: 'cl-now-v' });
+    var bars = spec && K && isFn(K.bars) ? K.bars({ rows: [{ key: 'v', label: spec[0], color: 'var(--accent)' }] }) : null;
+    live.push(function (s) {
+      setText(read, ctrlLiveValue(id, s) || '—');
+      if (bars) { var f = clamp(num(spec[1](s), 0), 0, 1); bars.set('v', f, spec[2](s, f)); }
+    });
+    return h('div', { class: 'cl-now', role: 'group', 'aria-label': 'Cómo está ahora' },
+      h('p', { class: 'cl-now-k' }, h('span', { class: 'live-dot', 'aria-hidden': 'true' }), 'Ahora está'), read, bars);
+  }
+  /** One-line cue under the title ("Hacelo: …" / "Ojo: …"), same family as the runner's "Mirá:". */
+  function clCue(iconName, label, text) {
+    return h('p', { class: 'runner-mira cl-hint' }, kic(iconName), h('span', null, h('strong', { text: label + ' ' }), text));
   }
 
-  function clNextChecklist(cur) {
-    var i, x = null;
-    for (i = 0; i < CHECKLISTS.length; i++) if (CHECKLISTS[i].continuaDe === cur.cl.id) { x = i; break; }
-    if (x === null) for (i = cur.idx + 1; i < CHECKLISTS.length; i++) if (CL.doneIds.indexOf(CHECKLISTS[i].id) < 0) { x = i; break; }
-    return x;
+  /** The current item as the AIRE runner: kicker, count, progress, the item as a big title, "Dejalo en" pill, live reading, actions. */
+  function clRunner(cur) {
+    var cl = cur.cl, n = arr(cl.items).length, it = cl.items[cur.i] || {}, parts = splitItem(it.texto), c = CTRL[it.control], auto = isFn(it.check);
+    var doneN = cur.done.filter(Boolean).length;
+    var okEl = auto ? h('p', { class: 'cl-ok', hidden: true, role: 'status' }, icon('check'), h('span', { class: 'cl-ok-text' })) : null;
+    CL.okEl = okEl;
+    var R = runnerEl({ cls: 'cl-runner', titleId: 'stp-name', kicker: 'Checklist C' + (cur.idx + 1) + ' · ' + (cl.titulo || ''), count: (cur.i + 1) + ' / ' + n,
+      closeLabel: 'Volver a las checklists', onClose: clBack, frac: doneN / n, title: parts[0], text: '' });
+    if (parts[1]) R.appendChild(h('p', { class: 'cl-val' }, h('span', { class: 'cl-val-k', text: 'Dejalo en' }), h('strong', { text: parts[1] })));
+    var meter = c ? clMeter(it.control, CL.live) : null;
+    if (meter) R.appendChild(meter);
+    if (okEl) R.appendChild(okEl);
+    R.appendChild(auto ? clCue('hand', 'Hacelo:', 'en la cabina 3D (o con “Probalo”). Cuando esté bien y lo soltás, se tilda solo.')
+      : clCue('eye', 'Ojo:', 'este paso no se puede comprobar en el simulador. Hacelo mentalmente y tocá “Hecho”.'));
+    if (c) {
+      R.appendChild(h('div', { class: 'runner-links' },
+        h('button', { type: 'button', class: 'btn btn--small', onclick: function () { navLook(function () { clFocusCurrent(true); }, c.nombre); } }, kic('target'), 'Mostrámelo en 3D'),
+        h('button', { type: 'button', class: 'btn btn--small', onclick: function () { UI.showControl(it.control); } }, kic('cabin'), 'Ver la ficha: ' + c.nombre)));
+    }
+    if (!auto) {
+      R.appendChild(h('div', { class: 'runner-nav cl-nav' },
+        h('button', { type: 'button', class: 'btn', onclick: function () { clTick(true); } }, kic('minus'), 'Saltear'),
+        h('button', { type: 'button', class: 'btn btn--primary cl-confirm', onclick: function () { clTick(false); } }, 'Hecho', kic('check'))));
+    } else {
+      R.appendChild(h('div', { class: 'stp-skip' }, h('button', { type: 'button', class: 'btn btn--small btn--ghost', onclick: function () { clTick(true); } }, 'No me sale: saltear este ítem')));
+    }
+    return R;
   }
 
   function clRenderRun() {
@@ -3711,67 +4181,70 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     clear(v);
     if (!cur) return;
     var cl = cur.cl, items = arr(cl.items), n = items.length;
-    var doneN = cur.done.filter(Boolean).length;
-    v.appendChild(h('div', { class: 'detail-top lp-top' },
-      h('button', { type: 'button', class: 'btn btn--ghost btn--small back-btn', onclick: clBack }, icon('back'), 'Checklists'),
-      h('span', { class: 'lp-count', text: 'Checklist ' + (cur.idx + 1) + ' de ' + CHECKLISTS.length })));
-    var seen = {};
-    cur.done.forEach(function (d, k) { if (d) seen[k] = d === 'skip' ? 'skip' : true; });
-    v.appendChild(h('article', { class: 'card stp-head', 'aria-labelledby': 'cl-title' },
-      h('p', { class: 'kicker', text: 'Checklist' }),
-      h('h2', { class: 'placard detail-title', id: 'cl-title', tabindex: '-1', text: cl.titulo || '' }),
-      cl.descripcion ? h('p', { class: 'soft', text: cl.descripcion }) : null,
-      cur.carried ? callK('dato', 'Seguís con el mismo avión', 'Quedó tal como lo dejaste al terminar la checklist anterior.') : null,
-      cur.carried ? h('div', { class: 'btn-row' }, h('button', { type: 'button', class: 'btn btn--small', onclick: function () { clOpen(cur.idx, true); } }, 'Empezar de cero')) : null,
-      h('div', { class: 'lp-prog' }, stepBar(n, cur.finished ? -1 : cur.i, seen, null, 'Ítems de la checklist'),
-        h('span', { class: 'step-n', text: doneN + ' de ' + n }))));
-    // what was already done: the last three ticked, the rest folded
-    var past = [];
-    items.forEach(function (it, k) { if (cur.done[k]) past.push(k); });
-    if (past.length) {
-      var shown = cur.finished ? [] : past.slice(-3), older = cur.finished ? past : past.slice(0, -3);
-      if (shown.length) {
-        v.appendChild(h('ol', { class: 'stp-list stp-list--done', 'aria-label': 'Ítems ya hechos' }, shown.map(function (k) { return clDoneRow(items[k] || {}, k, cur); })));
-      }
+    var past = [], todo = [];
+    items.forEach(function (it, k) { if (cur.done[k]) past.push(k); else if (k > cur.i) todo.push(k); });
+    var secs = [];                                                           // [title, meta, body, key, openByDefault]
+    function pastBody() {
+      var shown = cur.finished ? [] : past.slice(-3), older = cur.finished ? past : past.slice(0, -3), box = h('div');
+      if (shown.length) box.appendChild(h('ol', { class: 'stp-list stp-list--done', 'aria-label': 'Ítems ya hechos' }, shown.map(function (k) { return clDoneRow(items[k] || {}, k, cur); })));
       if (older.length) {
-        v.appendChild(acc((cur.finished ? 'Lo que hiciste' : 'Ver los ' + older.length + ' anteriores') + ' (' + older.length + ')',
-          h('ol', { class: 'stp-list stp-list--done', 'aria-label': 'Ítems anteriores' }, older.map(function (k) { return clDoneRow(items[k] || {}, k, cur); })), { icon: 'check' }));
+        box.appendChild(older.length > 4 && !cur.finished
+          ? acc('Ver los ' + older.length + ' anteriores', h('ol', { class: 'stp-list stp-list--done', 'aria-label': 'Ítems anteriores' }, older.map(function (k) { return clDoneRow(items[k] || {}, k, cur); })), { icon: 'check' })
+          : h('ol', { class: 'stp-list stp-list--done', 'aria-label': 'Ítems anteriores' }, older.map(function (k) { return clDoneRow(items[k] || {}, k, cur); })));
       }
+      return box;
     }
     if (cur.finished) {
       var nx = clNextChecklist(cur), nm = firstUndone(MISSIONS, 'mision');
       var sg = [];
       if (nx !== null) sg.push({ primary: true, icon: 'checklist', title: 'Checklist: ' + (CHECKLISTS[nx].titulo || ''), text: clMin(CHECKLISTS[nx]) + ' min · ' + arr(CHECKLISTS[nx].items).length + ' pasos', onClick: function () { clOpen(nx); } });
       if (nm >= 0) sg.push({ primary: nx === null, icon: 'plane', title: 'Misión: ' + (MISSIONS[nm].titulo || ''), text: 'Ahora volalo vos', onClick: function () { startMission(MISSIONS[nm]); sheetEnsure('half'); } });
-      else sg.push({ icon: 'quiz', title: 'Quiz rápido', text: 'Probá lo que aprendiste', onClick: function () { setMode('quiz'); scrollPanelTop(); } });
+      else sg.push({ icon: 'quiz', title: 'Quiz rápido', text: 'Probá lo que aprendiste', onClick: function () { navOpen('quiz'); } });
       v.appendChild(doneCard({
-        id: 'cl-done-title', kicker: 'Checklist completa', title: cl.titulo || '¡Checklist completa!',
+        id: 'cl-done-title', kicker: 'Checklist C' + (cur.idx + 1) + ' completa', title: cl.titulo || '¡Checklist completa!',
         text: 'Hiciste los ' + n + ' ítems en orden.' + (cur.skipped ? ' Salteaste ' + cur.skipped + (cur.skipped === 1 ? ' ítem: practicalo de nuevo.' : ' ítems: practicalos de nuevo.') : ' Así, siempre en el mismo orden, se vuelve automático.'),
         suggestions: sg,
         actions: [h('button', { type: 'button', class: 'btn', onclick: function () { clOpen(cur.idx, true); } }, icon('retry'), 'Repetir'),
           h('button', { type: 'button', class: 'btn btn--ghost', onclick: clBack }, 'Todas las checklists')]
       }));
+      secs.push(['Lo que hiciste', past.length + '/' + n, pastBody(), 'cl-r-done', false]);
     } else {
-      v.appendChild(clCurrent(cur));
-      var todo = [];
-      items.forEach(function (it, k) { if (k > cur.i) todo.push(k); });
-      if (todo.length) {
-        v.appendChild(acc('Lo que sigue (' + todo.length + ')', h('ol', { class: 'stp-list', 'aria-label': 'Ítems que siguen' }, todo.map(function (k) { return clTodoRow(items[k] || {}, k); })), { icon: 'list' }));
+      var it = items[cur.i] || {}, c = CTRL[it.control];
+      v.appendChild(clRunner(cur));
+      if (cur.carried) {
+        v.appendChild(h('div', { class: 'cl-carried' }, callK('dato', 'Seguís con el mismo avión', 'Quedó tal como lo dejaste al terminar la checklist anterior.'),
+          h('div', { class: 'btn-row' }, h('button', { type: 'button', class: 'btn btn--small', onclick: function () { clOpen(cur.idx, true); } }, 'Empezar de cero'))));
       }
+      var pb = c ? buildProbalo(c, CL.live, true, true) : null;
+      if (pb) secs.push(['Probalo', 'o en el 3D', h('div', { class: 'cl-probalo' }, pb), 'cl-r-pb', true]);
+      if (it.detalle) secs.push(['Por qué importa', '', h('p', { class: 'cl-why', text: it.detalle }), 'cl-r-why', !cc('isMobile')]);
+      if (past.length) secs.push(['Ya hecho', past.length + '/' + n, pastBody(), 'cl-r-done', true]);
+      if (todo.length) secs.push(['Lo que sigue', todo.length + (todo.length === 1 ? ' ítem' : ' ítems'),
+        h('ol', { class: 'stp-list', 'aria-label': 'Ítems que siguen' }, todo.map(function (k) { return clTodoRow(items[k] || {}, k); })), 'cl-r-todo', false]);
+    }
+    secs.forEach(function (x, i) { v.appendChild(secK(i + 1, x[0], x[1], x[2], x[3], x[4])); });
+    if (!cur.finished) {
       v.appendChild(h('div', { class: 'btn-row stp-reset' },
         h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: function () { clOpen(cur.idx, true); } }, icon('retry'), 'Reiniciar la checklist')));
     }
-    glossText(v, '.stp-hint, .acc-body, .callout-body, .stp-head .soft');
+    glossText(v, '.cl-hint > span, .cl-why, .callout-body');
     var s = S();
     if (s) runLive(CL.live, s);
     if (hadFocus) {
-      var target = v.querySelector('.stp-cur .btn') || v.querySelector('.done-card button') || $('cl-title');
+      var target = v.querySelector('.cl-runner .cl-confirm') || v.querySelector('.cl-runner .btn') || v.querySelector('.done-card button') || $('stp-name') || $('cl-done-title');
       if (target) safe(function () { target.focus({ preventScroll: true }); });
     }
-    var curEl = v.querySelector('.stp-cur');
+    var curEl = v.querySelector('.cl-runner');
     if (curEl && mode === 'checklists' && curEl.scrollIntoView) {
       safe(function () { curEl.scrollIntoView({ block: 'nearest', behavior: reducedMotion() ? 'auto' : 'smooth' }); });
     }
+  }
+
+  function clNextChecklist(cur) {
+    var i, x = null;
+    for (i = 0; i < CHECKLISTS.length; i++) if (CHECKLISTS[i].continuaDe === cur.cl.id) { x = i; break; }
+    if (x === null) for (i = cur.idx + 1; i < CHECKLISTS.length; i++) if (CL.doneIds.indexOf(CHECKLISTS[i].id) < 0) { x = i; break; }
+    return x;
   }
 
   function clTick(skipped) {
@@ -3816,7 +4289,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
    *  0.45 s ago (they see "✓ Bien" first): passing through the target mid-drag never jumps to the next item. */
   function clEvaluate(s) {
     var cur = CL.cur;
-    if (!cur || cur.finished) return;
+    if (!cur || cur.finished || !CL.open || mode !== 'checklists') return;              // a run left on the side waits, exactly where it was
     var it = cur.cl.items[cur.i];
     if (!it || !isFn(it.check)) { clSetOk(null); return; }
     var ok = false;
@@ -3843,7 +4316,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       sec.appendChild(CL.runView);
       clRenderList();
     },
-    enter: function () { if (CL.cur) clFocusCurrent(); },
+    enter: function () { if (CL.open && CL.cur) clFocusCurrent(); },
     exit: function () { cc('setTargetHighlight', null); }
   };
 
@@ -3860,7 +4333,12 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
 
   function freshCtx() { return { t: 0, dt: 0, hold: 0, data: {} }; }
 
+  /** User-level: from another tab it is an ABRIR to Misiones. */
   function startMission(m) {
+    if (mode !== 'volar' && navOn()) { navOpen('volar', { run: function () { startMissionRaw(m); } }); return; }
+    startMissionRaw(m);
+  }
+  function startMissionRaw(m) {
     if (sitOk() && isFn(C150.Situations.stop)) safe(function () { C150.Situations.stop(); }, 'Situations.stop');
     VO.tab = 'practicar';
     progTouch('mision', m.id);
@@ -4007,66 +4485,28 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     return h('div', { class: 'vsl' + (red ? ' vsl--red' : '') }, h('span', { class: 'vsl-name', text: name }), track, val);
   }
 
-  function stackLabel(main, small) { return [h('span', { text: main }), h('small', { text: small })]; }
 
+  /** The panel's flight controls with the AIRE components: the yoke pad, then each control as a Kit slider / detents / hold segmented row. */
   function flightPad(live) {
     var yoke = wYoke(CTRL.yoke || { nombre: 'Volante' }, live, true);
-    var thr = vSlider('Acelerador', 'throttle', false, live, function (v, s) {
-      var e = (s && s.engine) || {};
-      return pct(v) + '\n' + (num(e.rpm, 0) > 50 ? Math.round(num(e.rpm, 0) / 10) * 10 + ' RPM' : 'apagado');
-    });
-    var mix = vSlider('Mezcla', 'mixture', true, live, function (v) {
-      return v < 0.04 ? 'CORTE' : (v > 0.96 ? 'RICA' : pct(v));
-    });
-
-    var carb = h('button', {
-      type: 'button', class: 'btn btn--stack', 'aria-pressed': 'false',
-      onclick: function () { setInput('carbHeat', num(getInput('carbHeat'), 0) > 0.5 ? 0 : 1); }
-    }, stackLabel('Calef. carburador', 'fría'));
-    var flapUp = h('button', {
-      type: 'button', class: 'btn btn--stack', 'aria-pressed': 'false',
-      onclick: function () { setFlapSwitch(getInput('flapSwitch') === 'UP' ? 'OFF' : 'UP'); }
-    }, stackLabel('Subir flaps', 'R'));
-    var flapDnSmall = h('small', { text: 'F' });
-    var flapDn = holdButton([h('span', { text: 'Bajar flaps' }), flapDnSmall],
-      function () { hold('flap-switch', null, true); }, function () { hold('flap-switch', null, false); }, 'btn--stack', 'Bajar flaps: mantené apretado');
-    var view = h('button', {
-      type: 'button', class: 'btn btn--stack span2',
-      onclick: function () { cc('setMainView', mainView === 'exterior' ? 'cockpit' : 'exterior'); syncMainView(); kick(); }
-    }, h('span', { class: 'vo-view-lbl', text: 'Ver desde afuera' }), h('small', { text: 'C' }));
-    var pause = h('button', {
-      type: 'button', class: 'btn btn--stack span2', 'aria-pressed': 'false',
-      onclick: function () {
-        var s = S(); if (!s) return;
-        if (has('setPaused')) cc('setPaused', !s.paused); else s.paused = !s.paused;
-        kick();
-      }
-    }, h('span', { class: 'vo-pause-lbl', text: 'Pausa' }), h('small', { text: 'P' }));
-
-    live.push(function (s) {
-      var ch = num(s.carbHeat, 0) > 0.5;
-      setAttr(carb, 'aria-pressed', ch ? 'true' : 'false');
-      setText(carb.querySelector('small'), ch ? 'caliente' : 'fría');
-      setAttr(flapUp, 'aria-pressed', s.flapSwitch === 'UP' ? 'true' : 'false');
-      setText(flapDnSmall, 'F · ' + Math.round(num(s.flaps, 0)) + '°');
-      setText(view.querySelector('.vo-view-lbl'), mainView === 'exterior' ? 'Ver la cabina' : 'Ver desde afuera');
-      setAttr(pause, 'aria-pressed', s.paused ? 'true' : 'false');
-      setText(pause.querySelector('.vo-pause-lbl'), s.paused ? 'Seguir' : 'Pausa');
-    });
-
+    function widget(id) { var c = CTRL[id]; return c ? buildProbalo(c, live, true, true) : null; }
+    function grp(cap, kids, cls) { return h('div', { class: 'ctl-group' + (cls ? ' ' + cls : '') }, ctlCap(cap), kids); }
+    var pause = switchBtn('Pausa', function () { var s = S(); return !!(s && s.paused); }, function (on) {
+      var s = S(); if (!s) return;
+      if (has('setPaused')) cc('setPaused', !!on); else s.paused = !!on;
+      kick();
+    }, 'congelado', 'volando', live);
+    var view = switchBtn('Ver desde afuera', function () { return mainView === 'exterior'; }, function (on) {
+      cc('setMainView', on ? 'exterior' : 'cockpit'); syncMainView(); kick();
+    }, 'afuera', 'adentro', live);
     return h('div', { class: 'flypad', role: 'group', 'aria-label': 'Mandos en pantalla' },
       h('p', { class: 'flypad-ovnote' }, 'El ', h('strong', { text: 'volante' }), ', los pedales, los frenos y el acelerador están sobre la vista 3D, abajo. Acá tenés el resto.'),
-      yoke,
-      h('div', { class: 'flypad-sliders' }, thr, mix),
-      h('div', { class: 'flypad-btns' },
-        holdButton(stackLabel('◀ Pedal', 'Z'), function () { hold('rudder-pedals', 'left', true); }, function () { hold('rudder-pedals', 'left', false); }, 'btn--stack', 'Pedal izquierdo: mantené apretado'),
-        holdButton(stackLabel('Frenos', 'B'), function () { hold('toe-brakes', null, true); }, function () { hold('toe-brakes', null, false); }, 'btn--stack', 'Frenos: mantené apretado'),
-        holdButton(stackLabel('Pedal ▶', 'X'), function () { hold('rudder-pedals', 'right', true); }, function () { hold('rudder-pedals', 'right', false); }, 'btn--stack', 'Pedal derecho: mantené apretado'),
-        carb,
-        flapUp, flapDn,
-        holdButton(stackLabel('Compensador ▼', 'nariz abajo · T'), function () { VO.trimDir = -1; }, function () { VO.trimDir = 0; }, 'btn--stack', 'Compensador nariz abajo: mantené apretado'),
-        holdButton(stackLabel('Compensador ▲', 'nariz arriba · G'), function () { VO.trimDir = 1; }, function () { VO.trimDir = 0; }, 'btn--stack', 'Compensador nariz arriba: mantené apretado'),
-        view, pause));
+      grp('Volante · inclinar y cabecear', yoke, 'flypad-yoke'),
+      grp('Motor · potencia, mezcla y calor', [widget('throttle'), widget('mixture'), widget('carb-heat')], 'flypad-engine'),
+      grp('Flaps · para volar lento', widget('flap-switch')),
+      grp('Compensador · aliviar el volante', widget('trim-wheel')),
+      grp('Pedales y frenos', widget('rudder-pedals'), 'flypad-feet'),
+      grp('Vista y pausa', togGrid([pause, view])));
   }
 
   /**
@@ -4123,6 +4563,9 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
 
   var MISSION_LEVEL = { arrancar: 1, carreteo: 1, despegue: 2, 'recto-nivelado': 2, ascenso: 2, viraje: 3, perdida: 3, aproximacion: 3 };
   function missionLevel(m) { return MISSION_LEVEL[m.id] || 2; }
+  // by level (stable): M1, M2… follow the order of the sections, so the "next" mission is always the next one down the list
+  MISSIONS = MISSIONS.map(function (m, i) { return [m, i]; }).sort(function (x, y) { return (missionLevel(x[0]) - missionLevel(y[0])) || (x[1] - y[1]); }).map(function (x) { return x[0]; });
+  var MISSION_LEVELS = [{ n: 1, title: 'Primeros pasos' }, { n: 2, title: 'Volar de verdad' }, { n: 3, title: 'Maniobras' }];
   /** "01 ── Título ───" (Kit) with a plain fallback. */
   function sectHead(n, title, meta) {
     var K = C150.Kit;
@@ -4134,63 +4577,84 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     if (K && isFn(K.progressRing)) return K.progressRing(frac, { size: size || 56, ok: !!ok, text: Math.round(clamp(frac, 0, 1) * 100) + '%', ariaLabel: 'Mejor intento' });
     return h('span', { class: 'pct', text: Math.round(clamp(frac, 0, 1) * 100) + ' %' });
   }
+  function clockText(t) { t = Math.max(0, Math.floor(num(t, 0))); return Math.floor(t / 60) + ':' + ('0' + (t % 60)).slice(-2); }
+  /** "AHORA" block of a run (AIRE look): mono label with the live dot, a big readout and, under it, live bars. Returns {el, big, bars}. */
+  function nowBlock(label, barLabel) {
+    var K = C150.Kit;
+    var big = h('output', { class: 'cl-now-v vo-big' });
+    var bars = K && isFn(K.bars) ? K.bars({ rows: [{ key: 'p', label: barLabel || 'Avance', color: 'var(--accent)' }] }) : null;
+    return { el: h('div', { class: 'cl-now vo-now', role: 'group', 'aria-label': label }, h('p', { class: 'cl-now-k' }, h('span', { class: 'live-dot', 'aria-hidden': 'true' }), label), big, bars), big: big, bars: bars };
+  }
 
-  function missionPanel(live) {
-    var m = VO.m;
-    var bar = progressBar(VO.progress, VO.achieved);
-    var pctEl = h('span', { class: 'pct' });
+  function endMission() {
+    if (!VO.achieved && VO.progress > 0.1) confirmLeave('Terminar la misión', 'Si la terminás ahora, perdés lo que llevás de esta vez. ¿La terminamos?', stopMission); else stopMission();
+  }
+  /** The running mission as the AIRE runner: kicker M3 · level, live percentage, progress line, title, objective, live bars; steps and tip below. */
+  function missionPanel(live, secs) {
+    var m = VO.m, mi = MISSIONS.indexOf(m);
+    var R = runnerEl({ cls: 'vo-runner', titleId: 'vo-mission-title', kicker: 'Misión M' + (mi + 1) + ' · ' + DIFF_TXT[missionLevel(m)], count: '0 %', closeLabel: 'Terminar la misión',
+      onClose: endMission, frac: 0, title: m.titulo || '', text: m.objetivo || '' });
+    var fill = R.querySelector('.runner-prog > span'), count = R.querySelector('.runner-count');
+    var now = nowBlock('Tu avance', 'Objetivo');
+    var clock = h('p', { class: 'vo-clock' }, kic('clock'), h('span', { class: 'vo-clock-t' }), h('span', { class: 'vo-clock-b' }));
     live.push(function () {
-      bar.set(VO.progress, VO.achieved);
-      setText(pctEl, VO.achieved ? 'Cumplida' : Math.round(VO.progress * 100) + ' %');
+      var f = clamp(VO.progress, 0, 1), p = Math.round(f * 100) + ' %';
+      if (fill) fill.style.width = (f * 100).toFixed(1) + '%';
+      setText(count, VO.achieved ? 'Cumplida' : p);
+      setText(now.big, VO.achieved ? '¡Cumplida!' : p);
+      if (now.bars) now.bars.set('p', f, p);
+      setText(clock.querySelector('.vo-clock-t'), 'Tiempo ' + clockText(VO.ctx ? VO.ctx.t : 0));
+      var b = clamp(num(VO.best[m.id], 0), 0, 1);
+      setText(clock.querySelector('.vo-clock-b'), b > 0 ? ' · mejor intento ' + Math.round(b * 100) + ' %' : '');
     });
+    R.setAttribute('role', 'status');
+    R.appendChild(now.el);
+    R.appendChild(clock);
+    R.appendChild(h('div', { class: 'runner-nav vo-nav' },
+      h('button', { type: 'button', class: 'btn', onclick: endMission }, 'Terminar misión'),
+      h('button', { type: 'button', class: 'btn btn--primary', onclick: function () { startMission(m); } }, icon('retry'), VO.achieved ? 'Otra vez' : 'Reintentar')));
+    var out = [R];
     var pasos = arr(m.pasos);
-    var ol = null;
-    if (pasos.length) { ol = h('ol', { class: 'steps' }); pasos.forEach(function (p) { ol.appendChild(h('li', { text: typeof p === 'string' ? p : (p && p.texto) || '' })); }); }
-    var nm = firstUndone(MISSIONS, 'mision', m.id);
-    var out = [
-      h('div', { class: 'mission-bar', role: 'status' },
-        h('div', { class: 'mission-bar-top' }, h('span', { class: 'mission-bar-title', text: 'Misión: ' + (m.titulo || '') }), pctEl),
-        bar),
-      h('article', { class: 'card vo-mission', 'aria-labelledby': 'vo-mission-title' },
-        h('p', { class: 'kicker' }, 'Misión ', diffDots(missionLevel(m))),
-        h('h2', { class: 'placard detail-title', id: 'vo-mission-title', tabindex: '-1', text: m.titulo || '' }),
-        m.objetivo ? h('p', { class: 'lead', text: m.objetivo }) : null,
-        ol ? acc('Paso a paso', ol, { open: true, icon: 'list' }) : null,
-        m.consejo ? callK('tip', 'Consejo', m.consejo) : null,
-        h('div', { class: 'btn-row' },
-          h('button', { type: 'button', class: 'btn btn--primary', onclick: function () { startMission(m); } }, icon('retry'), VO.achieved ? 'Otra vez' : 'Reintentar'),
-          h('button', { type: 'button', class: 'btn btn--ghost', onclick: stopMission }, 'Terminar misión')))
-    ];
+    if (pasos.length || m.consejo) {
+      var body = h('div');
+      if (pasos.length) { var ol = h('ol', { class: 'steps' }); pasos.forEach(function (p) { ol.appendChild(h('li', { text: typeof p === 'string' ? p : (p && p.texto) || '' })); }); body.appendChild(ol); }
+      if (m.consejo) body.appendChild(callK('tip', 'Consejo', m.consejo));
+      secs.push(['Paso a paso', pasos.length + (pasos.length === 1 ? ' paso' : ' pasos'), body, 'vo-m-steps', true]);
+    }
     if (VO.achieved) {
-      var sg = [];
+      var nm = firstUndone(MISSIONS, 'mision', m.id), sg = [];
       if (nm >= 0) sg.push({ primary: true, icon: 'plane', title: 'Misión: ' + (MISSIONS[nm].titulo || ''), text: DIFF_TXT[missionLevel(MISSIONS[nm])], onClick: function () { startMission(MISSIONS[nm]); } });
       if (sitOk() && arr(C150.Situations.list).length) sg.push({ primary: nm < 0, icon: 'flag', title: 'Situaciones: ¿qué harías?', text: 'Cosas que pasan en un vuelo, en el simulador', onClick: function () { stopMission(); voSetTab('situaciones'); scrollPanelTop(); } });
-      sg.push({ icon: 'quiz', title: 'Quiz rápido', text: 'Probá lo que sabés', onClick: function () { setMode('quiz'); scrollPanelTop(); } });
-      out.splice(2, 0, doneCard({ id: 'vo-done-title', kicker: 'Misión cumplida', title: m.titulo || '¡Misión cumplida!', text: 'Lo lograste. Probá la siguiente o repetila para hacerlo más prolijo.', suggestions: sg }));
+      sg.push({ icon: 'quiz', title: 'Quiz rápido', text: 'Probá lo que sabés', onClick: function () { navOpen('quiz'); } });
+      out.push(doneCard({ id: 'vo-done-title', kicker: 'Misión M' + (mi + 1) + ' cumplida', title: m.titulo || '¡Misión cumplida!', text: 'Lo lograste. Probá la siguiente o repetila para hacerlo más prolijo.', suggestions: sg }));
     }
     return out;
   }
 
-  /** A mission as a card: progress ring (best attempt), title, what to do, difficulty. */
-  function missionCard(m, nextId) {
-    var best = clamp(num(VO.best[m.id], 0), 0, 1), active = VO.m === m, isNext = nextId === m.id;
-    return h('li', null, h('button', {
-      type: 'button', class: 'lcard mcard' + (best >= 1 ? ' is-done' : '') + (isNext ? ' is-next' : '') + (active ? ' is-active' : ''),
-      'aria-current': active ? 'true' : null, onclick: function () { startMission(m); }
-    },
-      ringOf(best, best >= 1),
-      h('span', { class: 'lcard-main' },
-        isNext ? h('span', { class: 'lcard-flag', text: Object.keys(VO.best).length ? 'Siguiente' : 'Empezá por acá' }) : null,
-        h('span', { class: 'lcard-t', text: m.titulo || m.id }),
-        m.objetivo ? h('span', { class: 'lcard-d mcard-d', text: m.objetivo }) : null,
-        h('span', { class: 'lcard-meta' }, diffDots(missionLevel(m)),
-          best >= 1 ? h('span', { class: 'lcard-ok' }, kic('check'), 'Lograda')
-            : (best > 0 ? metaItem('target', 'Mejor intento: ' + Math.round(best * 100) + ' %') : (active ? metaItem('play', 'En curso') : metaItem('play', 'Sin intentar'))))),
-      h('span', { class: 'lcard-go', 'aria-hidden': 'true' }, kic('chevron-right'))));
+  /** The missions of one level as AIRE cards (M1…): best attempt as a thin line, "Empezá acá" on the next one. */
+  function missionSection(level, nextId, num0, forceTitle) {
+    var K = C150.Kit, idxs = [], items = [];
+    MISSIONS.forEach(function (m, i) {
+      if (VO.m === m) return;
+      if (level && missionLevel(m) !== level.n) return;
+      var best = clamp(num(VO.best[m.id], 0), 0, 1), active = VO.m === m;
+      idxs.push(i);
+      items.push({ code: 'M' + (i + 1), title: m.titulo || m.id, sum: m.objetivo || '', current: active,
+        meta: DIFF_TXT[missionLevel(m)] + ' · ' + (best >= 1 ? 'lograda' : (best > 0 ? 'mejor intento ' + Math.round(best * 100) + ' %' : 'sin intentar')),
+        tag: nextId === m.id ? (Object.keys(VO.best).length ? 'Siguiente' : 'Empezá acá') : null, onClick: function () { startMission(m); } });
+    });
+    if (!items.length) return null;
+    var ul = K.cardCarousel({ items: items, list: true, label: 'Misiones: ' + (forceTitle || level.title).toLowerCase() });
+    var hechas = 0;
+    idxs.forEach(function (i, k) {
+      var b = clamp(num(VO.best[MISSIONS[i].id], 0), 0, 1);
+      if (b >= 1) { hechas++; cardDone(ul, k); } else cardBar(ul, k, b, 'Mejor intento');
+    });
+    return { title: forceTitle || level.title, meta: hechas + '/' + items.length + ' logradas', body: ul, key: 'vo-lv' + (level ? level.n : 'x') };
   }
 
   function voRender() {
-    var v = VO.view;
+    var v = VO.view, K = C150.Kit;
     if (!v) return;
     var hadFocus = v.contains(doc.activeElement);
     releaseAllHolds();
@@ -4199,20 +4663,18 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     clear(v);
     if (!(VO.m && VO.tab === 'practicar')) v.appendChild(modeHead('Misiones y situaciones', 'Pasá de mirar a volar: elegí una misión con un objetivo claro, o una situación real (“¿qué harías?”). Los instrumentos y los mandos están acá abajo.'));
     v.appendChild(voTabs());
-    var airRow = voAirToggle();
+    var airRow = voAirToggle(VO.live);
     if (airRow) v.appendChild(airRow);
     if (VO.tab === 'situaciones' && VO.sitView) {      // "Situaciones prácticas" (situations.js keeps its own DOM)
       v.appendChild(VO.sitView);
       if (hadFocus) { var tb = v.querySelector('.vo-tab[aria-selected="true"]'); if (tb) safe(function () { tb.focus({ preventScroll: true }); }); }
       return;
     }
-    if (VO.m) add(v, missionPanel(VO.live));
+    var secs = [];                                  // [title, meta, body, key, openByDefault]
+    if (VO.m) add(v, missionPanel(VO.live, secs));
 
-    // order of the sections: while a mission runs, the instruments and the pad come right after it; otherwise the missions go first
-    var order = VO.m ? ['inst', 'pad', 'scen', 'mis'] : ['mis', 'scen', 'inst', 'pad'];
-    function N(k) { return ('0' + (order.indexOf(k) + 1)).slice(-2); }
-    var inst = h('section', { class: 'vo-sec' }, sectHead(N('inst'), 'Instrumentos', 'en vivo'), buildHud(VO.live));
-    var pad = h('section', { class: 'vo-sec' }, sectHead(N('pad'), 'Mandos', 'para volar'), flightPad(VO.live));
+    var inst = ['Instrumentos', 'en vivo', buildHud(VO.live), 'vo-s-inst', !!VO.m];
+    var pad = ['Mandos', 'para volar', flightPad(VO.live), 'vo-s-pad', !!VO.m];
 
     // scenarios: where and how the airplane is
     var P = (C150.Sim && C150.Sim.PRESETS) || {};
@@ -4221,30 +4683,28 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     SCENARIOS.forEach(function (sc) {
       var label = (P[sc[0]] && P[sc[0]].label) || sc[1];
       var b = h('button', {
-        type: 'button', class: 'btn scen-btn', 'aria-pressed': 'false', title: (P[sc[0]] && P[sc[0]].description) || null,
+        type: 'button', class: 'scen-btn', 'aria-pressed': 'false', title: (P[sc[0]] && P[sc[0]].description) || null,
         onclick: function () { applyPreset(sc[0]); }
       }, label);
       scenBtns.push([sc[0], b]);
       scen.appendChild(b);
     });
     VO.live.push(function () { scenBtns.forEach(function (x) { setAttr(x[1], 'aria-pressed', currentPreset === x[0] ? 'true' : 'false'); }); });
-    var scenSec = h('section', { class: 'vo-sec' }, sectHead(N('scen'), 'Dónde está el avión', 'escenario'), scen,
-      h('p', { class: 'soft small vo-note', text: 'Cambiar de escenario reinicia el avión: motor, palancas y posición.' }));
+    var scenSec = ['Dónde está el avión', 'escenario', h('div', null, scen, h('p', { class: 'ctl-sub vo-note', text: 'Cambiar de escenario reinicia el avión: motor, palancas y posición.' })), 'vo-s-scen', false];
 
-    // missions as cards
+    // missions as cards: one numbered section per level (the running one is left out)
     var nextId = null;
     for (var q = 0; q < MISSIONS.length; q++) if (num(VO.best[MISSIONS[q].id], 0) < 1) { nextId = MISSIONS[q].id; break; }
-    var ml = h('ul', { class: 'lc-list', 'aria-label': 'Misiones' });
-    if (!MISSIONS.length) ml.appendChild(h('li', { class: 'empty', text: 'Las misiones todavía no están cargadas.' }));
-    MISSIONS.forEach(function (m) { if (VO.m !== m) ml.appendChild(missionCard(m, nextId)); });
-    var doneM = MISSIONS.filter(function (m) { return num(VO.best[m.id], 0) >= 1; }).length;
-    var misSec = h('section', { class: 'vo-sec' }, sectHead(N('mis'), VO.m ? 'Otras misiones' : 'Misiones', doneM + ' de ' + MISSIONS.length),
-      VO.m ? null : h('p', { class: 'soft vo-note', text: 'Cada misión tiene un objetivo y te va mostrando tu avance. Podés repetirlas las veces que quieras.' }), ml);
+    var misSecs = [];
+    if (!MISSIONS.length) misSecs.push(['Misiones', '', h('p', { class: 'empty', text: 'Las misiones todavía no están cargadas.' }), 'vo-lv0', true]);
+    else if (VO.m) { var o = missionSection(null, nextId, 0, 'Otras misiones'); if (o) misSecs.push([o.title, o.meta, o.body, o.key, false]); }
+    else MISSION_LEVELS.forEach(function (lv) { var o = missionSection(lv, nextId); if (o) misSecs.push([o.title, o.meta, o.body, o.key, true]); });
 
-    var byKey = { inst: inst, pad: pad, scen: scenSec, mis: misSec };
-    order.forEach(function (k) { v.appendChild(byKey[k]); });
+    var all = VO.m ? secs.concat([inst, pad, scenSec], misSecs) : misSecs.concat([scenSec, inst, pad]);
+    all.forEach(function (x, i) { v.appendChild(secK(i + 1, x[0], x[1], x[2], x[3], x[4])); });
 
     v.appendChild(acc('Atajos del teclado', keysTable(), { icon: 'keyboard' }));
+    glossText(v, '.mode-sub, .callout-body');
     var s = S();
     if (s) runLive(VO.live, s);
     if (hadFocus) { var t = $('vo-done-title') || $('vo-mission-title') || v.querySelector('button'); if (t) safe(function () { t.focus({ preventScroll: true }); }); }
@@ -4252,39 +4712,30 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
 
   /** "Mostrar el aire": the flow around the airplane in the exterior view while flying, and a short explanation when a control
    *  is moved on purpose (core.js "el aire en VOLAR"). Both sections of the tab. */
-  function voAirToggle() {
+  function voAirToggle(live) {
     if (!coreReady || !has('setAirPeek')) return null;
-    var on = voAirOn();
-    var state = h('span', { class: 'vo-air-s', text: on ? 'Activado' : 'Desactivado' });
-    var b = h('button', {
-      type: 'button', class: 'lb-loop vo-air', role: 'switch', 'aria-checked': on ? 'true' : 'false',
-      title: 'Líneas de aire alrededor del avión en la vista de afuera y una explicación corta cuando movés un mando a propósito',
-      onclick: function () {
-        volarAir = !voAirOn();
-        store.set('volarAir', volarAir);
-        setAttr(b, 'aria-checked', volarAir ? 'true' : 'false');
-        setText(state, volarAir ? 'Activado' : 'Desactivado');
-        syncAirPeek();
-        kick();
-      }
-    }, h('span', { class: 'lb-loop-track', 'aria-hidden': 'true' }), 'Mostrar el aire');
-    return h('div', { class: 'vo-air-row' },
-      h('span', { class: 'vo-air-ico', 'aria-hidden': 'true' }, kic('wind')),
-      h('div', { class: 'vo-air-body' }, h('div', { class: 'vo-air-top' }, b, state),
-        h('span', { class: 'vo-air-hint', text: 'Mientras volás, en la vista de afuera se dibuja el aire que pasa por el avión. Cuando movés un mando a propósito, te explico qué le hace al aire.' })));
+    var b = switchBtn('Mostrar el aire', function () { return voAirOn(); }, function (on) {
+      volarAir = !!on;
+      store.set('volarAir', volarAir);
+      syncAirPeek();
+      kick();
+    }, 'activado', 'desactivado', live);
+    b.title = 'Líneas de aire alrededor del avión en la vista de afuera y una explicación corta cuando movés un mando a propósito';
+    return h('div', { class: 'vo-air-row' }, b,
+      h('p', { class: 'ctl-sub vo-air-hint', text: 'Mientras volás, en la vista de afuera se dibuja el aire que pasa por el avión. Cuando movés un mando a propósito, te explico qué le hace al aire.' }));
   }
 
   /* --- sections of the tab: "Misiones" (free flight + missions) · "Situaciones" (situations.js, contract v3) --- */
   function sitOk() { var Si = C150.Situations; return !!(Si && isFn(Si.mount) && isFn(Si.frame)); }
   function voTabs() {
-    var wrap = h('div', { class: 'vo-tabs', role: 'tablist', 'aria-label': 'Secciones de Misiones y situaciones' });
-    [['practicar', 'Misiones'], ['situaciones', 'Situaciones']].forEach(function (t) {
+    var wrap = h('div', { class: 'vo-tabs seg seg--two', role: 'tablist', 'aria-label': 'Secciones de Misiones y situaciones' });
+    [['practicar', 'Misiones', MISSIONS.length], ['situaciones', 'Situaciones', sitOk() ? arr(C150.Situations.list).length : 0]].forEach(function (t) {
       if (t[0] === 'situaciones' && !sitOk()) return;
       var on = VO.tab === t[0];
       wrap.appendChild(h('button', {
         type: 'button', class: 'vo-tab', role: 'tab', 'aria-selected': on ? 'true' : 'false', tabindex: on ? '0' : '-1',
         onclick: function () { voSetTab(t[0]); }
-      }, t[1], t[0] === 'situaciones' ? h('span', { class: 'vo-tab-n', text: String(arr(C150.Situations.list).length) }) : null));
+      }, h('span', { class: 'vo-tab-t', text: t[1] }), h('span', { class: 'vo-tab-n', text: String(t[2]) })));
     });
     return wrap;
   }
@@ -4301,22 +4752,27 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   function sitApi() {
     return {
       annotate: gloss, h: h, icon: icon, setText: setText, setAttr: setAttr, toggleClass: toggleClass, safe: safe, store: store,
-      kic: kic, callK: callK, acc: acc, sectHead: sectHead, diffDots: diffDots, pgBar: pgBar, sgCard: sgCard, go: function (p) { return UI.go(p); },
+      kic: kic, callK: callK, acc: acc, sectHead: sectHead, diffDots: diffDots, pgBar: pgBar, sgCard: sgCard, go: function (p) { return navOpen(p); },
+      secK: secK, runnerEl: runnerEl, cardDone: cardDone, cardBar: cardBar, DIFF_TXT: DIFF_TXT, clockText: clockText,
       cc: cc, has: has, S: S, applyPreset: applyPreset, kick: kick, showToast: showToast, now: now,
       buildHud: buildHud, flightPad: flightPad, CTRL: CTRL, progressBar: progressBar, reducedMotion: reducedMotion,
       scrollPanelTop: scrollPanelTop, releaseAllHolds: releaseAllHolds,
+      open: function (p) { return navOpen(p); }, showControl: function (id) { UI.showControl(id); },
+      navDetail: function (route, fn) { navDetail('detail', route, fn); },
       probalo: function (id, live) {
         var w = buildProbalo(CTRL[id], live, true);
         var head = w && w.querySelector('.probalo-head');
         if (head) head.parentNode.removeChild(head);
         return w;
       },
-      focusControl: function (id) {
-        whenIdle(function () {
-          if (mainView === 'exterior' && layoutMode !== 'dos') { cc('setMainView', 'cockpit'); syncMainView(); }
-          cc('setTargetHighlight', id);
-          focusControl(id, true);
-        }, 'sitFocus');
+      focusControl: function (id) {                                    // MIRAR: only the camera moves
+        navLook(function () {
+          whenIdle(function () {
+            if (mainView === 'exterior' && layoutMode !== 'dos') { cc('setMainView', 'cockpit'); syncMainView(); }
+            cc('setTargetHighlight', id);
+            focusControl(id, true);
+          }, 'sitFocus');
+        }, ctrlName(id));
       },
       showPractice: function () { voSetTab('practicar'); },
       stopMission: function () { if (VO.m) { VO.m = null; VO.ctx = null; VO.progress = 0; VO.achieved = false; } }
@@ -4479,8 +4935,23 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   }
   function lessonIndexById(id) { for (var i = 0; i < LESSONS.length; i++) if (LESSONS[i].id === id) return i; return -1; }
 
+  /** One dot per question: the ones answered right are green, the wrong ones amber, the current one a wide orange pill. */
+  function qzDots(n) {
+    var w = h('div', { class: 'qz-dots', role: 'img', 'aria-label': 'Pregunta ' + (QZ.i + 1) + ' de ' + n + '. Correctas hasta ahora: ' + QZ.score });
+    for (var k = 0; k < n; k++) {
+      var r = QZ.results[k], cur = k === QZ.i;
+      w.appendChild(h('span', { class: 'qz-dot' + (cur ? ' is-cur' : '') + (r && !(cur && !QZ.answered) ? (r.ok ? ' is-ok' : ' is-bad') : '') }));
+    }
+    return w;
+  }
+  /** ✕ on the question card: the same as UP (confirms only when there are answers to lose). */
+  function qzLeave() {
+    var lose = QZ.phase === 'q' && (QZ.i > 0 || QZ.answered);
+    confirmLeave('Dejar el quiz', lose ? 'Si salís ahora, perdés las respuestas de este intento. ¿Salimos?' : '', function () { qzReset(); });
+  }
+
   function qzRender(focusTitle) {
-    var v = QZ.view;
+    var v = QZ.view, K = C150.Kit;
     if (!v) return;
     clear(v);
     var n = QZ.qs.length;
@@ -4489,6 +4960,14 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       v.appendChild(modeHead('Quiz', 'Un repaso corto para ver qué quedó. No hay nota ni apuro: cada respuesta viene con su explicación.'));
       if (!QUIZ.length) { v.appendChild(emptyState('Las preguntas todavía no están cargadas.')); return; }
       var canPick = coreReady && has('pickMode');
+      var len = Math.min(QUIZ_LEN, QUIZ.length);
+      var start = h('article', { class: 'runner qz-start', 'aria-labelledby': 'qz-start-t' },
+        h('p', { class: 'runner-kicker' }, h('span', { text: 'Quiz · listo para empezar' }), h('span', { class: 'runner-count', text: len + ' preguntas' })),
+        h('h3', { class: 'runner-title', id: 'qz-start-t', text: len + ' preguntas al azar' }),
+        h('p', { class: 'runner-text', text: 'Cada vez salen otras, así que podés repetirlo cuando quieras. Se aprueba con el 70 % o más.' }),
+        !canPick ? callK('dato', 'Sin la cabina 3D', 'El quiz usa sólo preguntas de opciones.') : null,
+        h('div', { class: 'runner-nav qz-startnav' }, h('button', { type: 'button', class: 'btn btn--primary qz-go', id: 'qz-start', onclick: qzStart }, 'Empezar el quiz', icon('next'))));
+      v.appendChild(start);
       var hows = h('ul', { class: 'qz-how' },
         canPick ? h('li', null, h('span', { class: 'qz-how-ico', 'aria-hidden': 'true' }, kic('hand')),
           h('span', null, h('strong', { text: '¿Dónde está?' }), 'Respondés tocando el control en la cabina 3D. Tenés dos intentos.')) : null,
@@ -4496,14 +4975,11 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
           h('span', null, h('strong', { text: 'Opciones' }), 'Elegís una respuesta y te explico por qué.')),
         h('li', null, h('span', { class: 'qz-how-ico', 'aria-hidden': 'true' }, kic('swap')),
           h('span', null, h('strong', { text: 'Cada vez distinto' }), 'Las preguntas salen al azar: podés repetirlo cuando quieras.')));
-      v.appendChild(h('article', { class: 'card qz-start' },
-        h('p', { class: 'kicker', text: 'Listo para empezar' }),
-        h('h3', { class: 'qz-start-t', text: Math.min(QUIZ_LEN, QUIZ.length) + ' preguntas al azar' }),
-        hows,
-        !canPick ? callK('dato', 'Sin la cabina 3D', 'El quiz usa sólo preguntas de opciones.') : null,
-        b ? h('div', { class: 'qz-best' }, ringOf(b.total ? b.score / b.total : 0, b.total && b.score / b.total >= 0.7, 64),
-          h('span', null, h('strong', { text: 'Tu mejor resultado' }), h('span', { class: 'mono', text: b.score + ' de ' + b.total + ' correctas' }))) : null,
-        h('div', { class: 'btn-row' }, h('button', { type: 'button', class: 'btn btn--primary btn--large qz-go', id: 'qz-start', onclick: qzStart }, 'Empezar el quiz', icon('next')))));
+      var secs = [['Cómo funciona', canPick ? '2 tipos' : '1 tipo', hows, 'qz-s-how', true]];
+      if (b) secs.push(['Tu mejor resultado', b.score + ' de ' + b.total, h('div', { class: 'qz-best' }, ringOf(b.total ? b.score / b.total : 0, b.total && b.score / b.total >= 0.7, 72),
+        h('span', null, h('strong', { text: Math.round(b.total ? b.score / b.total * 100 : 0) + ' % de aciertos' }), h('span', { class: 'ctl-sub', text: b.score + ' de ' + b.total + ' correctas · se aprueba con 70 %' }))), 'qz-s-best', true]);
+      secs.forEach(function (x, i) { v.appendChild(secK(i + 1, x[0], x[1], x[2], x[3], x[4])); });
+      glossText(v, '.mode-sub, .runner-text, .callout-body');
       return;
     }
     if (QZ.phase === 'end') {
@@ -4515,29 +4991,30 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       var wrong = QZ.results.filter(function (x) { return !x.ok; });
       var weak = qzWeak(wrong);
       var best = qzBest();
-      v.appendChild(modeHead('Quiz', null));
-      var ring = ringOf(r, pass, 132);
+      var ring = ringOf(r, pass, 124);
       if (ring.set) ring.set(r, QZ.score + '/' + n);
-      var card = h('article', { class: 'card qz-result', 'aria-labelledby': 'qz-title' },
+      var card = h('article', { class: 'runner qz-result' + (pass ? ' is-pass' : ''), 'aria-labelledby': 'qz-title' },
         celebrateEl(),
+        h('p', { class: 'runner-kicker' }, h('span', { text: 'Quiz · resultado' }), h('span', { class: 'runner-count', text: pass ? 'Aprobado' : Math.round(r * 100) + ' %' })),
         h('div', { class: 'qz-result-top' }, ring,
           h('div', { class: 'qz-result-main' },
-            h('p', { class: 'done-k' + (pass ? '' : ' is-neutral'), text: pass ? 'Aprobado (70 % o más)' : 'Resultado' }),
-            h('h2', { class: 'placard qz-result-t', id: 'qz-title', tabindex: '-1', text: QZ.score + ' de ' + n + ' correctas' }),
-            best ? h('p', { class: 'soft small', text: QZ.newBest ? '¡Es tu mejor resultado hasta ahora!' : 'Tu mejor resultado: ' + best.score + ' de ' + best.total }) : null)),
-        h('p', { class: 'lead', text: msg }));
+            h('h2', { class: 'runner-title qz-result-t', id: 'qz-title', tabindex: '-1', text: QZ.score + ' de ' + n + ' correctas' }),
+            h('p', { class: 'ctl-sub', text: pass ? 'Aprobado: 70 % o más.' : 'Para aprobar hace falta el 70 %.' }),
+            best ? h('p', { class: 'ctl-sub', text: QZ.newBest ? '¡Es tu mejor resultado hasta ahora!' : 'Tu mejor resultado: ' + best.score + ' de ' + best.total }) : null)),
+        h('p', { class: 'runner-text', text: msg }));
       v.appendChild(card);
+      var secs2 = [];
       if (weak.length) {
         var wl = h('ul', { class: 'qz-weak' });
         weak.slice(0, 4).forEach(function (w) {
           var li = lessonIndexById(w.t.lesson);
           wl.appendChild(h('li', null,
             h('span', { class: 'qz-weak-n', text: String(w.n) }),
-            h('span', { class: 'qz-weak-t' }, h('strong', { text: w.t.label }), h('span', { class: 'soft small', text: w.n + (w.n === 1 ? ' respuesta para repasar' : ' respuestas para repasar') })),
-            li >= 0 ? h('button', { type: 'button', class: 'btn btn--small', onclick: function () { setMode('basico'); lbOpen(li); sheetEnsure('half'); } }, kic('book'), 'Repasar')
+            h('span', { class: 'qz-weak-t' }, h('strong', { text: w.t.label }), h('span', { class: 'ctl-sub', text: w.n + (w.n === 1 ? ' respuesta para repasar' : ' respuestas para repasar') })),
+            li >= 0 ? h('button', { type: 'button', class: 'btn btn--small', onclick: function () { lbOpen(li); sheetEnsure('half'); } }, kic('book'), 'Repasar')
               : (w.t.control ? h('button', { type: 'button', class: 'btn btn--small', onclick: function () { UI.showControl(w.t.control); } }, kic('cabin'), 'Ver') : null)));
         });
-        v.appendChild(h('section', { class: 'qz-sec' }, sectHead('01', 'Temas para repasar'), wl));
+        secs2.push(['Temas para repasar', weak.length + (weak.length === 1 ? ' tema' : ' temas'), wl, 'qz-e-weak', true]);
       }
       if (wrong.length) {
         var list = h('ul', { class: 'rows' });
@@ -4549,18 +5026,19 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
             q.explicacion ? h('p', { class: 'small soft', text: q.explicacion }) : null,
             q.tipo === 'donde' ? h('div', { style: { 'margin-top': '6px' } }, controlChip(q.control)) : null));
         });
-        v.appendChild(h('div', { class: 'qz-sec' }, acc('Las que fallaste (' + wrong.length + ')', list, { icon: 'list' })));
+        secs2.push(['Las que fallaste', wrong.length + (wrong.length === 1 ? ' pregunta' : ' preguntas'), list, 'qz-e-wrong', false]);
       }
+      secs2.forEach(function (x, i) { v.appendChild(secK(i + 1, x[0], x[1], x[2], x[3], x[4])); });
       var sg = [];
       if (!pass) {
         var wl0 = weak.length ? lessonIndexById(weak[0].t.lesson) : -1;
-        if (wl0 >= 0) sg.push({ primary: true, icon: 'book', title: 'Lección: ' + (LESSONS[wl0].titulo || ''), text: 'Repasá “' + weak[0].t.label + '”', onClick: function () { setMode('basico'); lbOpen(wl0); sheetEnsure('half'); } });
-        else sg.push({ primary: true, icon: 'route', title: 'Recorrido guiado', text: 'Control por control, desde cero', onClick: function () { setMode('recorrido'); scrollPanelTop(); } });
+        if (wl0 >= 0) sg.push({ primary: true, icon: 'book', title: 'Lección: ' + (LESSONS[wl0].titulo || ''), text: 'Repasá “' + weak[0].t.label + '”', onClick: function () { lbOpen(wl0); sheetEnsure('half'); } });
+        else sg.push({ primary: true, icon: 'route', title: 'Recorrido guiado', text: 'Control por control, desde cero', onClick: function () { navOpen('recorrido'); } });
         sg.push({ icon: 'retry', title: 'Probar de nuevo', text: 'Otras preguntas al azar', onClick: qzStart });
       } else {
         var nk = firstUndone(CHECKLISTS, 'checklist');
-        if (nk >= 0) sg.push({ primary: true, icon: 'checklist', title: 'Checklist “' + (CHECKLISTS[nk].titulo || '') + '”', text: 'Seguí practicando los procedimientos', onClick: function () { clOpen(nk); setMode('checklists'); sheetEnsure('half'); } });
-        sg.push({ primary: nk < 0, icon: 'flag', title: 'Situaciones: ¿qué harías?', text: 'Cosas reales que pasan en un vuelo', onClick: function () { setMode('volar'); voSetTab('situaciones'); scrollPanelTop(); } });
+        if (nk >= 0) sg.push({ primary: true, icon: 'checklist', title: 'Checklist “' + (CHECKLISTS[nk].titulo || '') + '”', text: 'Seguí practicando los procedimientos', onClick: function () { clOpen(nk); sheetEnsure('half'); } });
+        sg.push({ primary: nk < 0, icon: 'flag', title: 'Situaciones: ¿qué harías?', text: 'Cosas reales que pasan en un vuelo', onClick: function () { navOpen('volar', { run: function () { voSetTab('situaciones'); } }); } });
         sg.push({ icon: 'retry', title: 'Otra tanda de preguntas', text: 'Para afianzar', onClick: qzStart });
       }
       v.appendChild(h('div', { class: 'qz-sec sg-wrap' }, h('p', { class: 'sg-k', text: 'Seguí con…' }), h('div', { class: 'sg-list' }, sg.map(sgCard))));
@@ -4596,14 +5074,17 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         QZ.fb.text ? h('span', { text: QZ.fb.text }) : null)) : null;
     var nextBtn = QZ.answered ? h('button', { type: 'button', class: 'btn btn--primary btn--large', id: 'qz-next', onclick: qzNext },
       QZ.i + 1 >= n ? 'Ver el resultado' : 'Siguiente pregunta', icon('next')) : null;
-    v.appendChild(h('div', { class: 'qz-prog' }, progressBar((QZ.i + (QZ.answered ? 1 : 0)) / n),
-      h('span', { class: 'pg-t', text: 'Pregunta ' + (QZ.i + 1) + ' de ' + n }),
-      h('span', { class: 'qz-score', title: 'Respuestas correctas hasta ahora' }, kic('check'), QZ.score)));
-    v.appendChild(h('article', { class: 'card qz-card', 'aria-labelledby': 'qz-q' },
-      h('p', { class: 'kicker' }, q.tipo === 'donde' ? '¿Dónde está?' : 'Elegí una opción'),
-      h('h2', { class: 'quiz-q', id: 'qz-q', tabindex: '-1', text: q.pregunta }),
+    var Rn = h('article', { class: 'runner qz-card', 'aria-labelledby': 'qz-q' },
+      h('div', { class: 'runner-top' },
+        h('p', { class: 'runner-kicker' }, h('span', { text: 'Quiz · ' + (q.tipo === 'donde' ? '¿Dónde está?' : 'Elegí una opción') }),
+          h('span', { class: 'runner-count', text: (QZ.i + 1) + ' / ' + n }), h('span', { class: 'qz-score', title: 'Respuestas correctas hasta ahora' }, kic('check'), QZ.score)),
+        h('button', { type: 'button', class: 'icon-btn icon-btn--small runner-close', 'aria-label': 'Dejar el quiz', title: 'Dejar el quiz', onclick: qzLeave }, kic('close'))),
+      h('div', { class: 'runner-prog', 'aria-hidden': 'true' }, h('span', { style: { width: ((QZ.i + (QZ.answered ? 1 : 0)) / n * 100).toFixed(1) + '%' } })),
+      h('h2', { class: 'runner-title quiz-q', id: 'qz-q', tabindex: '-1', text: q.pregunta }),
       body, fb,
-      nextBtn ? h('div', { class: 'btn-row qz-next' }, nextBtn) : null));
+      nextBtn ? h('div', { class: 'runner-nav qz-next' }, nextBtn) : null,
+      qzDots(n));
+    v.appendChild(Rn);
     if (focusTitle) { var qt = $('qz-q'); if (qt && mode === 'quiz') safe(function () { qt.focus({ preventScroll: true }); }); }
     else if (nextBtn && mode === 'quiz') safe(function () { nextBtn.focus({ preventScroll: true }); });
   }
@@ -4632,9 +5113,11 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       annotate: gloss, h: h, icon: icon, setText: setText, setAttr: setAttr, toggleClass: toggleClass, fmt: fmt, safe: safe, store: store,
       kic: kic, acc: acc, callK: callK,
       cc: cc, has: has, core: Core, S: S, setInput: setInput, applyPreset: applyPreset, setFlapSwitch: setFlapSwitch,
-      kick: kick, viewport: $('viewport'), panel: $('panel'), setMode: setMode, getMode: function () { return mode; },
+      kick: kick, viewport: $('viewport'), panel: $('panel'), setMode: function (m) { navGo(m); }, getMode: function () { return mode; },
       currentPreset: function () { return currentPreset; }, getMainView: function () { return mainView; },
-      syncMainView: syncMainView, reducedMotion: reducedMotion, now: now, showToast: showToast
+      syncMainView: syncMainView, reducedMotion: reducedMotion, now: now, showToast: showToast,
+      navDetail: function (route, fn) { navDetail('detail', route, fn); },
+      navUp: function () { var n = NAV(); return !!(navOn() && n && isFn(n.up) && n.up()); }
     };
   }
   function labOk() { var Lb = C150.Lab; return !!(Lb && isFn(Lb.mount) && isFn(Lb.enter)); }
@@ -4682,7 +5165,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     var rq = null;
     for (var i = 0; i < st.requisitos.length; i++) if (!st.requisitos[i].hecho) { rq = st.requisitos[i]; break; }
     if (!rq) return null;
-    return { id: 'g:' + st.id, title: rq.texto, btn: 'Ir', icon: 'flag', fn: function () { UI.go(String(rq.ruta || '#inicio').replace(/^#/, '')); sheetEnsure('half'); } };
+    return { id: 'g:' + st.id, title: rq.texto, btn: 'Ir', icon: 'flag', fn: function () { navOpen(String(rq.ruta || '#inicio')); sheetEnsure('half'); } };
   }
   function nxPick() {
     var i, g = null;
@@ -4692,7 +5175,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
           var ids = essentialsNext(1);
           if (ids.length) return { id: 'c:' + ids[0], title: 'Conocé: ' + ctrlName(ids[0]), btn: 'Verlo', icon: 'cabin', fn: function () { openControl(ids[0], 'list'); } };
         }
-        if (!isDone('recorrido', 'tour') && TOUR.length) return { id: 'tour', title: 'El recorrido guiado', btn: 'Empezar', icon: 'route', fn: function () { setMode('recorrido'); sheetEnsure('half'); } };
+        if (!isDone('recorrido', 'tour') && TOUR.length) return { id: 'tour', title: 'El recorrido guiado', btn: 'Empezar', icon: 'route', fn: function () { navOpen('recorrido'); sheetEnsure('half'); } };
         break;
       case 'basico':
         i = firstUndone(LESSONS, 'leccion');
@@ -4750,6 +5233,228 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     var P = PG();
     if (P && isFn(P.onChange)) P.onChange(function () { NX.ver++; });
     liveGlobal.push(function () { nxRefresh(false); });
+    liveGlobal.push(function () { var n = NAV(); if (n && isFn(n.refresh)) n.refresh(false); var np = $('nav-pause'); if (np && np.hidden === navPauseBarOn()) np.hidden = !np.hidden; });
+  }
+
+  /* ================================================================== NAVIGATION PROVIDERS (contract v6)
+   * Every panel tells C150.Nav how to label itself, what to save and restore, how to go UP to its list, whether it is "in detail" and
+   * whether an activity is in progress ("EN CURSO"). Nav calls them when it leaves / returns to a place (Back, Forward, the return bar). */
+
+  /* A mission / situation run that was left on the side pauses the simulation (so the airplane does not fly on its own) and, when the
+   * student comes back, a "Pausado — Continuar" banner (#nav-pause in the panel head) gives the controls back. */
+  var NAVP = { paused: false };
+  function volarActive() {
+    return !!((VO.m && !VO.achieved) || (sitOk() && isFn(C150.Situations.phase) && C150.Situations.phase() === 'run'));
+  }
+  function navPauseSim() {
+    var s = S();
+    if (!volarActive() || !s || s.paused) return;
+    NAVP.paused = true;
+    if (has('setPaused')) cc('setPaused', true); else s.paused = true;
+    kick();
+  }
+  function navResumeSim() {
+    if (!NAVP.paused) return;
+    NAVP.paused = false;
+    var s = S();
+    if (s && s.paused) { if (has('setPaused')) cc('setPaused', false); else s.paused = false; }
+    kick();
+  }
+  function navPauseBarOn() {
+    var s = S();
+    if (NAVP.paused && !(s && s.paused)) NAVP.paused = false;      // the student already pressed "Seguir"
+    return !!(NAVP.paused && mode === 'volar');
+  }
+  function sitPhase() { return (sitOk() && isFn(C150.Situations.phase)) ? C150.Situations.phase() : 'lista'; }
+  function sitTitle() {
+    var id = sitOk() && isFn(C150.Situations.current) ? C150.Situations.current() : null, list = sitOk() ? arr(C150.Situations.list) : [];
+    for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i].titulo || list[i].nombre || id;
+    return '';
+  }
+
+  function registerNavProviders() {
+    var N = NAV();
+    if (!N || !isFn(N.registerProvider)) return;
+    var F = N.fmtLabel;
+    function none() { return false; }
+    N.registerProvider('inicio', {
+      label: function () { return 'Inicio'; }, crumbs: function () { return ['Inicio']; }, route: function () { return 'inicio'; },
+      capture: function () { return {}; }, restore: function () {}, up: none, inDetail: none, active: none
+    });
+    N.registerProvider('explorar', {
+      label: function () { return EX.id ? F({ kind: 'Ficha', title: ctrlName(EX.id) }) : 'Cabina'; },
+      crumbs: function () { return EX.id ? ['Cabina', ctrlName(EX.id)] : ['Cabina']; },
+      route: function () { return EX.id ? 'cabina/' + EX.id : 'cabina'; },
+      capture: function () { return { id: EX.id }; },
+      restore: function (o) {
+        if (o.id && CTRL[o.id]) { if (EX.id !== o.id) openControlRaw(o.id, '3d'); }
+        else if (EX.id) closeDetailRaw();
+      },
+      up: function () { if (!EX.id) return false; closeDetailRaw(); return true; },
+      inDetail: function () { return !!EX.id; }, active: none
+    });
+    function lessonNow() { return LB.open ? LESSONS[LB.idx] || null : null; }
+    N.registerProvider('basico', {
+      label: function () { var L = lessonNow(); return L ? F({ kind: 'Lección', title: L.titulo, detail: LB.finished ? 'terminada' : 'paso ' + (LB.i + 1) }) : 'Lecciones'; },
+      crumbs: function () { var L = lessonNow(); return L ? ['Lecciones', L.titulo || 'Lección', LB.finished ? 'Terminada' : 'Paso ' + (LB.i + 1)] : ['Lecciones']; },
+      route: function () { var L = lessonNow(); return L ? 'basico/' + L.id : 'basico'; },
+      capture: function () { return { idx: LB.idx, i: LB.i, open: LB.open, finished: LB.finished, seen: JSON.parse(JSON.stringify(LB.seen || {})) }; },
+      restore: function (o) {
+        if (o.open && o.idx >= 0 && LESSONS[o.idx]) {
+          if (LB.idx !== o.idx || !LB.listView || LB.listView.hidden === false) { lbOpenRaw(o.idx); }
+          LB.i = clamp(num(o.i, 0), 0, arr(LESSONS[o.idx].pasos).length - 1);
+          LB.seen = o.seen || LB.seen; LB.finished = !!o.finished; LB.open = true;
+          LB.listView.hidden = true; LB.lessonView.hidden = false;
+          if (LB.finished) lbLeave();
+          lbRenderStep(!LB.finished);
+        } else if (LB.open) lbBackRaw();
+      },
+      up: function () { if (!LB.open) return false; lbBackRaw(); return true; },
+      inDetail: function () { return !!lessonNow(); },
+      active: function () { return LB.idx >= 0 && !LB.finished; }
+    });
+    N.registerProvider('recorrido', {
+      label: function () { return TR.finished ? 'Recorrido guiado · terminado' : F({ kind: 'Recorrido guiado', detail: 'paso ' + (TR.i + 1) }); },
+      crumbs: function () { return ['Recorrido guiado']; }, route: function () { return 'recorrido'; },
+      capture: function () { return { i: TR.i, finished: TR.finished }; },
+      restore: function (o) {
+        if (typeof o.i === 'number' && TOUR.length && (o.i !== TR.i || !!o.finished !== TR.finished)) {
+          TR.i = clamp(o.i, 0, TOUR.length - 1); TR.finished = !!o.finished; store.set('tourStep', TR.i); trRender(); trFocus();
+        }
+      },
+      up: none, inDetail: none,
+      active: function () { return TOUR.length > 0 && !TR.finished && TR.i > 0; }
+    });
+    function clNow() { return (CL.open && CL.cur) ? CL.cur : null; }
+    N.registerProvider('checklists', {
+      label: function () { var c = clNow(); return c ? F({ kind: 'Checklist', title: c.cl.titulo, detail: c.finished ? 'completa' : 'ítem ' + (c.i + 1) }) : 'Checklists'; },
+      crumbs: function () { var c = clNow(); return c ? ['Checklists', c.cl.titulo || 'Checklist', c.finished ? 'Completa' : 'Ítem ' + (c.i + 1)] : ['Checklists']; },
+      route: function () { var c = clNow(); return c ? 'checklists/' + c.cl.id : 'checklists'; },
+      capture: function () { return { open: CL.open, id: CL.cur ? CL.cur.cl.id : null }; },
+      restore: function (o) {
+        if (o.open && o.id) {
+          if (CL.cur && CL.cur.cl.id === o.id) { if (!CL.open) clShowRaw(); }
+          else for (var i = 0; i < CHECKLISTS.length; i++) if (CHECKLISTS[i].id === o.id) { clOpenRaw(i); break; }
+        } else if (CL.open) clBackRaw();
+      },
+      up: function () { if (!CL.open) return false; clBackRaw(); return true; },
+      inDetail: function () { return !!clNow(); },
+      active: function () { return !!(CL.cur && !CL.cur.finished); }
+    });
+    N.registerProvider('volar', {
+      label: function () {
+        if (sitPhase() !== 'lista' && VO.tab === 'situaciones') return F({ kind: 'Situación', title: sitTitle() });
+        if (VO.m) return F({ kind: 'Misión', title: VO.m.titulo });
+        return 'Misiones y situaciones';
+      },
+      crumbs: function () { return ['Misiones y situaciones', sitTitle() || 'Situación']; },
+      route: function () { var id = (VO.tab === 'situaciones' && sitPhase() !== 'lista' && isFn(C150.Situations.current)) ? C150.Situations.current() : null; return id ? 'volar/' + id : 'volar'; },
+      capture: function () { return { tab: VO.tab, sit: sitPhase() !== 'lista' ? (C150.Situations.current && C150.Situations.current()) : null }; },
+      restore: function (o) {
+        if (o.tab && o.tab !== VO.tab) voSetTab(o.tab);
+        if (o.sit && sitOk() && isFn(C150.Situations.open) && (sitPhase() === 'lista' || C150.Situations.current() !== o.sit)) safe(function () { C150.Situations.open(o.sit); }, 'Situations.open');
+        else if (!o.sit && sitOk() && VO.tab === 'situaciones' && sitPhase() !== 'lista' && isFn(C150.Situations.toList)) safe(function () { C150.Situations.toList(); }, 'Situations.toList');
+      },
+      up: function () {
+        if (!(sitOk() && sitPhase() !== 'lista' && isFn(C150.Situations.toList))) return false;
+        var ph = sitPhase();
+        if (ph === 'run') confirmLeave('Salir de la situación', 'Si salís ahora, la situación se corta y el avión vuelve a su escenario. ¿Salimos?', function () { C150.Situations.toList(); scrollPanelTop(); });
+        else C150.Situations.toList();
+        return true;
+      },
+      inDetail: function () { return VO.tab === 'situaciones' && sitPhase() !== 'lista'; },
+      active: function () { return volarActive(); },
+      pause: navPauseSim, resume: function () { /* the banner (navPauseBarOn) gives the controls back */ }
+    });
+    N.registerProvider('quiz', {
+      label: function () { return QZ.phase === 'q' ? F({ kind: 'Quiz', detail: 'pregunta ' + (QZ.i + 1) }) : 'Quiz'; },
+      crumbs: function () { return QZ.phase === 'q' ? ['Quiz', 'Pregunta ' + (QZ.i + 1) + ' de ' + QZ.qs.length] : ['Quiz', 'Resultado']; },
+      route: function () { return 'quiz'; },
+      capture: function () { return { phase: QZ.phase, i: QZ.i }; }, restore: function () {},
+      up: function () {
+        if (QZ.phase === 'start') return false;
+        var lose = QZ.phase === 'q' && (QZ.i > 0 || QZ.answered);
+        confirmLeave('Dejar el quiz', lose ? 'Si salís ahora, perdés las respuestas de este intento. ¿Salimos?' : '', function () { qzReset(); });
+        return true;
+      },
+      inDetail: function () { return QZ.phase !== 'start'; },
+      active: function () { return QZ.phase === 'q' && (QZ.i > 0 || QZ.answered); }
+    });
+    function labExp() { var Lb = C150.Lab, i = (Lb && isFn(Lb.getInfo)) ? safe(function () { return Lb.getInfo(); }, 'Lab.getInfo') : null; return (i && i.experiment) ? i : null; }
+    function labTitle(id) { return lbLabTitle(id) || id; }
+    N.registerProvider('aire', {
+      label: function () { var e = labExp(); return e ? F({ kind: 'Aire · experimento', title: labTitle(e.experiment) }) : 'Aire'; },
+      crumbs: function () { var e = labExp(); return e ? ['Aire', labTitle(e.experiment)] : ['Aire']; },
+      route: function () { var e = labExp(); return e ? 'aire/' + e.experiment : 'aire'; },
+      capture: function () { var e = labExp(); return { exp: e ? e.experiment : null, step: e ? e.step : 0 }; },
+      restore: function (o) {
+        var Lb = C150.Lab;
+        if (!Lb) return;
+        if (o.exp) { var e = labExp(); if (!e || e.experiment !== o.exp || e.step !== o.step) safe(function () { Lb.startExperiment(o.exp, o.step); }, 'Lab.startExperiment'); }
+        else if (labExp() && isFn(Lb.stopExperiment)) safe(function () { Lb.stopExperiment(); }, 'Lab.stopExperiment');
+      },
+      up: function () { var Lb = C150.Lab; if (!labExp() || !Lb || !isFn(Lb.stopExperiment)) return false; Lb.stopExperiment(); return true; },
+      inDetail: function () { return !!labExp(); }, active: none
+    });
+    N.registerProvider('escuela', {
+      label: function () { return 'Escuela'; }, crumbs: function () { return ['Escuela']; }, route: function () { return 'escuela'; },
+      capture: function () { return {}; }, restore: function () {}, up: none, inDetail: none, active: none
+    });
+  }
+
+  /** Modal things the system Back button must close first: the help dialog, every Kit.dialog (welcome, confirmations) and the search palette. */
+  function navOverlayWrap() {
+    var K = C150.Kit, n = NAV();
+    if (!K || !n || !isFn(n.overlayOpen) || K._navWrapped) return;
+    K._navWrapped = true;
+    if (isFn(K.dialog)) {
+      var orig = K.dialog;
+      K.dialog = function (o) {
+        o = o || {};
+        var tok = null, onClose = o.onClose;
+        var o2 = {};
+        for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) o2[k] = o[k];
+        o2.onClose = function () { if (tok && isFn(n.overlayClosed)) n.overlayClosed(tok); if (isFn(onClose)) onClose(); };
+        var api = orig.call(K, o2);
+        tok = n.overlayOpen(function () { api.close(); });
+        return api;
+      };
+    }
+  }
+  /** One tap on "Continuar" in the pause banner. */
+  function setupPauseBanner() {
+    var b = $('nav-pause-go');
+    if (b) b.addEventListener('click', function () { navResumeSim(); var n = NAV(); if (n && isFn(n.refresh)) n.refresh(true); });
+  }
+  /** Starts Nav (history, popstate, bars, chip) once the first route is shown. */
+  function mountNav() {
+    var n = NAV();
+    if (!n || !isFn(n.mount)) return;
+    safe(function () {
+      n.mount({
+        doc: doc, win: root, h: h, icon: kic,
+        getMode: function () { return mode; }, groupOf: groupOf,
+        capture: navCapture, show: navShow, label: navLabel, route: navRoute, up: navUp,
+        getView: function () { return coreReady ? cc('getViewState') : null; },
+        setView: function (v, o) { if (coreReady) { cc('setViewState', v, o); syncMainView(); } },
+        announce: function (t) { var el = $('nav-live'); if (el) el.textContent = t; },
+        focusPanel: function () { var cur = doc.querySelector('.mode:not([hidden])'); if (cur) safe(function () { cur.focus({ preventScroll: true }); }); },
+        extra: navPauseBarOn,
+        onNavRender: function (info) {
+          var pb = $('nav-pause'); if (pb) pb.hidden = !navPauseBarOn();
+          var sub = $('sheet-sub');
+          if (sub) setText(sub, info.returnLabel ? 'Volver a ' + info.returnLabel : (info.detail && info.crumbs.length ? N_CRUMB(info.crumbs) : (MODE_INFO[mode] || {}).sub || ''));
+        }
+      });
+    }, 'Nav.mount');
+    navOverlayWrap();
+  }
+  function N_CRUMB(list) { var n = NAV(); return n && isFn(n.crumbText) ? n.crumbText(list) : list.join(' › '); }
+  function qzReset() {
+    QZ.phase = 'start'; QZ.qs = []; QZ.i = 0; QZ.score = 0; QZ.results = []; QZ.answered = false; QZ.chosen = -1; QZ.fb = null;
+    cc('pickMode', null); cc('setTargetHighlight', null);
+    qzRender(true);
+    kick();
   }
 
   /* ================================================================== boot */
@@ -4759,7 +5464,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     CO.selId = id && CTRL[id] ? id : null;
     updateCallout();
     if (mode === 'explorar') {
-      if (id && CTRL[id]) { if (EX.id !== id) openControl(id, '3d'); sheetEnsure('half'); }
+      if (id && CTRL[id]) { if (EX.id !== id && !isProgrammatic(id)) openControl(id, '3d'); sheetEnsure('half'); }   // a "look" (Mostrámelo) selects without changing the card
       else if (!id && EX.id && !isProgrammatic(null)) closeDetail();
       return;
     }
@@ -4802,6 +5507,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       Co.on('pause', function () { kick(); });
       Co.on('quality', function () { syncQuality(); });
       Co.on('preset', function (name) {         // mark the camera preset in use ("Vistas")
+        if (!name) { var nv = NAV(); if (nv && isFn(nv.noteManual)) nv.noteManual(); }
         currentCam = name || null;
         if (DOCK.cams) DOCK.cams.setValue(currentCam, false);
       });
@@ -4843,33 +5549,35 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     safe(setupInteractionTracking, 'interaction');
     safe(setupProgress, 'progress');
     safe(setupNextBar, 'nextbar');
+    safe(registerNavProviders, 'nav providers');
+    safe(setupPauseBanner, 'pause banner');
     root.addEventListener('blur', releaseAllHolds);
     var ok = safe(function () { return startCore(state); }, 'startCore');
     if (!ok) { coreReady = false; if (state) startLocalLoop(); }
     var m = (root.location.hash || '').slice(1);
-    if (!m || !go(m, { fromHash: true })) setMode('inicio', { fromHash: true });
-    if (!m) { try { root.history.replaceState(null, '', '#inicio'); } catch (e) { /* sin historial (sandbox) */ } }
+    if (!m || !go(m)) setMode('inicio');
+    mountNav();                                                   // history + return bar + UP + "Volver a la vista anterior" (after the first route)
     if (!state) showToast({ text: 'No se pudo cargar la simulación: las fichas funcionan, pero los controles no se mueven.', kind: 'warn' });
     var Ob = C150.Onboarding;
     if (Ob && isFn(Ob.maybeStart)) safe(function () { Ob.maybeStart(); }, 'Onboarding.maybeStart');
   };
-  UI.setMode = function (name) { setMode(name); };
+  UI.setMode = function (name) { navGo(name); };
   UI.getMode = function () { return mode; };
   UI.getGroup = function () { return groupOf(mode); };
-  UI.go = function (path) { return go(path); };
+  UI.go = function (path) { return navGo(path); };                           // IR (top nav, deep links)
+  UI.open = function (path, o) { return navOpen(path, o); };                   // ABRIR: a detail somewhere else, with "← Volver a …"
+  UI.lookAt = function (id) { lookAtControl(id); };                            // MIRAR: only the camera moves (glossary "Verlo en 3D")
+  UI.back = function () { var n = NAV(); return !!(n && isFn(n.back) && n.back()); };
+  UI.up = function () { var n = NAV(); return !!(navOn() && n && isFn(n.up) ? n.up() : navUp()); };
   UI.toast = function (e) { showToast(e); };
   UI.syncNav = function () { syncNav(); syncSearchBtn(); };
   UI.progressSummary = progNow;
   UI.resetTips = function () { coachReset(); };
-  UI.openLab = function (expId) {
-    setMode('aire');
-    if (expId && C150.Lab && isFn(C150.Lab.startExperiment)) safe(function () { C150.Lab.startExperiment(expId); }, 'Lab.startExperiment');
-  };
+  UI.openLab = function (expId) { navOpen(expId ? 'aire/' + expId : 'aire'); };
   /* deep links used by the search palette, Inicio and the onboarding (each opens its mode first) */
   UI.openHelp = function () { openHelp(); };
   UI.sheet = function (snap) { sheetEnsure(snap || 'half'); };
   UI.openLesson = function (id) {
-    setMode('basico');
     for (var i = 0; i < LESSONS.length; i++) if (LESSONS[i].id === id) { lbOpen(i); sheetEnsure('half'); return true; }
     return false;
   };
@@ -4879,15 +5587,15 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     return false;
   };
   UI.openSituation = function (id) {
-    setMode('volar');
-    if (sitOk()) { voSetTab('situaciones'); if (isFn(C150.Situations.open)) safe(function () { C150.Situations.open(id); }, 'Situations.open'); }
+    navOpen('volar/' + id, { run: function () {
+      if (sitOk()) { voSetTab('situaciones'); if (isFn(C150.Situations.open)) safe(function () { C150.Situations.open(id); }, 'Situations.open'); }
+    } });
     sheetEnsure('half');
   };
-  UI.startQuiz = function () { setMode('quiz'); qzStart(); sheetEnsure('half'); };
+  UI.startQuiz = function () { navOpen('quiz', { run: function () { qzStart(); } }); sheetEnsure('half'); };
   UI.showControl = function (id) {
     if (!CTRL[id]) return;
-    setMode('explorar');
-    openControl(id, 'list');
+    navOpen('cabina/' + id);
     sheetEnsure('half');
   };
 

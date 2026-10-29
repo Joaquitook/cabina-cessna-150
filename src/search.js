@@ -282,6 +282,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     return out;
   }
 
+  var lastQuery = '';
   function open(opts) {
     opts = opts || {};
     var Kit = K();
@@ -290,6 +291,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     var h = Kit.el;
     if (Kit.closePopover) Kit.closePopover();
     var prev = doc.activeElement;
+    var navTok = null;
     var input = h('input', {
       type: 'search', 'class': 'pal-input', id: 'pal-input', role: 'combobox', 'aria-expanded': 'true', 'aria-controls': 'pal-list', 'aria-autocomplete': 'list',
       'aria-label': 'Buscar en la aplicación', placeholder: 'Buscá un mando o una palabra', autocomplete: 'off', spellcheck: 'false', enterkeyhint: 'go', autocapitalize: 'off'
@@ -388,6 +390,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     function close() {
       if (cur !== api) return;
       cur = null;
+      lastQuery = input.value;                                        // opening the palette again brings the last search back
+      if (navTok && C150.Nav && typeof C150.Nav.overlayClosed === 'function') { C150.Nav.overlayClosed(navTok); navTok = null; }
       doc.removeEventListener('keydown', onKey, true);
       el.classList.remove('is-on');
       var gone = function () { if (el.parentNode) el.parentNode.removeChild(el); };
@@ -397,7 +401,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     var api = { el: el, input: input, render: render, close: close };
     cur = api;
     doc.body.appendChild(el);
-    if (opts.query) input.value = opts.query;
+    if (C150.Nav && typeof C150.Nav.overlayOpen === 'function' && C150.Nav.mounted && C150.Nav.mounted()) navTok = C150.Nav.overlayOpen(close);   // the system Back button closes it first
+    input.value = opts.query !== undefined ? opts.query : lastQuery;
     render();
     void el.offsetWidth;
     el.classList.add('is-on');

@@ -817,7 +817,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     if (o.ticks) {
       ticks = h('div', { 'class': 'ticks', 'aria-hidden': 'true' });
       o.ticks.forEach(function (tk, i) {
-        var sp = h('span', { 'class': 'tick' + (i % 2 ? ' is-alt' : '') + (tk.cls ? ' ' + tk.cls : ''), text: tk.t });
+        var sp = h('span', { 'class': 'tick' + (i % 2 ? ' is-alt' : '') + (tk.cls ? ' ' + tk.cls : '') + (tk.v <= o.min ? ' is-first' : '') + (tk.v >= o.max ? ' is-last' : ''), text: tk.t });
         sp.style.left = ((tk.v - o.min) / span * 100) + '%';
         ticks.appendChild(sp);
       });

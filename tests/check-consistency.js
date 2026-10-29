@@ -72,7 +72,7 @@ const PROBAR_TIPOS = ['yoke', 'pedales', 'slider', 'toggle', 'opciones', 'master
 const SCRIPT_ORDER = ['data/controls-a.js', 'data/controls-b.js', 'data/learning.js', 'data/lab.js', 'data/situations.js', 'sim.js', 'gauges.js',
   'airfoil.js', 'world.js', 'cockpit.js', 'exterior.js', 'airflow.js', 'core.js', 'lab.js', 'situations.js', 'icons.js', 'kit.js', 'progress.js', 'ui.js'];
 // contrato UI/UX v4 §4: módulos de las próximas olas (opcionales hasta que existan); si están, van antes de ui.js y después de progress.js
-const SCRIPT_OPTIONAL = ['glossary.js', 'search.js', 'home.js', 'onboarding.js'];
+const SCRIPT_OPTIONAL = ['nav.js', 'glossary.js', 'search.js', 'home.js', 'onboarding.js'];   // nav.js (contrato v6): después de progress.js, antes de ui.js
 
 /* ───────────── Carga (global falso, sin DOM) ───────────── */
 
