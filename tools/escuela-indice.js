@@ -43,18 +43,18 @@ const RESUMEN = {
 
 function readJson(p) { return JSON.parse(fs.readFileSync(p, 'utf8')); }
 
-/** ids de lección presentes en src/data/escuela/<ID>.json */
+/** lecciones presentes en src/data/escuela/<ID>.json: id → { componentes: [tipos reales], enlaces: n }  (Map: se usa con .has y .get) */
 function leccionesConContenido() {
-  const set = new Set();
-  if (!fs.existsSync(OUT_DIR)) return set;
+  const map = new Map();
+  if (!fs.existsSync(OUT_DIR)) return map;
   for (const f of fs.readdirSync(OUT_DIR)) {
     if (!/^[A-Z]{3}\.json$/.test(f)) continue;
     try {
       const m = readJson(path.join(OUT_DIR, f));
-      for (const u of m.unidades || []) for (const l of u.lecciones || []) set.add(l.id);
+      for (const u of m.unidades || []) for (const l of u.lecciones || []) map.set(l.id, { componentes: (l.componentes || []).map((c) => c.tipo), enlaces: (l.enlaces || []).length });
     } catch (e) { console.error('AVISO: no se pudo leer ' + f + ': ' + e.message); }
   }
-  return set;
+  return map;
 }
 
 function detalleDe(id, estructuraDetalle, conContenido) {
@@ -78,7 +78,9 @@ function build() {
           id: u.id, titulo: u.titulo, paginas: u.paginas || '',
           lecciones: u.lecciones.map((l) => ({
             id: l.id, titulo: l.titulo, paginas: l.paginas || '', minutos: l.minutos || 0,
-            componentes: l.componentes || [], enlaces: l.enlaces || 0, detalle: detalleDe(l.id, l.detalle, conContenido)
+            // una lección ya adaptada manda con sus componentes y enlaces reales (el plan puede haberse reordenado al adaptar)
+            componentes: conContenido.has(l.id) ? conContenido.get(l.id).componentes : (l.componentes || []),
+            enlaces: conContenido.has(l.id) ? conContenido.get(l.id).enlaces : (l.enlaces || 0), detalle: detalleDe(l.id, l.detalle, conContenido)
           }))
         }))
       };
@@ -87,6 +89,7 @@ function build() {
     modulos = readJson(OUT).modulos;
     for (const m of modulos) for (const u of m.unidades) for (const l of u.lecciones) {
       l.detalle = detalleDe(l.id, l.detalle === 'pendiente' ? 'pendiente' : 'completo', conContenido);
+      if (conContenido.has(l.id)) { l.componentes = conContenido.get(l.id).componentes; l.enlaces = conContenido.get(l.id).enlaces; }
     }
   } else {
     console.error('No hay _teorico/mapa/escuela-estructura.json ni un indice.json previo.');

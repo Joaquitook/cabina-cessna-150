@@ -11,7 +11,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
  *     desafio?:false,                                       el modo desafío aparece solo si la herramienta lo tiene; false lo apaga
  *     pasos?:true, nota?:'texto' }
  *   Herramientas de partida: conversion · viento-cruzado · tvd (tiempo, velocidad, distancia) · combustible · altitud-isa · plazo (fecha límite) ·
- *   fecha-minima · hora-llegada · horario-reglas · costo-opcion · area-ala · anticipacion · lista-condicional (las últimas se arman con los datos de la lección).
+ *   fecha-minima · hora-llegada · horario-reglas · costo-opcion · area-ala · anticipacion · lista-condicional (las últimas se arman con los datos de la lección) ·
+ *   tramite-licencia (INT-07-06: la fecha del psicofísico → calendario, costo en UR y lo que se lleva a cada lugar).
  *   normalizar acepta también los esbozos libres del plan (reconoce la herramienta por palabras; las que necesitan datos propios los toman de ahí) y devuelve null si no entiende.
  *
  * API del registro (pura, corre en Node):  Herr.register(id, def) · Herr.get(id) · Herr.has(id) · Herr.ids() · Herr.calc(id, valores, params) → {salidas, pasos, error?} · Herr.inferir(texto)
@@ -376,6 +377,47 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       for (k in (p && p.si) || {}) { var extra = arr(p.si[k][v[k]]); lista = lista.concat(extra); if (extra.length) pasos.push('Por «' + v[k] + '»: ' + extra.join(', ') + '.'); }
       return { salidas: [{ id: 'lista', etiqueta: 'Tu lista (' + lista.length + ')', valor: lista, tipo: 'lista', destacada: true }], pasos: ['Siempre: ' + arr(p && p.siempre).join(', ') + '.'].concat(pasos) };
     }
+  });
+
+  /* ---- el calendario del trámite de la licencia de alumno piloto (INT-07-06): la cita en DINACIA va por lo menos 3 días después del psicofísico */
+  var LUGAR_MED = 'en Medicina Aeronáutica', LUGAR_MUT = 'en mi mutualista';
+  Herr.register('tramite-licencia', {
+    nombre: 'Mi calendario del trámite', resumen: 'Con la fecha del psicofísico armás tu calendario, el costo y lo que llevás a cada lugar.', prioridad: 30,
+    reconoce: [/calendario del tramite|tramite de la licencia/],
+    entradas: [
+      { id: 'fecha', etiqueta: 'Fecha de tu psicofísico', tipo: 'fecha', valor: '', claves: [/fecha|psicofisico/] },
+      opc('lugar', 'Dónde hacés los análisis de sangre y orina', [LUGAR_MED, LUGAR_MUT], LUGAR_MED, { claves: [/lugar|analisis/] }),
+      opc('edad', '¿Tenés 50 años o más?', ['no', 'sí'], 'no', { claves: [/edad|50/] })
+    ],
+    calcular: function (v) {
+      var b = U.parseFecha(v.fecha); if (!b) return { error: 'Elegí la fecha de tu psicofísico.', salidas: [], pasos: [] };
+      var med = v.lugar !== LUGAR_MUT, mayor = v.edad === 'sí', previo = U.sumarDias(b, -1), cita = U.sumarDias(b, 3), ur = med ? 4 : 2;
+      var hitos = [
+        U.fechaTexto(previo, true) + ': la víspera. Privación de sueño de 24 horas para el electroencefalograma (preguntale al gabinete cómo hacerla)' + (med ? '; última comida a las 20:00 o antes, para llegar con 12 horas de ayuno a las 8:00.' : '.'),
+        U.fechaTexto(b, true) + ': psicofísico, a las 8:00 en Medicina Aeronáutica. Costo: ' + ur + ' UR.' + (med ? ' Llevá algo para comer y tomar después de la extracción de sangre.' : ''),
+        U.fechaTexto(cita, true) + ': primera fecha posible para tu cita en Personal Aeronáutico de DINACIA (3 días después del psicofísico).'
+      ];
+      var medicina = ['Electroencefalograma completo con privación de sueño de 24 horas', 'Certificado de vacuna antitetánica vigente', 'Una foto carné']
+        .concat(med ? ['Ayuno de 12 horas', 'Primera orina de la mañana'] : ['Todos los resultados de sangre y orina', 'Electrocardiograma informado por cardiólogo (llevá la tira)'])
+        .concat(mayor ? ['Ergometría (prueba de esfuerzo), por tener 50 años o más'] : []);
+      var dinacia = ['Una carta de la escuela que acredite que ya estás en el curso teórico', 'Una foto carné'];
+      return { salidas: [
+        { id: 'cita', etiqueta: 'Tu cita en DINACIA, desde el', valor: U.fechaTexto(cita, true), tipo: 'texto', destacada: true },
+        { id: 'costo', etiqueta: 'Costo del psicofísico', valor: ur, unidad: 'UR', dec: 0, destacada: true },
+        { id: 'hitos', etiqueta: 'Tu calendario', valor: hitos, tipo: 'lista' },
+        { id: 'medicina', etiqueta: 'Llevás a Medicina Aeronáutica', valor: medicina, tipo: 'lista' },
+        { id: 'dinacia', etiqueta: 'Llevás a DINACIA', valor: dinacia, tipo: 'lista' }
+      ], pasos: [
+        'La cita en DINACIA va por lo menos 3 días después del psicofísico: ' + U.fechaTexto(b) + ' + 3 días = ' + U.fechaTexto(cita) + '.',
+        med ? 'Si hacés los análisis en Medicina Aeronáutica: ayuno de 12 horas (desde las 8:00 hacia atrás, la última comida es a las 20:00), primera orina de la mañana y 4 UR.'
+          : 'Si llevás los estudios hechos desde tu mutualista: llevás todos los resultados y la tira del electrocardiograma, sin el ayuno de 12 horas, y son 2 UR.',
+        mayor ? 'Tenés 50 años o más: se suma la ergometría.' : 'Con menos de 50 años no se pide ergometría.'
+      ], aviso: 'Teléfonos, costos y requisitos pueden cambiar: confirmalos con el gabinete y con DINACIA.' };
+    },
+    ejemplos: [
+      { nombre: 'Psicofísico el 4 de agosto de 2026, análisis en Medicina Aeronáutica', valores: { fecha: '2026-08-04', lugar: LUGAR_MED, edad: 'no' }, nota: 'Cita en DINACIA desde el viernes 7 de agosto; 4 UR.' },
+      { nombre: 'Psicofísico el 11 de agosto de 2026, análisis en la mutualista, 50 años o más', valores: { fecha: '2026-08-11', lugar: LUGAR_MUT, edad: 'sí' }, nota: 'Cita desde el viernes 14 de agosto; 2 UR y se suma la ergometría.' }
+    ]
   });
 
   /* ================================================================== normalizar (puro) */

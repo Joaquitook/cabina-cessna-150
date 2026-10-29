@@ -3790,3 +3790,19 @@ div.card-h:hover { border-color: var(--line); transform: none; }
 .es-sit-opts .opt.is-correct .opt-letter { color: var(--es-on-ok); }
 .es-sit-opts .opt.is-wrong .opt-letter { color: var(--es-on-bad); }
 /* ==== fin componentes B ==== */
+/* ==== ESCUELA · CONTENIDO (INT-05 a INT-08): colores de zona y trazos para los dibujos de las lecciones (componente diagrama). Sólo tokens del tema. ==== */
+.dg-zok { fill: color-mix(in srgb, var(--ok) 26%, var(--surface)); stroke: var(--ok); stroke-width: 1.6; stroke-linejoin: round; }
+.dg-zwarn { fill: color-mix(in srgb, var(--warn) 28%, var(--surface)); stroke: var(--warn); stroke-width: 1.6; stroke-linejoin: round; }
+.dg-zbad { fill: color-mix(in srgb, var(--bad) 22%, var(--surface)); stroke: var(--bad); stroke-width: 1.6; stroke-linejoin: round; }
+.dg-zinfo { fill: color-mix(in srgb, var(--info) 22%, var(--surface)); stroke: var(--info); stroke-width: 1.6; stroke-linejoin: round; }
+.dg-ground { fill: var(--surface-2); stroke: none; }
+.dg-ln { fill: none; stroke: var(--fg-soft); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.dg-ln--bad { stroke: var(--bad); stroke-width: 2.4; }
+.dg-ln--ok { stroke: var(--ok); stroke-width: 2.4; }
+.dg-ln--dash { stroke-dasharray: 6 4; }
+.dg-fillbad { fill: var(--bad); stroke: none; }
+.dg-fillok { fill: var(--ok); stroke: none; }
+.dg-fillfg { fill: var(--fg-soft); stroke: none; }
+.dg-lbl--fg { fill: var(--fg); }
+.dg-lbl--lg { font-size: 13px; }
+/* ==== fin contenido INT ==== */

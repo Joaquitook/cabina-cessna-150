@@ -9,49 +9,49 @@
       {"id":"INT-01-06","titulo":"Duración de las clases","paginas":"10","minutos":5,"componentes":["animacion","simulador","calculadora"],"enlaces":0,"detalle":"completo"}
     ]},
     {"id":"INT-02","titulo":"Cómo funciona tu curso","paginas":"11–16","lecciones":[
-      {"id":"INT-02-01","titulo":"Google Classroom: tu mochila digital","paginas":"11","minutos":5,"componentes":["ordenar","emparejar","enlace3d"],"enlaces":1,"detalle":"proximamente"},
-      {"id":"INT-02-02","titulo":"Los tests: simulacro, 75 % y re-take","paginas":"12–13","minutos":8,"componentes":["simulador","animacion","situacion"],"enlaces":0,"detalle":"proximamente"},
-      {"id":"INT-02-03","titulo":"Horarios, cancelaciones y llegadas tarde","paginas":"14–15","minutos":10,"componentes":["calculadora","clasificar","animacion"],"enlaces":2,"detalle":"proximamente"},
-      {"id":"INT-02-04","titulo":"Vestimenta para volar","paginas":"16","minutos":5,"componentes":["clasificar","diapositiva","enlace3d"],"enlaces":2,"detalle":"proximamente"}
+      {"id":"INT-02-01","titulo":"Google Classroom: tu mochila digital","paginas":"11","minutos":5,"componentes":["ordenar","emparejar","enlace3d"],"enlaces":1,"detalle":"completo"},
+      {"id":"INT-02-02","titulo":"Los tests: simulacro, 75 % y re-take","paginas":"12–13","minutos":8,"componentes":["simulador","animacion","situacion"],"enlaces":0,"detalle":"completo"},
+      {"id":"INT-02-03","titulo":"Horarios, cancelaciones y llegadas tarde","paginas":"14–15","minutos":10,"componentes":["calculadora","clasificar","animacion"],"enlaces":1,"detalle":"completo"},
+      {"id":"INT-02-04","titulo":"Vestimenta para volar","paginas":"16","minutos":5,"componentes":["clasificar","diapositiva","enlace3d"],"enlaces":2,"detalle":"completo"}
     ]},
     {"id":"INT-03","titulo":"El Cervesómetro","paginas":"17–20","lecciones":[
-      {"id":"INT-03-01","titulo":"El Cervesómetro: el formulario A1","paginas":"17","minutos":8,"componentes":["diapositiva","situacion","emparejar"],"enlaces":4,"detalle":"proximamente"},
-      {"id":"INT-03-02","titulo":"Las 7 reglas del Cervesómetro","paginas":"18","minutos":8,"componentes":["tarjetas","completar","situacion"],"enlaces":0,"detalle":"proximamente"},
-      {"id":"INT-03-03","titulo":"Leves, medias y graves","paginas":"19","minutos":10,"componentes":["clasificar","simulador","enlace3d"],"enlaces":6,"detalle":"proximamente"},
-      {"id":"INT-03-04","titulo":"El recuento, el asado y el apagado sin cervezas","paginas":"20","minutos":10,"componentes":["animacion","enlace3d","ordenar"],"enlaces":7,"detalle":"proximamente"}
+      {"id":"INT-03-01","titulo":"El Cervesómetro: el formulario A1","paginas":"17","minutos":8,"componentes":["diapositiva","situacion","emparejar"],"enlaces":1,"detalle":"completo"},
+      {"id":"INT-03-02","titulo":"Las 7 reglas del Cervesómetro","paginas":"18","minutos":8,"componentes":["tarjetas","completar","situacion"],"enlaces":0,"detalle":"completo"},
+      {"id":"INT-03-03","titulo":"Leves, medias y graves","paginas":"19","minutos":10,"componentes":["clasificar","simulador","enlace3d"],"enlaces":6,"detalle":"completo"},
+      {"id":"INT-03-04","titulo":"El recuento, el asado y el apagado sin cervezas","paginas":"20","minutos":10,"componentes":["animacion","enlace3d","ordenar"],"enlaces":6,"detalle":"completo"}
     ]},
     {"id":"INT-04","titulo":"El acceso al aeropuerto","paginas":"21–27","lecciones":[
-      {"id":"INT-04-01","titulo":"Los dos portones: 6A y Bomberos","paginas":"21–22","minutos":8,"componentes":["calculadora","mapa","clasificar"],"enlaces":0,"detalle":"proximamente"},
-      {"id":"INT-04-02","titulo":"Policía Aérea Nacional (PAN)","paginas":"23","minutos":6,"componentes":["animacion","completar","emparejar"],"enlaces":0,"detalle":"proximamente"},
-      {"id":"INT-04-03","titulo":"Objetos prohibidos en los hangares","paginas":"24","minutos":8,"componentes":["clasificar","emparejar","situacion"],"enlaces":0,"detalle":"proximamente"},
-      {"id":"INT-04-04","titulo":"¿Cuándo puedo entrar? Listado y carnet provisorio","paginas":"25","minutos":8,"componentes":["ordenar","clasificar","situacion"],"enlaces":0,"detalle":"proximamente"},
-      {"id":"INT-04-05","titulo":"¿A dónde me deja ir el carnet provisorio?","paginas":"26","minutos":7,"componentes":["mapa","emparejar","situacion"],"enlaces":0,"detalle":"proximamente"},
-      {"id":"INT-04-06","titulo":"Cómo traer invitados","paginas":"27","minutos":6,"componentes":["calculadora","situacion","ordenar"],"enlaces":0,"detalle":"proximamente"}
+      {"id":"INT-04-01","titulo":"Los dos portones: 6A y Bomberos","paginas":"21–22","minutos":8,"componentes":["calculadora","mapa","clasificar"],"enlaces":0,"detalle":"completo"},
+      {"id":"INT-04-02","titulo":"Policía Aérea Nacional (PAN)","paginas":"23","minutos":6,"componentes":["animacion","completar","emparejar"],"enlaces":0,"detalle":"completo"},
+      {"id":"INT-04-03","titulo":"Objetos prohibidos en los hangares","paginas":"24","minutos":8,"componentes":["clasificar","emparejar","situacion"],"enlaces":0,"detalle":"completo"},
+      {"id":"INT-04-04","titulo":"¿Cuándo puedo entrar? Listado y carnet provisorio","paginas":"25","minutos":8,"componentes":["ordenar","clasificar","situacion"],"enlaces":0,"detalle":"completo"},
+      {"id":"INT-04-05","titulo":"¿A dónde me deja ir el carnet provisorio?","paginas":"26","minutos":7,"componentes":["mapa","emparejar","situacion"],"enlaces":0,"detalle":"completo"},
+      {"id":"INT-04-06","titulo":"Cómo traer invitados","paginas":"27","minutos":6,"componentes":["calculadora","situacion","ordenar"],"enlaces":0,"detalle":"completo"}
     ]},
     {"id":"INT-05","titulo":"Reglas en hangares y plataforma","paginas":"28–34","lecciones":[
-      {"id":"INT-05-01","titulo":"Chaleco y prohibición de fumar","paginas":"28–29","minutos":6,"componentes":["situacion","diagrama","clasificar"],"enlaces":0,"detalle":"proximamente"},
-      {"id":"INT-05-02","titulo":"Beacon prendido y chorro de la hélice","paginas":"30","minutos":9,"componentes":["diagrama","enlace3d","situacion","animacion"],"enlaces":8,"detalle":"proximamente"},
-      {"id":"INT-05-03","titulo":"Nunca toques una hélice","paginas":"31–32","minutos":9,"componentes":["diagrama","enlace3d","situacion","diapositiva"],"enlaces":5,"detalle":"proximamente"},
-      {"id":"INT-05-04","titulo":"Caminar desde el 6A y prioridad de paso","paginas":"33","minutos":9,"componentes":["mapa","ordenar","situacion"],"enlaces":0,"detalle":"proximamente"},
-      {"id":"INT-05-05","titulo":"Ingreso por el portón de Bomberos","paginas":"34","minutos":6,"componentes":["situacion","calculadora","mapa"],"enlaces":0,"detalle":"proximamente"}
+      {"id":"INT-05-01","titulo":"Chaleco y prohibición de fumar","paginas":"28–29","minutos":6,"componentes":["diagrama","diagrama","clasificar","situacion"],"enlaces":0,"detalle":"completo"},
+      {"id":"INT-05-02","titulo":"Beacon prendido y chorro de la hélice","paginas":"30","minutos":9,"componentes":["enlace3d","diagrama","animacion","situacion"],"enlaces":5,"detalle":"completo"},
+      {"id":"INT-05-03","titulo":"Nunca toques una hélice","paginas":"31–32","minutos":9,"componentes":["diagrama","enlace3d","diapositiva","situacion"],"enlaces":4,"detalle":"completo"},
+      {"id":"INT-05-04","titulo":"Caminar desde el 6A y prioridad de paso","paginas":"33","minutos":9,"componentes":["diagrama","mapa","ordenar","situacion"],"enlaces":0,"detalle":"completo"},
+      {"id":"INT-05-05","titulo":"Ingreso por el portón de Bomberos","paginas":"34","minutos":6,"componentes":["calculadora","mapa","situacion"],"enlaces":0,"detalle":"completo"}
     ]},
     {"id":"INT-06","titulo":"Seguridad Operacional (SMS) y Calidad","paginas":"35–39","lecciones":[
-      {"id":"INT-06-01","titulo":"El programa SMS: reportar sin castigo","paginas":"35–36","minutos":8,"componentes":["situacion","clasificar","caso"],"enlaces":2,"detalle":"proximamente"},
-      {"id":"INT-06-02","titulo":"El ciclo del SMS y la matriz de tolerabilidad de riesgos","paginas":"36","minutos":10,"componentes":["ordenar","clasificar","diagrama","simulador"],"enlaces":0,"detalle":"proximamente"},
-      {"id":"INT-06-03","titulo":"¿Cómo llego al formulario SMS?","paginas":"37","minutos":5,"componentes":["diagrama","emparejar","situacion"],"enlaces":0,"detalle":"proximamente"},
-      {"id":"INT-06-04","titulo":"Programa y formulario de Calidad","paginas":"38–39","minutos":5,"componentes":["clasificar","completar","diapositiva"],"enlaces":0,"detalle":"proximamente"}
+      {"id":"INT-06-01","titulo":"El programa SMS: reportar sin castigo","paginas":"35–36","minutos":8,"componentes":["diagrama","clasificar","situacion","caso"],"enlaces":1,"detalle":"completo"},
+      {"id":"INT-06-02","titulo":"El ciclo del SMS y la matriz de tolerabilidad de riesgos","paginas":"36","minutos":10,"componentes":["diagrama","diagrama","simulador","ordenar","clasificar"],"enlaces":0,"detalle":"completo"},
+      {"id":"INT-06-03","titulo":"¿Cómo llego al formulario SMS?","paginas":"37","minutos":5,"componentes":["diagrama","emparejar","situacion"],"enlaces":0,"detalle":"completo"},
+      {"id":"INT-06-04","titulo":"Programa y formulario de Calidad","paginas":"38–39","minutos":5,"componentes":["diapositiva","clasificar","completar"],"enlaces":0,"detalle":"completo"}
     ]},
     {"id":"INT-07","titulo":"Trámites para la licencia de alumno piloto","paginas":"40–44","lecciones":[
-      {"id":"INT-07-01","titulo":"Medicina Aeronáutica: qué es y cómo agendar","paginas":"40–41","minutos":7,"componentes":["diapositiva","mapa","situacion"],"enlaces":0,"detalle":"proximamente"},
-      {"id":"INT-07-02","titulo":"Qué llevar al psicofísico","paginas":"41","minutos":9,"componentes":["calculadora","clasificar","completar"],"enlaces":0,"detalle":"proximamente"},
-      {"id":"INT-07-03","titulo":"Costos y logística del día","paginas":"42","minutos":7,"componentes":["calculadora","animacion","emparejar"],"enlaces":0,"detalle":"proximamente"},
-      {"id":"INT-07-04","titulo":"Qué estudios te hacen","paginas":"43","minutos":7,"componentes":["tarjetas","diagrama","simulador","clasificar"],"enlaces":0,"detalle":"proximamente"},
-      {"id":"INT-07-05","titulo":"Trámite en Personal Aeronáutico de DINACIA","paginas":"44","minutos":8,"componentes":["diapositiva","calculadora","clasificar","situacion"],"enlaces":0,"detalle":"proximamente"},
-      {"id":"INT-07-06","titulo":"La línea de tiempo de tu licencia de alumno piloto","paginas":"40–44","minutos":10,"componentes":["ordenar","calculadora","clasificar","caso"],"enlaces":0,"detalle":"proximamente"}
+      {"id":"INT-07-01","titulo":"Medicina Aeronáutica: qué es y cómo agendar","paginas":"40–41","minutos":7,"componentes":["diapositiva","diagrama","mapa","situacion"],"enlaces":0,"detalle":"completo"},
+      {"id":"INT-07-02","titulo":"Qué llevar al psicofísico","paginas":"41","minutos":9,"componentes":["calculadora","clasificar","completar"],"enlaces":0,"detalle":"completo"},
+      {"id":"INT-07-03","titulo":"Costos y logística del día","paginas":"42","minutos":7,"componentes":["calculadora","animacion","emparejar"],"enlaces":0,"detalle":"completo"},
+      {"id":"INT-07-04","titulo":"Qué estudios te hacen","paginas":"43","minutos":7,"componentes":["diagrama","tarjetas","clasificar"],"enlaces":0,"detalle":"completo"},
+      {"id":"INT-07-05","titulo":"Trámite en Personal Aeronáutico de DINACIA","paginas":"44","minutos":8,"componentes":["diapositiva","calculadora","clasificar","situacion"],"enlaces":0,"detalle":"completo"},
+      {"id":"INT-07-06","titulo":"La línea de tiempo de tu licencia de alumno piloto","paginas":"40–44","minutos":10,"componentes":["calculadora","ordenar","clasificar","caso"],"enlaces":0,"detalle":"completo"}
     ]},
     {"id":"INT-08","titulo":"Cierre: dudas y test","paginas":"45–47","lecciones":[
-      {"id":"INT-08-01","titulo":"¿Dudas? Repaso de toda la Introducción","paginas":"45–46","minutos":10,"componentes":["diagrama","tarjetas","completar","situacion"],"enlaces":5,"detalle":"proximamente"},
-      {"id":"INT-08-02","titulo":"El test de la Introducción","paginas":"47","minutos":12,"componentes":["diapositiva","quiz","tarjetas","situacion"],"enlaces":2,"detalle":"proximamente"}
+      {"id":"INT-08-01","titulo":"¿Dudas? Repaso de toda la Introducción","paginas":"45–46","minutos":10,"componentes":["diagrama","tarjetas","completar","situacion"],"enlaces":5,"detalle":"completo"},
+      {"id":"INT-08-02","titulo":"El test de la Introducción","paginas":"47","minutos":12,"componentes":["diapositiva","quiz","tarjetas","situacion"],"enlaces":2,"detalle":"completo"}
     ]}
   ]},
   {"id":"AER","orden":2,"titulo":"Aerodinámica","fuente":"aerosur","paginas":"48–193","color":"#2F6FE0","icono":"flaps","resumen":"Las cuatro fuerzas, el ala y la pérdida: por qué vuela un avión y cómo lo controlás.","examen":{"numPreguntas":40},"unidades":[

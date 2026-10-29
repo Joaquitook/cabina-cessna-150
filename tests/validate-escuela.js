@@ -256,6 +256,11 @@ eq([sal(C_('area-ala', { envergadura: 10, cuerda: 1.5 }), 'm2'), r2(sal(C_('area
   ok(co && sal(C_('costo-opcion', { donde: 'gabinete', valor: 1500 }, co.params), 'pesos') === 6000 && C_('costo-opcion', { donde: 'hechos' }, co.params).salidas.length === 1, 'costo-opcion: UR por valor; sin valor sólo muestra las UR');
   const li = HR.get('lista-condicional').desdeDatos({ entradas: [{ id: 'lugar', opciones: ['a', 'b'] }, { id: 'edad', opciones: ['no', 'sí'] }], siempre: ['foto'], siLugar: { a: ['ayuno'] }, siEdad: { 'sí': ['ergometría'] } });
   ok(li && sal(C_('lista-condicional', { lugar: 'a', edad: 'sí' }, li.params), 'lista').join('|') === 'foto|ayuno|ergometría' && sal(C_('lista-condicional', { lugar: 'b', edad: 'no' }, li.params), 'lista').join('|') === 'foto', 'lista-condicional: la lista cambia con las respuestas');
+  // tramite-licencia (INT-07-06): psicofísico + 3 días = cita en DINACIA; 4 UR en el gabinete y 2 UR con los estudios hechos; ergometría desde los 50
+  const tl1 = C_('tramite-licencia', { fecha: '2026-08-04', lugar: 'en Medicina Aeronáutica', edad: 'no' }), tl2 = C_('tramite-licencia', { fecha: '2026-08-11', lugar: 'en mi mutualista', edad: 'sí' });
+  ok(HR.has('tramite-licencia') && sal(tl1, 'cita') === 'viernes 7 de agosto de 2026' && sal(tl1, 'costo') === 4 && sal(tl2, 'cita') === 'viernes 14 de agosto de 2026' && sal(tl2, 'costo') === 2, 'tramite-licencia: la cita es 3 días después del psicofísico; 4 UR en el gabinete, 2 UR con los estudios hechos');
+  ok(sal(tl1, 'medicina').includes('Ayuno de 12 horas') && !sal(tl1, 'medicina').some((x) => /Ergometr/.test(x)) && !sal(tl2, 'medicina').includes('Ayuno de 12 horas') && sal(tl2, 'medicina').some((x) => /Ergometr/.test(x)) && sal(tl2, 'medicina').some((x) => /tira/.test(x)), 'tramite-licencia: el ayuno sólo en Medicina Aeronáutica, la tira sólo en la mutualista y la ergometría sólo desde los 50');
+  ok(sal(tl1, 'dinacia').length === 2 && sal(tl1, 'hitos').length === 3 && C_('tramite-licencia', { fecha: '' }).error, 'tramite-licencia: lo que se lleva a DINACIA (carta y foto), tres hitos y aviso si falta la fecha');
 }
 // figuras
 ok(FG.ids().length >= 2, 'figuras propias: ' + FG.ids().join(', '));
