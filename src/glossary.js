@@ -330,7 +330,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   function body(e, K) {
     var h = K.el, nodes = [];
     nodes.push(h('p', { text: e.definicion || 'Sin descripción todavía.' }));
-    if (e.ingles) nodes.push(h('p', { class: 'pop-en' }, h('span', { class: 'pop-en-k', text: 'En inglés' }), ' ', h('span', { lang: 'en', text: e.ingles })));
+    if (e.ingles) nodes.push(h('p', { class: 'pop-en' }, h('span', { class: 'pop-en-k', text: 'En inglés' }), ' ', h('span', { lang: 'en', text: (C150.Kit && C150.Kit.enName) ? C150.Kit.enName(e.ingles) : e.ingles })));
     return nodes;
   }
   function see3d(e, K, close) {

@@ -204,7 +204,7 @@
     function tick() {
       t0 += 0.08;
       hd.set({ kicker: 'Lecciones · En vuelo', live: true, bigs: [{ v: 2300 + Math.round(Math.sin(t0) * 40), u: 'rpm', l: 'Motor' }, { v: 95 + Math.round(Math.sin(t0 * 1.3) * 3), u: 'nudos', l: 'Velocidad' }, { v: 3000 + Math.round(Math.sin(t0 * 0.7) * 30), u: 'pies', l: 'Altura' }],
-        row: [{ text: 'Corriente (master) encendida', onClick: function () {} }, { text: 'Flaps 0°' }, { text: 'En vuelo', onClick: function () {} }],
+        row: [{ text: 'Corriente encendida', onClick: function () {} }, { text: 'Flaps 0°' }, { text: 'En vuelo', onClick: function () {} }],
         pill: { text: 'En vuelo', tone: 'is-air' },
         extra: { k: 'Lección 2 · paso 3 de 5', t: '', nums: [{ v: Math.abs(Math.round(Math.sin(t0) * 20)), u: '° der.', l: 'Alabeo' }, { v: 3, u: '° arriba', l: 'Cabeceo' }] } });
     }
@@ -213,12 +213,14 @@
     var bottom = h('div', { 'class': 'vp-bottom' });
     var bar = K.chainBar();
     bar.set(['Acelerador', 'Empujás para dar más potencia', 'La hélice gira más rápido'], { key: 'demo' });
-    var vista = K.dockGroup({ label: 'Vista', value: 'pilot', items: ['Piloto', 'Horizonte', 'Tablero', 'Izq.', 'Centro', 'Der.', 'Piso', 'Techo'].map(function (t, i) { return { value: ['pilot', 'flight', 'panel', 'left', 'center', 'right', 'floor', 'overhead'][i], label: t }; }) });
+    var vista = K.dockGroup({ label: 'Vista', value: 'pilot', items: ['Piloto', 'Horizonte', 'Tablero', 'Izquierda', 'Centro', 'Derecha', 'Piso', 'Techo'].map(function (t, i) { return { value: ['pilot', 'flight', 'panel', 'left', 'center', 'right', 'floor', 'overhead'][i], label: t }; }) });
+    vista.classList.add('dock-group--vista');
+    var vchip = h('div', { 'class': 'dock-group dock-group--view' }, h('span', { 'class': 'dock-label', text: 'Vista' }), h('button', { type: 'button', 'class': 'seg-btn scn-btn view-btn' }, h('span', { 'class': 'scn-btn-v', text: 'Piloto' }), K.icon('chevron-down')));
     var dis = K.dockGroup({ label: 'Diseño', value: 'cabina', items: [{ value: 'cabina', label: 'Cabina' }, { value: 'dos', label: 'Las dos' }, { value: 'afuera', label: 'Afuera' }] });
     var scn = h('div', { 'class': 'dock-group dock-group--scn' }, h('span', { 'class': 'dock-label', text: 'Escenario' }), h('button', { type: 'button', 'class': 'seg-btn scn-btn' }, h('span', { 'class': 'scn-btn-v', text: 'En vuelo' }), K.icon('chevron-down')));
     var capas = K.dockGroup({ label: 'Capas', kind: 'chips', items: [{ value: 'flow', label: 'Flujo' }, { value: 'prop', label: 'Hélice' }] }); capas.setPressed('flow', true);
     bottom.appendChild(bar);
-    bottom.appendChild(K.dock(phone ? [vista, dis, scn] : [vista, dis, scn, capas]));
+    bottom.appendChild(K.dock(phone ? [vista, vchip, dis, scn] : [vista, vchip, dis, scn, capas]));
     stage.appendChild(bottom);
     wrap.appendChild(stage);
     var ins = h('div', { 'class': 'sg-inset' }, h('span', { 'class': 'inset-label', text: 'Así se ve desde afuera' }));
@@ -230,6 +232,23 @@
   root.appendChild(h('div', { 'class': 'sg-demo' }, w1));
   label('Lo mismo en un teléfono (390 px): HUD compacto, cadena de dos eslabones y el dock en una sola fila que se desliza');
   root.appendChild(h('div', { 'class': 'sg-demo' }, stage3d(true)));
+  label('VISTA como chip con popover (desde la pantalla de 1 360 px para abajo; los 8 botones sólo se ven en pantallas muy anchas), cadena de una sola línea y la barra "Seguí con"');
+  var vpop = h('div', { 'class': 'view-grid', style: { 'max-width': '440px' } });
+  [['1', 'Piloto', 'Tus ojos, en el asiento del piloto', true], ['2', 'Horizonte', 'Mirar afuera, como en vuelo'], ['3', 'Tablero', 'Todo el tablero de frente'], ['4', 'Izquierda', 'Instrumentos de vuelo']].forEach(function (o) {
+    vpop.appendChild(h('button', { type: 'button', 'class': 'view-opt' + (o[3] ? ' is-on' : '') }, h('span', { 'class': 'view-key', text: o[0] }), h('span', { 'class': 'view-main' }, h('strong', { text: o[1] }), h('span', { 'class': 'view-desc', text: o[2] }))));
+  });
+  var lbar = K.chainBar(); lbar.set(['Acelerador', 'Empujás para más potencia y tirás…', 'Abre una mariposa en el carburador'], { key: 'sgl' });
+  lbar.style.position = 'static'; lbar.style.margin = '14px 0';
+  var nxt = h('div', { 'class': 'nextbar', style: { position: 'static', 'max-width': '440px', border: '1px solid var(--line)' } },
+    h('span', { 'class': 'nextbar-text' }, h('span', { 'class': 'nextbar-k', text: 'Seguí con' }), h('strong', { 'class': 'nextbar-t', text: 'Conocé: Volante de mando' })),
+    h('button', { type: 'button', 'class': 'btn btn--primary btn--small nextbar-go', text: 'Verlo' }));
+  root.appendChild(h('div', { 'class': 'sg-demo sg-paper paper' }, vpop, h('div', { 'class': 'sg-3d', style: { height: '90px', 'max-width': '740px' } }, h('div', { 'class': 'vp-bottom' }, lbar)), nxt));
+  label('Nombre en inglés de un mando (Kit.enName): sin paréntesis ni corchetes, en una línea mono');
+  var enL = h('div', { 'class': 'sg-demo' });
+  ['Throttle (THROTTLE) with friction lock', 'Control wheel (yoke)', 'Airspeed indicator (ASI)', 'Tachometer (RPM) with hour meter', 'Mixture control (MIXTURE)', 'Rocker switches (DOME LT, PITOT HT, NAV, STROBE, BCN, TAXI, LDG)'].forEach(function (t) {
+    enL.appendChild(h('p', { style: { margin: '2px 0', font: '12.5px var(--font-data)' }, text: t + '  →  ' + K.enName(t) + '  |  corto: ' + K.enName(t, true) }));
+  });
+  root.appendChild(enL);
   label('Cartel sobre el 3D (.callout3d) con guía');
   var co3 = h('div', { 'class': 'sg-3d', style: { height: '170px', 'max-width': '520px' } });
   var svgHold = document.createElement('div'); svgHold.innerHTML = '<svg class="callout3d-svg" viewBox="0 0 520 170" aria-hidden="true"><line x1="120" y1="120" x2="190" y2="70"/><circle cx="120" cy="120" r="5"/></svg>';

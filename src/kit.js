@@ -33,6 +33,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
  *   Kit.reducedMotion()
  *
  * v5 · lenguaje de AIRE (contrato v5): los mismos componentes en TODAS las pestañas (mismo DOM que lab.js; las clases .lab-* y las compartidas valen igual):
+ *   Kit.enName("Throttle (THROTTLE) with friction lock", corto?)   → "Throttle with friction lock" (el inglés de un mando en una línea, sin paréntesis; corto = sin el sinónimo)
  *   Kit.pageHeader({kicker, title, sub, children})                  → <header class="pg-head">: kicker mono "NN · SECCIÓN · SUB", título enorme, párrafo
  *   Kit.hud({label, kicker, bigs:[{label, unit, title, onClick}]})  → .hud de vidrio · .set({kicker, live, bigs:[{v,u,l,warn}], row:[{text,onClick}]|texto,
  *                                                                      pill:{text, tone:"is-ok|is-air|is-warn|is-demo|is-pause|is-stall"},
@@ -549,6 +550,19 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   var tick_ = function (node, text) { if (node && node.textContent !== text) node.textContent = text; };
   function fmtCode(n) { return typeof n === 'number' ? (n < 10 ? '0' + n : String(n)) : n; }
 
+  /** Nombre en inglés de un mando, legible en una línea mono: "Throttle (THROTTLE) with friction lock" → "Throttle with friction lock";
+   *  "Control wheel (yoke)" → "Control wheel · yoke"; "Airspeed indicator (ASI)" → "Airspeed indicator · ASI". Sin paréntesis ni corchetes:
+   *  lo que va entre paréntesis (el cartel del tablero o un sinónimo) pasa al final después de un punto medio, y se omite si repite el nombre. */
+  function enName(s, short) {
+    s = String(s || '').replace(/\s+/g, ' ').trim();
+    var m = /^(.*?)\s*\(([^)]*)\)\s*(.*)$/.exec(s);
+    if (!m) return s;
+    var main = (m[1] + ' ' + m[3]).replace(/\s+/g, ' ').trim(), aka = m[2].trim();
+    if (!main) return aka;
+    if (short || !aka || main.toLowerCase().indexOf(aka.toLowerCase()) >= 0) return main;
+    return main + ' · ' + aka;
+  }
+
   /** Cabecera de página: kicker mono con punto, título enorme y un párrafo. */
   function pageHeader(o) {
     o = o || {};
@@ -704,8 +718,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     shown.forEach(function (it, i) {
       if (i > 0) el.appendChild(h('span', { 'class': 'chain-arrow', 'aria-hidden': 'true' }));
       var cl = 'chain-item ' + (i === 0 ? 'chain-cause' : (i === shown.length - 1 ? 'chain-effect' : 'chain-step'));
-      if (typeof it === 'object' && isFn(it.onClick)) el.appendChild(h('button', { type: 'button', 'class': cl + ' chain-act', onclick: it.onClick, text: it.text }));
-      else el.appendChild(h('span', { 'class': cl, text: txt(it) }));
+      if (typeof it === 'object' && isFn(it.onClick)) el.appendChild(h('button', { type: 'button', 'class': cl + ' chain-act', onclick: it.onClick, title: it.text, text: it.text }));
+      else el.appendChild(h('span', { 'class': cl, title: txt(it), text: txt(it) }));
     });
     return el;
   }
@@ -885,6 +899,6 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   Kit.tooltip = tooltip; Kit.popover = popover; Kit.closePopover = function () { closePopover(true); };
   Kit.dialog = dialog; Kit.emptyState = emptyState; Kit.skeleton = skeleton; Kit.kbd = kbd; Kit.toast = toast;
   Kit.reducedMotion = reducedMotion; Kit.place = place;
-  Kit.pageHeader = pageHeader; Kit.hud = hud; Kit.dockGroup = dockGroup; Kit.dock = dock; Kit.tchip = tchip; Kit.chain = chain; Kit.chainBar = chainBar;
+  Kit.enName = enName; Kit.pageHeader = pageHeader; Kit.hud = hud; Kit.dockGroup = dockGroup; Kit.dock = dock; Kit.tchip = tchip; Kit.chain = chain; Kit.chainBar = chainBar;
   Kit.modes = modes; Kit.section = section; Kit.cardCarousel = cardCarousel; Kit.slider = slider; Kit.bars = bars;
 })(root.C150);

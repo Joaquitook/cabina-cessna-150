@@ -21,13 +21,21 @@
    rojo, blanco) son SEMÁNTICOS: sólo se usan para rangos y estados, nunca como decoración.
    Las capas sobre la vista 3D usan un velo oscuro fijo (la escena 3D no cambia con el tema). */
 
+/* B612 Mono dibuja los paréntesis como corchetes: "(master)" se lee "[master]". Los paréntesis se toman de una fuente común del sistema
+   (si ninguna está, queda la de siempre). Sólo ( y ): unicode-range. */
+@font-face {
+  font-family: 'Mono Paren';
+  src: local('Segoe UI'), local('Helvetica Neue'), local('Helvetica'), local('Arial'), local('Roboto'), local('Noto Sans'), local('DejaVu Sans');
+  unicode-range: U+0028-0029;
+}
+
 :root {
   --bg: #E7EBEE; --surface: #F6F8F9; --surface-2: #DDE3E7; --line: #C3CCD3;
   --fg: #13202B; --fg-soft: #4A5966; --accent: #C8641A; --accent-fg: #FFFFFF; --sky: #2F6FA8; --focus: #2F6FA8;
   --arc-white: #F2F2F2; --arc-green: #2E9A4E; --arc-yellow: #D9A400; --arc-red: #C7362B;
   --font-display: 'Barlow Condensed', 'Arial Narrow', sans-serif;
   --font-body: 'Atkinson Hyperlegible', system-ui, sans-serif;
-  --font-data: 'B612 Mono', ui-monospace, monospace;
+  --font-data: 'Mono Paren', 'B612 Mono', ui-monospace, monospace;
 
   /* derivados (se recalculan solos con el tema) */
   --accent-tint: color-mix(in srgb, var(--accent) 13%, transparent);
@@ -3284,6 +3292,80 @@ div.card-h:hover { border-color: var(--line); transform: none; }
 .runner-close { flex: none; min-width: 44px; min-height: 44px; }
 @media (max-width: 760px) and (orientation: portrait) { .nav-up-btn { min-width: 44px; min-height: 44px; } }
 
+/* ================================================================== v5 · V4 — revisión lado a lado con AIRE
+   Cadena de una sola línea · dock de una fila (VISTA es un chip con popover, salvo en pantallas muy anchas) · barra "Seguí con" baja. */
+.chain-bar .chain { flex-wrap: nowrap; align-items: center; }
+.chain-bar .chain-item {
+  display: block; -webkit-line-clamp: unset; -webkit-box-orient: unset; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  min-width: 0; flex: 0 1 auto; line-height: 1.3;
+}
+.chain-bar .chain-cause { flex-shrink: 0; max-width: 42%; }
+.chain-bar .chain-arrow { flex: none; }
+
+.dock-group--view { display: none; }
+.dock-group--view .scn-btn { gap: 6px; max-width: 100%; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .16); }
+.dock-group--view .scn-btn .icon, .dock-group--view .scn-btn svg { width: 14px; height: 14px; opacity: .7; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.dock-group--view .scn-btn[aria-expanded="true"] { background: rgba(255, 255, 255, .16); box-shadow: inset 0 -2px 0 #F08A3C; }
+@container vp (max-width: 1359px) {
+  .dock-group--vista { display: none; }
+  .dock-group--view { display: flex; }
+  .vp-bottom > .dock { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; padding: 0 12px 12px; pointer-events: auto; scrollbar-width: none; }
+  .vp-bottom > .dock::-webkit-scrollbar { display: none; }
+  .vp-bottom > .dock .dock-group { flex: none; }
+  .vp-bottom > .dock.has-more-r { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent); }
+  .vp-bottom > .dock.has-more-l:not(.has-more-r) { -webkit-mask-image: linear-gradient(90deg, transparent, #000 28px); mask-image: linear-gradient(90deg, transparent, #000 28px); }
+  .vp-bottom > .dock.has-more-l.has-more-r { -webkit-mask-image: linear-gradient(90deg, transparent, #000 28px, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(90deg, transparent, #000 28px, #000 calc(100% - 36px), transparent); }
+}
+@container vp (max-width: 760px) { .vp-bottom > .dock { padding: 0 8px 8px; } }
+.app.is-dos-side .dock-group--vista { display: none; }
+.app.is-dos-side .dock-group--view { display: flex; }
+.scn-btn-v { min-width: 0; }
+
+/* popover de la vista: las 8 vistas en una grilla, con la tecla de cada una */
+.pop--view { width: min(440px, calc(100vw - 16px)); max-height: min(82vh, 680px); }
+.view-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.view-opt {
+  display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 9px; align-items: start; width: 100%; min-height: 58px; padding: 9px 10px; text-align: left;
+  border: 1.5px solid var(--line); border-radius: var(--radius-m); background: var(--surface); color: var(--fg); font: inherit; cursor: pointer;
+  transition: border-color var(--motion-fast), background var(--motion-fast);
+}
+.view-opt:hover { border-color: var(--accent); background: var(--hover); }
+.view-opt:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.view-opt.is-on { border-color: var(--accent); background: var(--accent-tint); }
+.view-key {
+  display: grid; place-items: center; width: 22px; height: 22px; margin-top: 1px; border-radius: 6px; border: 1px solid var(--line);
+  font-family: var(--font-data); font-size: 11px; color: var(--fg-soft);
+}
+.view-opt.is-on .view-key { background: var(--accent-ink); border-color: transparent; color: var(--accent-fg); }
+.view-main { min-width: 0; }
+.view-main strong { display: block; font-family: var(--font-display); font-weight: 700; font-size: 18px; line-height: 1.1; text-transform: uppercase; letter-spacing: .04em; }
+.view-desc { display: block; margin-top: 2px; font-size: 13.5px; line-height: 1.3; color: var(--fg-soft); }
+@media (max-width: 420px) { .view-opt { grid-template-columns: 22px minmax(0, 1fr); gap: 7px; padding: 8px; } .view-desc { font-size: 12.5px; } .view-main strong { font-size: 16px; } }
+
+/* "Seguí con": una sola línea, baja (en una pantalla de 700 px de alto no tapa el panel) */
+.nextbar { gap: var(--space-2); padding: 6px 8px 6px var(--gutter); min-height: 52px; }
+.nextbar-ico { width: 30px; height: 30px; }
+.nextbar-text { flex-direction: row; align-items: baseline; flex-wrap: nowrap; gap: 8px; }
+.nextbar-k { flex: none; font-size: 10.5px; }
+.nextbar-t { display: block; -webkit-line-clamp: unset; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; font-size: 15px; min-width: 0; }
+.nextbar-go { min-height: 36px; padding: 0 16px; }
+@media (max-height: 760px) and (min-width: 761px) { .nextbar-ico { display: none; } }
+.subtabs.modes--3 .mode-btn { padding-inline: 8px; }
+.subtabs.modes--3 .mode-s { font-size: 9.5px; letter-spacing: .02em; overflow-wrap: normal; }
+/* un interruptor prendido es como una ficha de AIRE: el punto se enciende, el borde sigue neutro (el naranja es sólo para la acción principal) */
+.ctog:hover, .ctog[aria-checked="true"] { border-color: var(--fg-soft); }
+/* toques cómodos en el celular: los botones del recuadro de afuera y los números del HUD llegan a 44 px */
+@media (pointer: coarse), (max-width: 760px) {
+  .inset-btn { min-height: 44px; min-width: 44px; }
+  .big--btn::after { content: ''; position: absolute; inset: -4px -9px; }
+}
+.subtabs.modes--3 { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.25fr) minmax(0, .75fr); }
+.subtabs.modes--3 .mode-t { font-size: 16px; letter-spacing: .02em; }
+/* teléfonos en Volar: el pad de vuelo ya ocupa el 3D, así que el dock completo se esconde (el botón del recuadro cambia entre cabina y afuera) */
+@media (max-width: 899px) and (min-height: 541px) { .app.has-flypad .dock { display: none; } }
+/* 'Las dos' lado a lado: la mitad de la cabina es angosta; sin los rótulos mono el dock muestra Vista y Diseño sin cortar */
+.app.is-dos-side .vp-bottom > .dock .dock-label { display: none; }
+
 </style>
 </head>
 <body>
@@ -3391,8 +3473,8 @@ div.card-h:hover { border-color: var(--line); transform: none; }
         </div>
         <div id="subtabs-practicar" class="subtabs modes modes--3" role="tablist" aria-label="Secciones de Practicar" data-group="practicar" hidden>
           <button type="button" class="subtab mode-btn" role="tab" id="tab-checklists" data-mode="checklists" aria-controls="panel-checklists" aria-selected="false" tabindex="-1"><span class="mode-t">Checklists</span><span class="mode-s">Paso a paso</span></button>
-          <button type="button" class="subtab mode-btn" role="tab" id="tab-volar" data-mode="volar" aria-controls="panel-volar" aria-selected="false" tabindex="-1"><span class="mode-t">Misiones y situaciones</span><span class="mode-s">A volar</span></button>
-          <button type="button" class="subtab mode-btn" role="tab" id="tab-quiz" data-mode="quiz" aria-controls="panel-quiz" aria-selected="false" tabindex="-1"><span class="mode-t">Quiz</span><span class="mode-s">Probá lo que sabés</span></button>
+          <button type="button" class="subtab mode-btn" role="tab" id="tab-volar" data-mode="volar" aria-controls="panel-volar" aria-selected="false" tabindex="-1"><span class="mode-t">Misiones</span><span class="mode-s">Y situaciones</span></button>
+          <button type="button" class="subtab mode-btn" role="tab" id="tab-quiz" data-mode="quiz" aria-controls="panel-quiz" aria-selected="false" tabindex="-1"><span class="mode-t">Quiz</span><span class="mode-s">Probate</span></button>
         </div>
         <div id="navbar" class="navbar" hidden>
           <div id="nav-return" class="nav-return" hidden>
@@ -27022,6 +27104,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
  *   Kit.reducedMotion()
  *
  * v5 · lenguaje de AIRE (contrato v5): los mismos componentes en TODAS las pestañas (mismo DOM que lab.js; las clases .lab-* y las compartidas valen igual):
+ *   Kit.enName("Throttle (THROTTLE) with friction lock", corto?)   → "Throttle with friction lock" (el inglés de un mando en una línea, sin paréntesis; corto = sin el sinónimo)
  *   Kit.pageHeader({kicker, title, sub, children})                  → <header class="pg-head">: kicker mono "NN · SECCIÓN · SUB", título enorme, párrafo
  *   Kit.hud({label, kicker, bigs:[{label, unit, title, onClick}]})  → .hud de vidrio · .set({kicker, live, bigs:[{v,u,l,warn}], row:[{text,onClick}]|texto,
  *                                                                      pill:{text, tone:"is-ok|is-air|is-warn|is-demo|is-pause|is-stall"},
@@ -27538,6 +27621,19 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   var tick_ = function (node, text) { if (node && node.textContent !== text) node.textContent = text; };
   function fmtCode(n) { return typeof n === 'number' ? (n < 10 ? '0' + n : String(n)) : n; }
 
+  /** Nombre en inglés de un mando, legible en una línea mono: "Throttle (THROTTLE) with friction lock" → "Throttle with friction lock";
+   *  "Control wheel (yoke)" → "Control wheel · yoke"; "Airspeed indicator (ASI)" → "Airspeed indicator · ASI". Sin paréntesis ni corchetes:
+   *  lo que va entre paréntesis (el cartel del tablero o un sinónimo) pasa al final después de un punto medio, y se omite si repite el nombre. */
+  function enName(s, short) {
+    s = String(s || '').replace(/\s+/g, ' ').trim();
+    var m = /^(.*?)\s*\(([^)]*)\)\s*(.*)$/.exec(s);
+    if (!m) return s;
+    var main = (m[1] + ' ' + m[3]).replace(/\s+/g, ' ').trim(), aka = m[2].trim();
+    if (!main) return aka;
+    if (short || !aka || main.toLowerCase().indexOf(aka.toLowerCase()) >= 0) return main;
+    return main + ' · ' + aka;
+  }
+
   /** Cabecera de página: kicker mono con punto, título enorme y un párrafo. */
   function pageHeader(o) {
     o = o || {};
@@ -27693,8 +27789,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     shown.forEach(function (it, i) {
       if (i > 0) el.appendChild(h('span', { 'class': 'chain-arrow', 'aria-hidden': 'true' }));
       var cl = 'chain-item ' + (i === 0 ? 'chain-cause' : (i === shown.length - 1 ? 'chain-effect' : 'chain-step'));
-      if (typeof it === 'object' && isFn(it.onClick)) el.appendChild(h('button', { type: 'button', 'class': cl + ' chain-act', onclick: it.onClick, text: it.text }));
-      else el.appendChild(h('span', { 'class': cl, text: txt(it) }));
+      if (typeof it === 'object' && isFn(it.onClick)) el.appendChild(h('button', { type: 'button', 'class': cl + ' chain-act', onclick: it.onClick, title: it.text, text: it.text }));
+      else el.appendChild(h('span', { 'class': cl, title: txt(it), text: txt(it) }));
     });
     return el;
   }
@@ -27874,7 +27970,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   Kit.tooltip = tooltip; Kit.popover = popover; Kit.closePopover = function () { closePopover(true); };
   Kit.dialog = dialog; Kit.emptyState = emptyState; Kit.skeleton = skeleton; Kit.kbd = kbd; Kit.toast = toast;
   Kit.reducedMotion = reducedMotion; Kit.place = place;
-  Kit.pageHeader = pageHeader; Kit.hud = hud; Kit.dockGroup = dockGroup; Kit.dock = dock; Kit.tchip = tchip; Kit.chain = chain; Kit.chainBar = chainBar;
+  Kit.enName = enName; Kit.pageHeader = pageHeader; Kit.hud = hud; Kit.dockGroup = dockGroup; Kit.dock = dock; Kit.tchip = tchip; Kit.chain = chain; Kit.chainBar = chainBar;
   Kit.modes = modes; Kit.section = section; Kit.cardCarousel = cardCarousel; Kit.slider = slider; Kit.bars = bars;
 })(root.C150);
 
@@ -29028,7 +29124,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   function body(e, K) {
     var h = K.el, nodes = [];
     nodes.push(h('p', { text: e.definicion || 'Sin descripción todavía.' }));
-    if (e.ingles) nodes.push(h('p', { class: 'pop-en' }, h('span', { class: 'pop-en-k', text: 'En inglés' }), ' ', h('span', { lang: 'en', text: e.ingles })));
+    if (e.ingles) nodes.push(h('p', { class: 'pop-en' }, h('span', { class: 'pop-en-k', text: 'En inglés' }), ' ', h('span', { lang: 'en', text: (C150.Kit && C150.Kit.enName) ? C150.Kit.enName(e.ingles) : e.ingles })));
     return nodes;
   }
   function see3d(e, K, close) {
@@ -30098,7 +30194,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
  *      HUD (top-left, #hud): big MOTOR · VELOCIDAD · ALTURA (each opens a popover with the plain explanation and "Ver en 3D"), a mono line
  *      (Corriente (master) · flaps · en tierra/en vuelo) and a status pill; below it the tab's extras (hudExtra): the control picked in
  *      Cabina + its live value, the lesson step + its two live numbers, the checklist / mission progress. Hidden in Inicio.
- *      Dock (bottom, #dock): VISTA (camera presets, keys 1–8) · DISEÑO (Cabina · Las dos · Afuera) · ESCENARIO chip (popover with SCN_PLAIN +
+ *      Dock (bottom, #dock): VISTA (a chip with a popover of the 8 camera presets, keys 1–8; the 8 buttons only on very wide screens) · DISEÑO (Cabina · Las dos · Afuera) · ESCENARIO chip (popover with SCN_PLAIN +
  *      C150.Sim.PRESETS; "Demostración en curso" + "Volver al escenario" during a demonstration). On phones one scrollable row above the sheet.
  *      Chain bar (#chain-bar, over the dock): max 3 chips, hidden when empty (chainContent): Cabina [control → what it does → what it moves],
  *      Recorrido / Lecciones [step → what is happening], checklists [item → why], missions [goal → hint]; with nothing contextual, the
@@ -30589,6 +30685,20 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   var CTX_MODES = { explorar: 1, volar: 1, quiz: 1 };
   var navQuiet = 0;                    // > 0 while Nav (popstate, show) performs a change: the user-level wrappers must not write history
   function restoreCtx(v) { if (v && coreReady) { cc('setViewState', v, { smooth: false }); syncMainView(); } }
+  /* Tabs that frame the camera on a control (the tour, a lesson step, a checklist item): what they pointed at (selection, glow, callout,
+   * close-up) is given back when the student leaves, so it never leaks into the next tab. */
+  var FRAMING = { recorrido: 1, basico: 1, checklists: 1 };
+  var preFrame = {};
+  function stageClear(leaving) {
+    if (!coreReady) return;
+    progSel = { id: null, t: now() };                     // a quiet deselect: the Cabina card of a tab we are leaving stays open
+    cc('setTargetHighlight', null);
+    cc('select', null);
+    hideCallout();
+    var pf = FRAMING[leaving] && preFrame[leaving];
+    if (pf && pf.cam) cc('setViewState', { cam: pf.cam, preset: pf.preset, targets: [], selected: null }, { smooth: true });
+    preFrame[leaving] = null;
+  }
 
   /** RAW tab switch (no history): the user-level entry points are navGo / navOpen (IR / ABRIR) below. */
   function setMode(name, opts) {
@@ -30603,6 +30713,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       releaseAllHolds();
       navProv(mode, 'pause');
       if (prev && prev.exit) safe(prev.exit, 'exit ' + mode);
+      stageClear(mode);
       $('panel-' + mode).hidden = true;
       if (mode === 'aire' && preAire) { restoreCtx(preAire); preAire = null; }
     }
@@ -30620,6 +30731,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     sec.hidden = false;
     var impl = modeImpl[name];
     if (!rendered[name] && impl && impl.render) { rendered[name] = true; safe(function () { impl.render(sec); }, 'render ' + name); }
+    if (FRAMING[name] && coreReady) { var pf = cc('getViewState'); preFrame[name] = pf ? { cam: pf.cam, preset: pf.preset } : null; }   // where the camera was before this tab framed something
     if (impl && impl.enter) safe(impl.enter, 'enter ' + name);
     if (CTX_MODES[name] && tabCtx[name] && coreReady) cc('setViewState', tabCtx[name], { smooth: true });
     navProv(name, 'resume');
@@ -31327,9 +31439,9 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
    * buttons, the layout switch and the "Escenario" chip with its popover. On phones it becomes one scrollable row above the sheet. */
   var CAM_DESC = { pilot: 'Tus ojos, en el asiento del piloto', flight: 'Mirar afuera, como en vuelo', panel: 'Todo el tablero de frente',
     left: 'Instrumentos de vuelo', center: 'Motor y radio', right: 'El lado derecho', floor: 'Pedales y combustible', overhead: 'Techo y parabrisas' };
-  var CAM_SHORT = { pilot: 'Piloto', flight: 'Horizonte', panel: 'Tablero', left: 'Izq.', center: 'Centro', right: 'Der.', floor: 'Piso', overhead: 'Techo' };
+  var CAM_SHORT = { pilot: 'Piloto', flight: 'Horizonte', panel: 'Tablero', left: 'Izquierda', center: 'Centro', right: 'Derecha', floor: 'Piso', overhead: 'Techo' };
   var currentCam = null;
-  var DOCK = { el: null, cams: null, layout: null, scn: null };
+  var DOCK = { el: null, cams: null, view: null, layout: null, scn: null };
   var HUD = { el: null };
   var CH = { bar: null };
 
@@ -31365,6 +31477,33 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     });
     pop.el.classList.add('pop--scn');
   }
+  /** "Vista": the camera presets as one chip with a popover (the 8 buttons only show on very wide screens, where they fit on one row). */
+  function openViews(anchor) {
+    var K = C150.Kit;
+    if (!K || !isFn(K.popover)) return;
+    var pop = null;
+    var grid = h('div', { class: 'view-grid', role: 'radiogroup', 'aria-label': 'Vista de la cámara' });
+    CAMS.forEach(function (c, i) {
+      var id = c[0], on = currentCam === id;
+      grid.appendChild(h('button', {
+        type: 'button', class: 'view-opt' + (on ? ' is-on' : ''), role: 'radio', 'aria-checked': on ? 'true' : 'false',
+        onclick: function () { if (pop) pop.close(); cc('focusPreset', id); }
+      },
+        h('span', { class: 'view-key', 'aria-hidden': 'true', text: String(i + 1) }),
+        h('span', { class: 'view-main' }, h('strong', { text: CAM_SHORT[id] || c[1] }), h('span', { class: 'view-desc', text: CAM_DESC[id] || '' }))));
+    });
+    pop = K.popover(anchor, {
+      title: '¿Desde dónde mirás?', label: 'Vista de la cámara',
+      content: [h('p', { class: 'pop-sub', text: 'Elegí un punto de vista. También podés tocar las teclas del 1 al 8 o arrastrar para mirar alrededor.' }), grid]
+    });
+    pop.el.classList.add('pop--view');
+  }
+  function syncViewBtn() {
+    var v = $('vp-view-v'), b = $('vp-view-btn');
+    var nm = currentCam ? (CAM_SHORT[currentCam] || 'Cabina entera') : 'Libre';
+    if (v) setText(v, nm);
+    if (b) setAttr(b, 'aria-label', 'Vista de la cámara: ' + nm + '. Tocá para cambiarla');
+  }
   function syncScenarioBtn() {
     var v = $('vp-scenario-v'), b = $('vp-scenario-btn');
     if (v) setText(v, demoOn ? 'Demostración en curso' : scenarioName(currentPreset));
@@ -31391,6 +31530,15 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       }),
       onChange: function (id) { chooseLayout(id); }
     });
+    DOCK.cams.classList.add('dock-group--vista');
+    var viewBtn = h('button', { type: 'button', id: 'vp-view-btn', class: 'seg-btn scn-btn view-btn', 'aria-haspopup': 'dialog', 'aria-expanded': 'false' },
+      h('span', { class: 'scn-btn-v', id: 'vp-view-v' }), kic('chevron-down'));
+    DOCK.view = h('div', { class: 'dock-group dock-group--view', role: 'group', 'aria-label': 'Vista de la cámara: desde dónde mirar' },
+      h('span', { class: 'dock-label', text: 'Vista' }), viewBtn);
+    viewBtn.addEventListener('click', function () {
+      if (viewBtn.getAttribute('aria-expanded') === 'true') { K.closePopover(); return; }
+      openViews(viewBtn);
+    });
     var scnBtn = h('button', { type: 'button', id: 'vp-scenario-btn', class: 'seg-btn scn-btn', 'aria-haspopup': 'dialog', 'aria-expanded': 'false' },
       h('span', { class: 'scn-btn-v', id: 'vp-scenario-v' }), kic('chevron-down'));
     var back = h('button', { type: 'button', id: 'vp-scenario-back', class: 'seg-btn scn-back', 'aria-label': 'Volver al escenario', hidden: true },
@@ -31402,11 +31550,12 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       openScenarios(scnBtn);
     });
     back.addEventListener('click', function () { endDemo(); });
-    DOCK.el = K.dock([DOCK.cams, DOCK.layout, DOCK.scn], { label: 'Vista de la cámara, diseño y escenario' });
+    DOCK.el = K.dock([DOCK.cams, DOCK.view, DOCK.layout, DOCK.scn], { label: 'Vista de la cámara, diseño y escenario' });
     DOCK.el.id = 'dock';
     bottom.appendChild(CH.bar);
     bottom.appendChild(DOCK.el);
     syncScenarioBtn();
+    syncViewBtn();
     syncLayoutSwitch();
   }
 
@@ -31751,11 +31900,13 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       if (!CO.raf && root.requestAnimationFrame) CO.raf = root.requestAnimationFrame(calloutLoop);
     }
   }
+  /** English name of a control for one mono line (no brackets): see Kit.enName. */
+  function enTxt(t, short) { var K = C150.Kit; return (K && isFn(K.enName)) ? K.enName(t, short) : String(t || ''); }
   function ctrlLabel(c, sub) {
-    var name = c.nombre, en = c.ingles || '';
+    var name = c.nombre, en = enTxt(c.ingles || '');
     if (sub) {
       var si = arr(c.subitems).filter(function (x) { return x && x.subId === sub; })[0];
-      if (si) { name = si.nombre || (c.nombre + ' ' + sub); en = si.ingles || en; }
+      if (si) { name = si.nombre || (c.nombre + ' ' + sub); en = enTxt(si.ingles) || en; }
       else if (SUB_NAMES[sub]) name = c.nombre + ' (' + SUB_NAMES[sub] + ')';
     }
     return { name: name, en: en };
@@ -31991,7 +32142,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       live: !s.paused,
       bigs: [{ v: rpm, u: 'rpm', l: 'Motor', dim: !e.running && !e.cranking }, { v: ias, u: 'nudos', l: 'Velocidad', warn: stalled }, { v: alt, u: 'pies', l: 'Altura' }],
       row: [
-        { text: 'Corriente (master) ' + (s.masterBat ? (s.masterAlt ? 'encendida' : 'sólo batería') : 'apagada'), onClick: infoToggle('master'), title: 'Corriente (master): tocá para saber qué es' },
+        { text: 'Corriente ' + (s.masterBat ? (s.masterAlt ? 'encendida' : 'sólo batería') : 'apagada'), onClick: infoToggle('master'), title: 'Corriente (master): tocá para saber qué es' },
         { text: 'Flaps ' + Math.round(num(s.flaps, 0)) + '°' },
         { text: air ? 'En vuelo' : 'En tierra', onClick: infoToggle('ground'), title: 'En tierra o en vuelo: tocá para saber qué significa' }
       ],
@@ -32017,6 +32168,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       t = t.slice(0, max);
       var sp = t.lastIndexOf(' ');
       if (sp > max * 0.6) t = t.slice(0, sp);
+      if (t.split('(').length > t.split(')').length) t = t.slice(0, t.lastIndexOf('('));        // never cut inside an open parenthesis
       t = t.replace(/[.,;:\s(]+$/, '') + '…';
     }
     return t;
@@ -32027,32 +32179,32 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       case 'explorar':
         id = EX.id || CO.selId; c = id && CTRL[id];
         if (!c) return null;
-        return { key: 'c:' + id, items: [c.nombre, shortText(c.resumen, 72, true), shortText(c.enElAvion, 84, true)] };
+        return { key: 'c:' + id, items: [c.nombre, shortText(c.resumen, 34, true), shortText(c.enElAvion, 38, true)] };
       case 'recorrido': {
         if (TR.finished || !TOUR.length) return null;
         var st = TOUR[TR.i];
-        return st ? { key: 'r:' + TR.i, items: [shortText(st.titulo, 64), shortText(st.texto, 100, true)] } : null;
+        return st ? { key: 'r:' + TR.i, items: [shortText(st.titulo, 30), shortText(st.texto, 64, true)] } : null;
       }
       case 'basico': {
         if (!LB.open || LB.finished) return null;
         var p = lbStep();
         if (!p) return null;
         var cap = LB.poseCaption || captionText;
-        return { key: 'l:' + LB.idx + ':' + LB.i, items: [shortText(p.titulo, 64), cap ? shortText(cap, 110, true) : shortText(p.texto, 100, true)] };
+        return { key: 'l:' + LB.idx + ':' + LB.i, items: [shortText(p.titulo, 30), cap ? shortText(cap, 64, true) : shortText(p.texto, 64, true)] };
       }
       case 'checklists': {
         var cur = CL.cur;
         if (!cur || cur.finished) return null;
         var it = arr(cur.cl.items)[cur.i];
         if (!it) return null;
-        return { key: 'k:' + cur.cl.id + ':' + cur.i, items: [shortText(it.texto, 72), shortText(it.detalle, 104, true)] };
+        return { key: 'k:' + cur.cl.id + ':' + cur.i, items: [shortText(it.texto, 40), shortText(it.detalle, 60, true)] };
       }
       case 'volar': {
         var m = VO.m;
         if (!m) return null;
         var ps = arr(m.pasos), k = ps.length ? clamp(Math.floor(VO.progress * ps.length), 0, ps.length - 1) : 0;
-        if (VO.achieved) return { key: 'm:' + m.id + ':ok', tone: 'good', items: ['¡Misión cumplida!', shortText(m.titulo, 64)] };
-        return { key: 'm:' + m.id, items: [shortText(m.objetivo || m.titulo, 84, true), ps.length ? shortText(ps[k], 110, true) : null] };
+        if (VO.achieved) return { key: 'm:' + m.id + ':ok', tone: 'good', items: ['¡Misión cumplida!', shortText(m.titulo, 56)] };
+        return { key: 'm:' + m.id, items: [shortText(m.objetivo || m.titulo, 44, true), ps.length ? shortText(ps[k], 64, true) : null] };
       }
       default: return null;
     }
@@ -32067,7 +32219,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     try { text = tip.text(); } catch (e) { text = ''; }
     if (!text) { CH.bar.clear(); return; }
     COACH.tip = tip; COACH.shownId = tip.id;
-    var items = ['Consejo', { text: shortText(text, 150), keep: true }];
+    var items = ['Consejo', { text: shortText(text, 110), keep: true }];
     if (tip.action) items.push({ text: tip.action[0], onClick: function () { safe(tip.action[1], 'coach action'); } });
     CH.bar.set(items, { tone: 'info', key: 'tip:' + tip.id, dismiss: coachDismiss, dismissLabel: 'Cerrar este consejo' });
   }
@@ -33031,7 +33183,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       h('span', { class: 'cr-code', style: { '--cat': catColor(c) }, 'aria-hidden': 'true', text: catCode(c.categoria) }),
       h('span', { class: 'cr-main' },
         h('span', { class: 'cr-name', text: c.nombre }),
-        c.ingles ? h('span', { class: 'cr-en', lang: 'en', text: c.ingles }) : null),
+        c.ingles ? h('span', { class: 'cr-en', lang: 'en', text: enTxt(c.ingles, true) }) : null),
       h('span', { class: 'cr-end' },
         c.prioridad === 1 ? h('span', { class: 'cr-tag', text: 'Esencial' }) : null,
         seen ? h('span', { class: 'cr-check', title: 'Ya lo viste' }, kic('check'), h('span', { class: 'sr-only', text: 'Ya lo viste' }))
@@ -33185,7 +33337,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       subList = h('dl', { class: 'gloss' });
       subs.forEach(function (s) {
         if (!s) return;
-        subList.appendChild(h('dt', null, s.nombre || s.subId, s.ingles ? h('small', { lang: 'en', text: ' · ' + s.ingles }) : null));
+        subList.appendChild(h('dt', null, s.nombre || s.subId, s.ingles ? h('small', { lang: 'en', text: ' · ' + enTxt(s.ingles) }) : null));
         subList.appendChild(h('dd', { text: s.texto || '' }));
       });
     }
@@ -33222,7 +33374,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     ttl.id = titleId; ttl.tabIndex = -1; ttl.classList.add('detail-title');
     head.classList.add('cs-head');
     var ref = head.querySelector('.pg-sub') || head.querySelector('.cs-actions');
-    [c.ingles ? h('p', { class: 'cs-en', lang: 'en', text: c.ingles }) : null,
+    [c.ingles ? h('p', { class: 'cs-en', lang: 'en', text: enTxt(c.ingles) }) : null,
       h('div', { class: 'cs-tags' },
         h('span', { class: 'cr-code', style: { '--cat': catColor(c) }, text: catCode(c.categoria) }),
         c.prioridad === 1 ? h('span', { class: 'cr-tag', text: 'Esencial' }) : null,
@@ -33478,7 +33630,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       GLOSSARY.forEach(function (g) {
         if (q && norm(g.termino + ' ' + (g.ingles || '') + ' ' + (g.definicion || '')).indexOf(q) < 0) return;
         n++;
-        dl.appendChild(h('dt', null, g.termino, g.ingles ? h('small', { lang: 'en', text: ' · ' + g.ingles }) : null));
+        dl.appendChild(h('dt', null, g.termino, g.ingles ? h('small', { lang: 'en', text: ' · ' + enTxt(g.ingles) }) : null));
         dl.appendChild(h('dd', { text: g.definicion || '' }));
       });
       if (!n) dl.appendChild(h('dd', { class: 'empty', text: 'No hay ninguna palabra así en el glosario.' }));
@@ -35576,6 +35728,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         if (!name) { var nv = NAV(); if (nv && isFn(nv.noteManual)) nv.noteManual(); }
         currentCam = name || null;
         if (DOCK.cams) DOCK.cams.setValue(currentCam, false);
+        syncViewBtn();
       });
       Co.on('scenario', function (name) { if (!applyingPreset && name) presetApplied(name); });
       Co.on('interactionend', function () { kick(); });

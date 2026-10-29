@@ -14,6 +14,8 @@ Cinco secciones (arriba en la compu, abajo en el celular) pensadas para alguien 
 - **Practicar:** *Checklists* (se tildan solas cuando ponés cada mando bien), *Misiones y situaciones* (un simulador sencillo con 8 misiones y situaciones anormales para resolver) y un *Quiz* (tocando la cabina y de opción múltiple).
 - **Aire:** el laboratorio del aire en 3D: flujo alrededor del ala, las cuatro fuerzas, la pérdida y un túnel de viento.
 
+Todas las pestañas comparten el mismo lenguaje visual que **Aire**: panel con cuadrícula de papel, encabezado con rótulo mono y título grande, secciones numeradas y plegables, tarjetas con código (L1, C2, M3…), deslizadores con marcas, y sobre el 3D un HUD de vidrio (motor, velocidad, altura), una barra de causa y efecto y una sola barra inferior (Vista · Diseño · Escenario); todo sale de `C150.Kit` (ver `tests/styleguide.html`). El "volver atrás" también es único (`src/nav.js`, `docs/NAVEGACION.md`).
+
 Ayudas en todas partes:
 
 - **Buscador** (Ctrl K, `/` o la lupa): controles, palabras, lecciones, checklists, situaciones y experimentos.

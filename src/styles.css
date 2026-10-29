@@ -4,13 +4,21 @@
    rojo, blanco) son SEMÁNTICOS: sólo se usan para rangos y estados, nunca como decoración.
    Las capas sobre la vista 3D usan un velo oscuro fijo (la escena 3D no cambia con el tema). */
 
+/* B612 Mono dibuja los paréntesis como corchetes: "(master)" se lee "[master]". Los paréntesis se toman de una fuente común del sistema
+   (si ninguna está, queda la de siempre). Sólo ( y ): unicode-range. */
+@font-face {
+  font-family: 'Mono Paren';
+  src: local('Segoe UI'), local('Helvetica Neue'), local('Helvetica'), local('Arial'), local('Roboto'), local('Noto Sans'), local('DejaVu Sans');
+  unicode-range: U+0028-0029;
+}
+
 :root {
   --bg: #E7EBEE; --surface: #F6F8F9; --surface-2: #DDE3E7; --line: #C3CCD3;
   --fg: #13202B; --fg-soft: #4A5966; --accent: #C8641A; --accent-fg: #FFFFFF; --sky: #2F6FA8; --focus: #2F6FA8;
   --arc-white: #F2F2F2; --arc-green: #2E9A4E; --arc-yellow: #D9A400; --arc-red: #C7362B;
   --font-display: 'Barlow Condensed', 'Arial Narrow', sans-serif;
   --font-body: 'Atkinson Hyperlegible', system-ui, sans-serif;
-  --font-data: 'B612 Mono', ui-monospace, monospace;
+  --font-data: 'Mono Paren', 'B612 Mono', ui-monospace, monospace;
 
   /* derivados (se recalculan solos con el tema) */
   --accent-tint: color-mix(in srgb, var(--accent) 13%, transparent);
@@ -3266,3 +3274,77 @@ div.card-h:hover { border-color: var(--line); transform: none; }
 .hm-stage.is-done .pring-v { color: var(--ok-ink); }
 .runner-close { flex: none; min-width: 44px; min-height: 44px; }
 @media (max-width: 760px) and (orientation: portrait) { .nav-up-btn { min-width: 44px; min-height: 44px; } }
+
+/* ================================================================== v5 · V4 — revisión lado a lado con AIRE
+   Cadena de una sola línea · dock de una fila (VISTA es un chip con popover, salvo en pantallas muy anchas) · barra "Seguí con" baja. */
+.chain-bar .chain { flex-wrap: nowrap; align-items: center; }
+.chain-bar .chain-item {
+  display: block; -webkit-line-clamp: unset; -webkit-box-orient: unset; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  min-width: 0; flex: 0 1 auto; line-height: 1.3;
+}
+.chain-bar .chain-cause { flex-shrink: 0; max-width: 42%; }
+.chain-bar .chain-arrow { flex: none; }
+
+.dock-group--view { display: none; }
+.dock-group--view .scn-btn { gap: 6px; max-width: 100%; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .16); }
+.dock-group--view .scn-btn .icon, .dock-group--view .scn-btn svg { width: 14px; height: 14px; opacity: .7; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.dock-group--view .scn-btn[aria-expanded="true"] { background: rgba(255, 255, 255, .16); box-shadow: inset 0 -2px 0 #F08A3C; }
+@container vp (max-width: 1359px) {
+  .dock-group--vista { display: none; }
+  .dock-group--view { display: flex; }
+  .vp-bottom > .dock { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; padding: 0 12px 12px; pointer-events: auto; scrollbar-width: none; }
+  .vp-bottom > .dock::-webkit-scrollbar { display: none; }
+  .vp-bottom > .dock .dock-group { flex: none; }
+  .vp-bottom > .dock.has-more-r { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent); }
+  .vp-bottom > .dock.has-more-l:not(.has-more-r) { -webkit-mask-image: linear-gradient(90deg, transparent, #000 28px); mask-image: linear-gradient(90deg, transparent, #000 28px); }
+  .vp-bottom > .dock.has-more-l.has-more-r { -webkit-mask-image: linear-gradient(90deg, transparent, #000 28px, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(90deg, transparent, #000 28px, #000 calc(100% - 36px), transparent); }
+}
+@container vp (max-width: 760px) { .vp-bottom > .dock { padding: 0 8px 8px; } }
+.app.is-dos-side .dock-group--vista { display: none; }
+.app.is-dos-side .dock-group--view { display: flex; }
+.scn-btn-v { min-width: 0; }
+
+/* popover de la vista: las 8 vistas en una grilla, con la tecla de cada una */
+.pop--view { width: min(440px, calc(100vw - 16px)); max-height: min(82vh, 680px); }
+.view-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.view-opt {
+  display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 9px; align-items: start; width: 100%; min-height: 58px; padding: 9px 10px; text-align: left;
+  border: 1.5px solid var(--line); border-radius: var(--radius-m); background: var(--surface); color: var(--fg); font: inherit; cursor: pointer;
+  transition: border-color var(--motion-fast), background var(--motion-fast);
+}
+.view-opt:hover { border-color: var(--accent); background: var(--hover); }
+.view-opt:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.view-opt.is-on { border-color: var(--accent); background: var(--accent-tint); }
+.view-key {
+  display: grid; place-items: center; width: 22px; height: 22px; margin-top: 1px; border-radius: 6px; border: 1px solid var(--line);
+  font-family: var(--font-data); font-size: 11px; color: var(--fg-soft);
+}
+.view-opt.is-on .view-key { background: var(--accent-ink); border-color: transparent; color: var(--accent-fg); }
+.view-main { min-width: 0; }
+.view-main strong { display: block; font-family: var(--font-display); font-weight: 700; font-size: 18px; line-height: 1.1; text-transform: uppercase; letter-spacing: .04em; }
+.view-desc { display: block; margin-top: 2px; font-size: 13.5px; line-height: 1.3; color: var(--fg-soft); }
+@media (max-width: 420px) { .view-opt { grid-template-columns: 22px minmax(0, 1fr); gap: 7px; padding: 8px; } .view-desc { font-size: 12.5px; } .view-main strong { font-size: 16px; } }
+
+/* "Seguí con": una sola línea, baja (en una pantalla de 700 px de alto no tapa el panel) */
+.nextbar { gap: var(--space-2); padding: 6px 8px 6px var(--gutter); min-height: 52px; }
+.nextbar-ico { width: 30px; height: 30px; }
+.nextbar-text { flex-direction: row; align-items: baseline; flex-wrap: nowrap; gap: 8px; }
+.nextbar-k { flex: none; font-size: 10.5px; }
+.nextbar-t { display: block; -webkit-line-clamp: unset; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; font-size: 15px; min-width: 0; }
+.nextbar-go { min-height: 36px; padding: 0 16px; }
+@media (max-height: 760px) and (min-width: 761px) { .nextbar-ico { display: none; } }
+.subtabs.modes--3 .mode-btn { padding-inline: 8px; }
+.subtabs.modes--3 .mode-s { font-size: 9.5px; letter-spacing: .02em; overflow-wrap: normal; }
+/* un interruptor prendido es como una ficha de AIRE: el punto se enciende, el borde sigue neutro (el naranja es sólo para la acción principal) */
+.ctog:hover, .ctog[aria-checked="true"] { border-color: var(--fg-soft); }
+/* toques cómodos en el celular: los botones del recuadro de afuera y los números del HUD llegan a 44 px */
+@media (pointer: coarse), (max-width: 760px) {
+  .inset-btn { min-height: 44px; min-width: 44px; }
+  .big--btn::after { content: ''; position: absolute; inset: -4px -9px; }
+}
+.subtabs.modes--3 { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.25fr) minmax(0, .75fr); }
+.subtabs.modes--3 .mode-t { font-size: 16px; letter-spacing: .02em; }
+/* teléfonos en Volar: el pad de vuelo ya ocupa el 3D, así que el dock completo se esconde (el botón del recuadro cambia entre cabina y afuera) */
+@media (max-width: 899px) and (min-height: 541px) { .app.has-flypad .dock { display: none; } }
+/* 'Las dos' lado a lado: la mitad de la cabina es angosta; sin los rótulos mono el dock muestra Vista y Diseño sin cortar */
+.app.is-dos-side .vp-bottom > .dock .dock-label { display: none; }

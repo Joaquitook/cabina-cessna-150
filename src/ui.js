@@ -32,7 +32,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
  *      HUD (top-left, #hud): big MOTOR · VELOCIDAD · ALTURA (each opens a popover with the plain explanation and "Ver en 3D"), a mono line
  *      (Corriente (master) · flaps · en tierra/en vuelo) and a status pill; below it the tab's extras (hudExtra): the control picked in
  *      Cabina + its live value, the lesson step + its two live numbers, the checklist / mission progress. Hidden in Inicio.
- *      Dock (bottom, #dock): VISTA (camera presets, keys 1–8) · DISEÑO (Cabina · Las dos · Afuera) · ESCENARIO chip (popover with SCN_PLAIN +
+ *      Dock (bottom, #dock): VISTA (a chip with a popover of the 8 camera presets, keys 1–8; the 8 buttons only on very wide screens) · DISEÑO (Cabina · Las dos · Afuera) · ESCENARIO chip (popover with SCN_PLAIN +
  *      C150.Sim.PRESETS; "Demostración en curso" + "Volver al escenario" during a demonstration). On phones one scrollable row above the sheet.
  *      Chain bar (#chain-bar, over the dock): max 3 chips, hidden when empty (chainContent): Cabina [control → what it does → what it moves],
  *      Recorrido / Lecciones [step → what is happening], checklists [item → why], missions [goal → hint]; with nothing contextual, the
@@ -523,6 +523,20 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   var CTX_MODES = { explorar: 1, volar: 1, quiz: 1 };
   var navQuiet = 0;                    // > 0 while Nav (popstate, show) performs a change: the user-level wrappers must not write history
   function restoreCtx(v) { if (v && coreReady) { cc('setViewState', v, { smooth: false }); syncMainView(); } }
+  /* Tabs that frame the camera on a control (the tour, a lesson step, a checklist item): what they pointed at (selection, glow, callout,
+   * close-up) is given back when the student leaves, so it never leaks into the next tab. */
+  var FRAMING = { recorrido: 1, basico: 1, checklists: 1 };
+  var preFrame = {};
+  function stageClear(leaving) {
+    if (!coreReady) return;
+    progSel = { id: null, t: now() };                     // a quiet deselect: the Cabina card of a tab we are leaving stays open
+    cc('setTargetHighlight', null);
+    cc('select', null);
+    hideCallout();
+    var pf = FRAMING[leaving] && preFrame[leaving];
+    if (pf && pf.cam) cc('setViewState', { cam: pf.cam, preset: pf.preset, targets: [], selected: null }, { smooth: true });
+    preFrame[leaving] = null;
+  }
 
   /** RAW tab switch (no history): the user-level entry points are navGo / navOpen (IR / ABRIR) below. */
   function setMode(name, opts) {
@@ -537,6 +551,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       releaseAllHolds();
       navProv(mode, 'pause');
       if (prev && prev.exit) safe(prev.exit, 'exit ' + mode);
+      stageClear(mode);
       $('panel-' + mode).hidden = true;
       if (mode === 'aire' && preAire) { restoreCtx(preAire); preAire = null; }
     }
@@ -554,6 +569,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     sec.hidden = false;
     var impl = modeImpl[name];
     if (!rendered[name] && impl && impl.render) { rendered[name] = true; safe(function () { impl.render(sec); }, 'render ' + name); }
+    if (FRAMING[name] && coreReady) { var pf = cc('getViewState'); preFrame[name] = pf ? { cam: pf.cam, preset: pf.preset } : null; }   // where the camera was before this tab framed something
     if (impl && impl.enter) safe(impl.enter, 'enter ' + name);
     if (CTX_MODES[name] && tabCtx[name] && coreReady) cc('setViewState', tabCtx[name], { smooth: true });
     navProv(name, 'resume');
@@ -1261,9 +1277,9 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
    * buttons, the layout switch and the "Escenario" chip with its popover. On phones it becomes one scrollable row above the sheet. */
   var CAM_DESC = { pilot: 'Tus ojos, en el asiento del piloto', flight: 'Mirar afuera, como en vuelo', panel: 'Todo el tablero de frente',
     left: 'Instrumentos de vuelo', center: 'Motor y radio', right: 'El lado derecho', floor: 'Pedales y combustible', overhead: 'Techo y parabrisas' };
-  var CAM_SHORT = { pilot: 'Piloto', flight: 'Horizonte', panel: 'Tablero', left: 'Izq.', center: 'Centro', right: 'Der.', floor: 'Piso', overhead: 'Techo' };
+  var CAM_SHORT = { pilot: 'Piloto', flight: 'Horizonte', panel: 'Tablero', left: 'Izquierda', center: 'Centro', right: 'Derecha', floor: 'Piso', overhead: 'Techo' };
   var currentCam = null;
-  var DOCK = { el: null, cams: null, layout: null, scn: null };
+  var DOCK = { el: null, cams: null, view: null, layout: null, scn: null };
   var HUD = { el: null };
   var CH = { bar: null };
 
@@ -1299,6 +1315,33 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     });
     pop.el.classList.add('pop--scn');
   }
+  /** "Vista": the camera presets as one chip with a popover (the 8 buttons only show on very wide screens, where they fit on one row). */
+  function openViews(anchor) {
+    var K = C150.Kit;
+    if (!K || !isFn(K.popover)) return;
+    var pop = null;
+    var grid = h('div', { class: 'view-grid', role: 'radiogroup', 'aria-label': 'Vista de la cámara' });
+    CAMS.forEach(function (c, i) {
+      var id = c[0], on = currentCam === id;
+      grid.appendChild(h('button', {
+        type: 'button', class: 'view-opt' + (on ? ' is-on' : ''), role: 'radio', 'aria-checked': on ? 'true' : 'false',
+        onclick: function () { if (pop) pop.close(); cc('focusPreset', id); }
+      },
+        h('span', { class: 'view-key', 'aria-hidden': 'true', text: String(i + 1) }),
+        h('span', { class: 'view-main' }, h('strong', { text: CAM_SHORT[id] || c[1] }), h('span', { class: 'view-desc', text: CAM_DESC[id] || '' }))));
+    });
+    pop = K.popover(anchor, {
+      title: '¿Desde dónde mirás?', label: 'Vista de la cámara',
+      content: [h('p', { class: 'pop-sub', text: 'Elegí un punto de vista. También podés tocar las teclas del 1 al 8 o arrastrar para mirar alrededor.' }), grid]
+    });
+    pop.el.classList.add('pop--view');
+  }
+  function syncViewBtn() {
+    var v = $('vp-view-v'), b = $('vp-view-btn');
+    var nm = currentCam ? (CAM_SHORT[currentCam] || 'Cabina entera') : 'Libre';
+    if (v) setText(v, nm);
+    if (b) setAttr(b, 'aria-label', 'Vista de la cámara: ' + nm + '. Tocá para cambiarla');
+  }
   function syncScenarioBtn() {
     var v = $('vp-scenario-v'), b = $('vp-scenario-btn');
     if (v) setText(v, demoOn ? 'Demostración en curso' : scenarioName(currentPreset));
@@ -1325,6 +1368,15 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       }),
       onChange: function (id) { chooseLayout(id); }
     });
+    DOCK.cams.classList.add('dock-group--vista');
+    var viewBtn = h('button', { type: 'button', id: 'vp-view-btn', class: 'seg-btn scn-btn view-btn', 'aria-haspopup': 'dialog', 'aria-expanded': 'false' },
+      h('span', { class: 'scn-btn-v', id: 'vp-view-v' }), kic('chevron-down'));
+    DOCK.view = h('div', { class: 'dock-group dock-group--view', role: 'group', 'aria-label': 'Vista de la cámara: desde dónde mirar' },
+      h('span', { class: 'dock-label', text: 'Vista' }), viewBtn);
+    viewBtn.addEventListener('click', function () {
+      if (viewBtn.getAttribute('aria-expanded') === 'true') { K.closePopover(); return; }
+      openViews(viewBtn);
+    });
     var scnBtn = h('button', { type: 'button', id: 'vp-scenario-btn', class: 'seg-btn scn-btn', 'aria-haspopup': 'dialog', 'aria-expanded': 'false' },
       h('span', { class: 'scn-btn-v', id: 'vp-scenario-v' }), kic('chevron-down'));
     var back = h('button', { type: 'button', id: 'vp-scenario-back', class: 'seg-btn scn-back', 'aria-label': 'Volver al escenario', hidden: true },
@@ -1336,11 +1388,12 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       openScenarios(scnBtn);
     });
     back.addEventListener('click', function () { endDemo(); });
-    DOCK.el = K.dock([DOCK.cams, DOCK.layout, DOCK.scn], { label: 'Vista de la cámara, diseño y escenario' });
+    DOCK.el = K.dock([DOCK.cams, DOCK.view, DOCK.layout, DOCK.scn], { label: 'Vista de la cámara, diseño y escenario' });
     DOCK.el.id = 'dock';
     bottom.appendChild(CH.bar);
     bottom.appendChild(DOCK.el);
     syncScenarioBtn();
+    syncViewBtn();
     syncLayoutSwitch();
   }
 
@@ -1685,11 +1738,13 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       if (!CO.raf && root.requestAnimationFrame) CO.raf = root.requestAnimationFrame(calloutLoop);
     }
   }
+  /** English name of a control for one mono line (no brackets): see Kit.enName. */
+  function enTxt(t, short) { var K = C150.Kit; return (K && isFn(K.enName)) ? K.enName(t, short) : String(t || ''); }
   function ctrlLabel(c, sub) {
-    var name = c.nombre, en = c.ingles || '';
+    var name = c.nombre, en = enTxt(c.ingles || '');
     if (sub) {
       var si = arr(c.subitems).filter(function (x) { return x && x.subId === sub; })[0];
-      if (si) { name = si.nombre || (c.nombre + ' ' + sub); en = si.ingles || en; }
+      if (si) { name = si.nombre || (c.nombre + ' ' + sub); en = enTxt(si.ingles) || en; }
       else if (SUB_NAMES[sub]) name = c.nombre + ' (' + SUB_NAMES[sub] + ')';
     }
     return { name: name, en: en };
@@ -1925,7 +1980,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       live: !s.paused,
       bigs: [{ v: rpm, u: 'rpm', l: 'Motor', dim: !e.running && !e.cranking }, { v: ias, u: 'nudos', l: 'Velocidad', warn: stalled }, { v: alt, u: 'pies', l: 'Altura' }],
       row: [
-        { text: 'Corriente (master) ' + (s.masterBat ? (s.masterAlt ? 'encendida' : 'sólo batería') : 'apagada'), onClick: infoToggle('master'), title: 'Corriente (master): tocá para saber qué es' },
+        { text: 'Corriente ' + (s.masterBat ? (s.masterAlt ? 'encendida' : 'sólo batería') : 'apagada'), onClick: infoToggle('master'), title: 'Corriente (master): tocá para saber qué es' },
         { text: 'Flaps ' + Math.round(num(s.flaps, 0)) + '°' },
         { text: air ? 'En vuelo' : 'En tierra', onClick: infoToggle('ground'), title: 'En tierra o en vuelo: tocá para saber qué significa' }
       ],
@@ -1951,6 +2006,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       t = t.slice(0, max);
       var sp = t.lastIndexOf(' ');
       if (sp > max * 0.6) t = t.slice(0, sp);
+      if (t.split('(').length > t.split(')').length) t = t.slice(0, t.lastIndexOf('('));        // never cut inside an open parenthesis
       t = t.replace(/[.,;:\s(]+$/, '') + '…';
     }
     return t;
@@ -1961,32 +2017,32 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       case 'explorar':
         id = EX.id || CO.selId; c = id && CTRL[id];
         if (!c) return null;
-        return { key: 'c:' + id, items: [c.nombre, shortText(c.resumen, 72, true), shortText(c.enElAvion, 84, true)] };
+        return { key: 'c:' + id, items: [c.nombre, shortText(c.resumen, 34, true), shortText(c.enElAvion, 38, true)] };
       case 'recorrido': {
         if (TR.finished || !TOUR.length) return null;
         var st = TOUR[TR.i];
-        return st ? { key: 'r:' + TR.i, items: [shortText(st.titulo, 64), shortText(st.texto, 100, true)] } : null;
+        return st ? { key: 'r:' + TR.i, items: [shortText(st.titulo, 30), shortText(st.texto, 64, true)] } : null;
       }
       case 'basico': {
         if (!LB.open || LB.finished) return null;
         var p = lbStep();
         if (!p) return null;
         var cap = LB.poseCaption || captionText;
-        return { key: 'l:' + LB.idx + ':' + LB.i, items: [shortText(p.titulo, 64), cap ? shortText(cap, 110, true) : shortText(p.texto, 100, true)] };
+        return { key: 'l:' + LB.idx + ':' + LB.i, items: [shortText(p.titulo, 30), cap ? shortText(cap, 64, true) : shortText(p.texto, 64, true)] };
       }
       case 'checklists': {
         var cur = CL.cur;
         if (!cur || cur.finished) return null;
         var it = arr(cur.cl.items)[cur.i];
         if (!it) return null;
-        return { key: 'k:' + cur.cl.id + ':' + cur.i, items: [shortText(it.texto, 72), shortText(it.detalle, 104, true)] };
+        return { key: 'k:' + cur.cl.id + ':' + cur.i, items: [shortText(it.texto, 40), shortText(it.detalle, 60, true)] };
       }
       case 'volar': {
         var m = VO.m;
         if (!m) return null;
         var ps = arr(m.pasos), k = ps.length ? clamp(Math.floor(VO.progress * ps.length), 0, ps.length - 1) : 0;
-        if (VO.achieved) return { key: 'm:' + m.id + ':ok', tone: 'good', items: ['¡Misión cumplida!', shortText(m.titulo, 64)] };
-        return { key: 'm:' + m.id, items: [shortText(m.objetivo || m.titulo, 84, true), ps.length ? shortText(ps[k], 110, true) : null] };
+        if (VO.achieved) return { key: 'm:' + m.id + ':ok', tone: 'good', items: ['¡Misión cumplida!', shortText(m.titulo, 56)] };
+        return { key: 'm:' + m.id, items: [shortText(m.objetivo || m.titulo, 44, true), ps.length ? shortText(ps[k], 64, true) : null] };
       }
       default: return null;
     }
@@ -2001,7 +2057,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     try { text = tip.text(); } catch (e) { text = ''; }
     if (!text) { CH.bar.clear(); return; }
     COACH.tip = tip; COACH.shownId = tip.id;
-    var items = ['Consejo', { text: shortText(text, 150), keep: true }];
+    var items = ['Consejo', { text: shortText(text, 110), keep: true }];
     if (tip.action) items.push({ text: tip.action[0], onClick: function () { safe(tip.action[1], 'coach action'); } });
     CH.bar.set(items, { tone: 'info', key: 'tip:' + tip.id, dismiss: coachDismiss, dismissLabel: 'Cerrar este consejo' });
   }
@@ -2965,7 +3021,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       h('span', { class: 'cr-code', style: { '--cat': catColor(c) }, 'aria-hidden': 'true', text: catCode(c.categoria) }),
       h('span', { class: 'cr-main' },
         h('span', { class: 'cr-name', text: c.nombre }),
-        c.ingles ? h('span', { class: 'cr-en', lang: 'en', text: c.ingles }) : null),
+        c.ingles ? h('span', { class: 'cr-en', lang: 'en', text: enTxt(c.ingles, true) }) : null),
       h('span', { class: 'cr-end' },
         c.prioridad === 1 ? h('span', { class: 'cr-tag', text: 'Esencial' }) : null,
         seen ? h('span', { class: 'cr-check', title: 'Ya lo viste' }, kic('check'), h('span', { class: 'sr-only', text: 'Ya lo viste' }))
@@ -3119,7 +3175,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       subList = h('dl', { class: 'gloss' });
       subs.forEach(function (s) {
         if (!s) return;
-        subList.appendChild(h('dt', null, s.nombre || s.subId, s.ingles ? h('small', { lang: 'en', text: ' · ' + s.ingles }) : null));
+        subList.appendChild(h('dt', null, s.nombre || s.subId, s.ingles ? h('small', { lang: 'en', text: ' · ' + enTxt(s.ingles) }) : null));
         subList.appendChild(h('dd', { text: s.texto || '' }));
       });
     }
@@ -3156,7 +3212,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     ttl.id = titleId; ttl.tabIndex = -1; ttl.classList.add('detail-title');
     head.classList.add('cs-head');
     var ref = head.querySelector('.pg-sub') || head.querySelector('.cs-actions');
-    [c.ingles ? h('p', { class: 'cs-en', lang: 'en', text: c.ingles }) : null,
+    [c.ingles ? h('p', { class: 'cs-en', lang: 'en', text: enTxt(c.ingles) }) : null,
       h('div', { class: 'cs-tags' },
         h('span', { class: 'cr-code', style: { '--cat': catColor(c) }, text: catCode(c.categoria) }),
         c.prioridad === 1 ? h('span', { class: 'cr-tag', text: 'Esencial' }) : null,
@@ -3412,7 +3468,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       GLOSSARY.forEach(function (g) {
         if (q && norm(g.termino + ' ' + (g.ingles || '') + ' ' + (g.definicion || '')).indexOf(q) < 0) return;
         n++;
-        dl.appendChild(h('dt', null, g.termino, g.ingles ? h('small', { lang: 'en', text: ' · ' + g.ingles }) : null));
+        dl.appendChild(h('dt', null, g.termino, g.ingles ? h('small', { lang: 'en', text: ' · ' + enTxt(g.ingles) }) : null));
         dl.appendChild(h('dd', { text: g.definicion || '' }));
       });
       if (!n) dl.appendChild(h('dd', { class: 'empty', text: 'No hay ninguna palabra así en el glosario.' }));
@@ -5510,6 +5566,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         if (!name) { var nv = NAV(); if (nv && isFn(nv.noteManual)) nv.noteManual(); }
         currentCam = name || null;
         if (DOCK.cams) DOCK.cams.setValue(currentCam, false);
+        syncViewBtn();
       });
       Co.on('scenario', function (name) { if (!applyingPreset && name) presetApplied(name); });
       Co.on('interactionend', function () { kick(); });
