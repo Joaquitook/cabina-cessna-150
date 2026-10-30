@@ -1,7 +1,7 @@
 /* validate-escuela.js — pruebas de la Escuela (contrato v7 §7) en Node, sin DOM.
  *   node tests/validate-escuela.js
  * Cubre:
- *  - src/data/escuela/indice.json: esquema, ids únicos y con la forma AAA-NN-NN, módulos en orden, tipos de componente conocidos, tamaño (≤ 200 KB);
+ *  - src/data/escuela/indice.json: esquema, ids únicos y con la forma AAA-NN-NN, módulos en orden, tipos de componente conocidos, tamaño (≤ 256 KB);
  *  - cada src/data/escuela/<ID>.json: lecciones presentes en el índice como "completo", 2–4 objetivos, contenido, preguntas con 4 opciones y
  *    `correcta` válida, sin textos vacíos, enlaces contra los ids reales de la app (controles, poses, experimentos AIRE, situaciones, lecciones
  *    de la app y otras lecciones de la Escuela) y componentes: tipo registrado o en la lista "más adelante";
@@ -61,8 +61,8 @@ seccion('índice');
 const rawIx = fs.readFileSync(path.join(ED, 'indice.json'), 'utf8');
 const ix = JSON.parse(rawIx);
 ok(ix.v === 1 && Array.isArray(ix.modulos), 'indice.json: {v:1, modulos:[…]}');
-ok(Buffer.byteLength(rawIx) <= 200 * 1024, 'indice.json pesa ≤ 200 KB (' + (Buffer.byteLength(rawIx) / 1024).toFixed(0) + ' KB)');
-eq(ix.modulos.map((m) => m.id), ['INT', 'AER', 'INS', 'AYM', 'COM', 'ATM', 'RTF', 'MET', 'NAV', 'REG', 'PER', 'FHU'], 'los 12 módulos en el orden del curso y luego los complementarios');
+ok(Buffer.byteLength(rawIx) <= 256 * 1024, 'indice.json pesa ≤ 256 KB (' + (Buffer.byteLength(rawIx) / 1024).toFixed(0) + ' KB)');
+eq(ix.modulos.map((m) => m.id), ['INT', 'AER', 'INS', 'AYM', 'COM', 'ATM', 'RTF', 'MET', 'NAV', 'REG', 'PER', 'FHU', 'OPE'], 'los 13 módulos en el orden del curso y luego los complementarios');
 const ids = [], DETALLES = ['completo', 'proximamente', 'pendiente'];
 ix.modulos.forEach((m, i) => {
   ok(m.orden === i + 1 && /^#[0-9A-Fa-f]{6}$/.test(m.color) && m.titulo && m.resumen && ['aerosur', 'complementario'].includes(m.fuente), m.id + ': orden, color, título, resumen y fuente');
@@ -788,7 +788,7 @@ seccion('pantallas (puro): saludo, minutos, estado de lección y geometría del 
   ok(g.d.startsWith('M 36 0 L 36 50') && g.d.endsWith('L 64 1200') && (g.d.match(/ C /g) || []).length === 11, 'camino: entra desde arriba, 11 curvas y sale por abajo');
   ok(g.dHasta(0) === 'M 36 50' && g.dHasta(2).startsWith('M 36 50 C 36 98, 64 102, 64 150') && (g.dHasta(5).match(/ C /g) || []).length === 5, 'camino: dHasta(k) recorta el trazo hasta la estación k');
   ok(Pn.geometriaCamino(0, [20, 80]).d === '' && Pn.geometriaCamino(1, [20, 80]).d === 'M 20 0 L 20 50 L 20 100', 'camino: sin estaciones no hay trazo; con una, un tramo recto');
-  // los 12 módulos reales: cada uno tiene icono y color para su tarjeta y su estación
+  // los 13 módulos reales: cada uno tiene icono y color para su tarjeta y su estación
   ES.datos.modulos().forEach((m) => ok(/^#[0-9A-Fa-f]{6}$/.test(m.color) && C.Icons.has(m.icono), 'tarjeta y estación de ' + m.id + ': color e icono válidos'));
   // la tarjeta de lección usa un icono por tipo de componente: todos existen
   ['simulador', 'diagrama', 'animacion', 'clasificar', 'emparejar', 'enlace3d', 'calculadora', 'situacion', 'ordenar', 'completar', 'tarjetas', 'diapositiva', 'quiz', 'caso', 'mapa', 'fraseologia'].forEach((t) => ok(Mot.META[t] && Mot.META[t].codigo, 'componente ' + t + ': tiene código para su ficha en la tarjeta'));

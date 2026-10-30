@@ -775,23 +775,18 @@
     ]}
   ]},
   {"id":"MET","orden":8,"titulo":"Meteorología","fuente":"complementario","paginas":"","color":"#3FB4E8","icono":"wind","resumen":"La atmósfera, el viento, las nubes y cómo leer un METAR y un TAF.","examen":{"numPreguntas":80},"unidades":[
-    {"id":"MET-01","titulo":"La atmósfera","paginas":"","lecciones":[
+    {"id":"MET-01","titulo":"La atmósfera, la estándar y la temperatura","paginas":"","lecciones":[
       {"id":"MET-01-01","titulo":"La atmósfera: de qué está hecha y cómo se divide","paginas":"","minutos":8,"componentes":["diagrama","simulador","clasificar"],"enlaces":3,"detalle":"proximamente"},
       {"id":"MET-01-02","titulo":"La atmósfera estándar (ISA)","paginas":"","minutos":10,"componentes":["calculadora","simulador","emparejar"],"enlaces":4,"detalle":"proximamente"},
       {"id":"MET-01-03","titulo":"Temperatura: cómo se calienta el aire y cómo cambia","paginas":"","minutos":9,"componentes":["animacion","ordenar","calculadora","enlace3d"],"enlaces":4,"detalle":"proximamente"}
     ]},
-    {"id":"MET-02","titulo":"Presión y altímetro","paginas":"","lecciones":[
-      {"id":"MET-02-01","titulo":"Presión atmosférica: qué es y cómo se mide","paginas":"","minutos":9,"componentes":["simulador","calculadora","diagrama"],"enlaces":4,"detalle":"proximamente"},
-      {"id":"MET-02-02","titulo":"Altas y bajas: cómo leer un mapa de presión","paginas":"","minutos":10,"componentes":["mapa","clasificar","emparejar","simulador"],"enlaces":3,"detalle":"proximamente"},
+    {"id":"MET-02","titulo":"Presión, altas y bajas, y altímetro","paginas":"","lecciones":[
+      {"id":"MET-02-01","titulo":"Presión atmosférica: qué es y cómo se mide","paginas":"","minutos":9,"componentes":["simulador","calculadora","diagrama"],"enlaces":5,"detalle":"proximamente"},
+      {"id":"MET-02-05","titulo":"De hectopascales a pulgadas: la tabla de conversión","paginas":"","minutos":7,"componentes":["calculadora","completar","enlace3d","tarjetas"],"enlaces":6,"detalle":"proximamente"},
+      {"id":"MET-02-02","titulo":"Altas y bajas: cómo leer un mapa de presión","paginas":"","minutos":10,"componentes":["mapa","clasificar","emparejar","simulador"],"enlaces":4,"detalle":"proximamente"},
+      {"id":"MET-02-06","titulo":"Centros de acción: las altas y bajas que mandan en el planeta","paginas":"","minutos":8,"componentes":["mapa","ordenar","emparejar"],"enlaces":3,"detalle":"proximamente"},
       {"id":"MET-02-03","titulo":"El altímetro y la presión: QNH, QFE, QNE y sus errores","paginas":"","minutos":12,"componentes":["enlace3d","simulador","diagrama","completar"],"enlaces":8,"detalle":"proximamente"},
       {"id":"MET-02-04","titulo":"Altitud de presión y altitud de densidad","paginas":"","minutos":11,"componentes":["calculadora","simulador","clasificar","enlace3d"],"enlaces":9,"detalle":"proximamente"}
-    ]},
-    {"id":"MET-03","titulo":"Humedad, estabilidad y ascensos del aire","paginas":"","lecciones":[
-      {"id":"MET-03-01","titulo":"Humedad: vapor de agua, humedad relativa y punto de rocío","paginas":"","minutos":10,"componentes":["simulador","calculadora","diagrama","clasificar"],"enlaces":4,"detalle":"proximamente"},
-      {"id":"MET-03-02","titulo":"Condensación, nubes y base de las nubes","paginas":"","minutos":10,"componentes":["diapositiva","calculadora","ordenar","clasificar"],"enlaces":5,"detalle":"proximamente"},
-      {"id":"MET-03-03","titulo":"Gradientes adiabáticos: lo que le pasa a una burbuja que sube","paginas":"","minutos":11,"componentes":["simulador","diagrama","completar","animacion"],"enlaces":4,"detalle":"proximamente"},
-      {"id":"MET-03-04","titulo":"Estabilidad e inestabilidad del aire; inversiones","paginas":"","minutos":12,"componentes":["simulador","diagrama","clasificar","situacion"],"enlaces":5,"detalle":"proximamente"},
-      {"id":"MET-03-05","titulo":"Qué hace subir el aire: térmicas, relieve, convergencia y frentes","paginas":"","minutos":10,"componentes":["animacion","simulador","clasificar","diapositiva"],"enlaces":5,"detalle":"proximamente"}
     ]},
     {"id":"MET-04","titulo":"El viento","paginas":"","lecciones":[
       {"id":"MET-04-01","titulo":"Por qué sopla el viento: gradiente de presión, Coriolis y Buys-Ballot","paginas":"","minutos":11,"componentes":["diapositiva","simulador","diagrama","emparejar"],"enlaces":4,"detalle":"proximamente"},
@@ -800,10 +795,17 @@
       {"id":"MET-04-04","titulo":"Viento en el aeródromo: componentes, viento cruzado y rumbos verdaderos o magnéticos","paginas":"","minutos":12,"componentes":["calculadora","completar","enlace3d","situacion"],"enlaces":10,"detalle":"proximamente"},
       {"id":"MET-04-05","titulo":"Leer el viento sin instrumentos: manga, escala Beaufort y pistas del entorno","paginas":"","minutos":10,"componentes":["tarjetas","diagrama","clasificar","situacion"],"enlaces":4,"detalle":"proximamente"}
     ]},
-    {"id":"MET-05","titulo":"Circulación general y masas de aire","paginas":"","lecciones":[
-      {"id":"MET-05-01","titulo":"La circulación general de la atmósfera y el lugar de Uruguay","paginas":"","minutos":10,"componentes":["diagrama","simulador","emparejar","diapositiva"],"enlaces":3,"detalle":"proximamente"},
-      {"id":"MET-05-02","titulo":"La corriente en chorro y los vientos en altura","paginas":"","minutos":9,"componentes":["diagrama","calculadora","simulador","clasificar"],"enlaces":4,"detalle":"proximamente"},
-      {"id":"MET-05-03","titulo":"Masas de aire: qué son y cuáles visitan Uruguay","paginas":"","minutos":11,"componentes":["mapa","simulador","clasificar","tarjetas"],"enlaces":4,"detalle":"proximamente"}
+    {"id":"MET-11","titulo":"Ondas de montaña, turbulencia y cizalladura","paginas":"","lecciones":[
+      {"id":"MET-11-01","titulo":"Turbulencia: causas, intensidades y cómo se vuela","paginas":"","minutos":10,"componentes":["diagrama","simulador","clasificar","situacion"],"enlaces":7,"detalle":"proximamente"},
+      {"id":"MET-11-02","titulo":"Ondas de montaña, rotores y turbulencia en aire claro","paginas":"","minutos":9,"componentes":["diagrama","animacion","clasificar","tarjetas"],"enlaces":5,"detalle":"proximamente"},
+      {"id":"MET-11-03","titulo":"Cizalladura del viento y microrráfagas","paginas":"","minutos":12,"componentes":["animacion","simulador","clasificar","situacion","enlace3d"],"enlaces":9,"detalle":"proximamente"}
+    ]},
+    {"id":"MET-03","titulo":"Humedad, estabilidad y ascensos del aire","paginas":"","lecciones":[
+      {"id":"MET-03-01","titulo":"Humedad: vapor de agua, humedad relativa y punto de rocío","paginas":"","minutos":10,"componentes":["simulador","calculadora","diagrama","clasificar"],"enlaces":4,"detalle":"proximamente"},
+      {"id":"MET-03-02","titulo":"Condensación, nubes y base de las nubes","paginas":"","minutos":10,"componentes":["diapositiva","calculadora","ordenar","clasificar"],"enlaces":5,"detalle":"proximamente"},
+      {"id":"MET-03-03","titulo":"Gradientes adiabáticos: lo que le pasa a una burbuja que sube","paginas":"","minutos":11,"componentes":["simulador","diagrama","completar","animacion"],"enlaces":4,"detalle":"proximamente"},
+      {"id":"MET-03-04","titulo":"Estabilidad e inestabilidad del aire; inversiones","paginas":"","minutos":12,"componentes":["simulador","diagrama","clasificar","situacion"],"enlaces":5,"detalle":"proximamente"},
+      {"id":"MET-03-05","titulo":"Qué hace subir el aire: térmicas, relieve, convergencia y frentes","paginas":"","minutos":10,"componentes":["animacion","simulador","clasificar","diapositiva"],"enlaces":5,"detalle":"proximamente"}
     ]},
     {"id":"MET-06","titulo":"Nubes y precipitación","paginas":"","lecciones":[
       {"id":"MET-06-01","titulo":"Los diez géneros de nubes y sus pisos","paginas":"","minutos":11,"componentes":["diagrama","tarjetas","clasificar","emparejar"],"enlaces":4,"detalle":"proximamente"},
@@ -813,33 +815,35 @@
       {"id":"MET-06-05","titulo":"Cantidad de nubes, base, techo y visibilidad vertical","paginas":"","minutos":10,"componentes":["simulador","completar","caso","clasificar"],"enlaces":5,"detalle":"proximamente"},
       {"id":"MET-06-06","titulo":"Precipitación: llovizna, lluvia, chubasco, granizo y cómo se forman","paginas":"","minutos":10,"componentes":["animacion","emparejar","clasificar","caso"],"enlaces":4,"detalle":"proximamente"}
     ]},
-    {"id":"MET-07","titulo":"Frentes, depresiones y vientos del Río de la Plata","paginas":"","lecciones":[
-      {"id":"MET-07-01","titulo":"Frentes: qué son, qué cambia al pasar y cómo se dibujan","paginas":"","minutos":9,"componentes":["diagrama","emparejar","clasificar"],"enlaces":4,"detalle":"proximamente"},
-      {"id":"MET-07-02","titulo":"Frente frío: del viento norte al pampero","paginas":"","minutos":11,"componentes":["animacion","ordenar","diagrama","caso"],"enlaces":5,"detalle":"proximamente"},
-      {"id":"MET-07-03","titulo":"Frente cálido y frente estacionario: techos bajos y lluvia continua","paginas":"","minutos":9,"componentes":["diagrama","clasificar","situacion","animacion"],"enlaces":5,"detalle":"proximamente"},
-      {"id":"MET-07-04","titulo":"Oclusiones y depresiones: cómo nace, crece y muere un ciclón extratropical","paginas":"","minutos":11,"componentes":["animacion","mapa","ordenar","emparejar"],"enlaces":4,"detalle":"proximamente"},
-      {"id":"MET-07-05","titulo":"Pampero, sudestada y viento norte: los vientos que mandan en el Río de la Plata","paginas":"","minutos":12,"componentes":["mapa","clasificar","simulador","situacion"],"enlaces":6,"detalle":"proximamente"}
-    ]},
     {"id":"MET-08","titulo":"Visibilidad y niebla","paginas":"","lecciones":[
       {"id":"MET-08-01","titulo":"Visibilidad: qué es, qué la reduce y cómo se informa","paginas":"","minutos":10,"componentes":["simulador","emparejar","diagrama","caso"],"enlaces":5,"detalle":"proximamente"},
       {"id":"MET-08-02","titulo":"Niebla de radiación: la niebla de las mañanas de invierno","paginas":"","minutos":10,"componentes":["animacion","simulador","calculadora","situacion"],"enlaces":5,"detalle":"proximamente"},
       {"id":"MET-08-03","titulo":"Otras nieblas: advección, ladera, frontal y de vapor","paginas":"","minutos":10,"componentes":["clasificar","diagrama","mapa","emparejar"],"enlaces":4,"detalle":"proximamente"}
     ]},
+    {"id":"MET-05","titulo":"Circulación general y masas de aire","paginas":"","lecciones":[
+      {"id":"MET-05-01","titulo":"La circulación general de la atmósfera y el lugar de Uruguay","paginas":"","minutos":10,"componentes":["diagrama","simulador","emparejar","diapositiva"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"MET-05-02","titulo":"La corriente en chorro y los vientos en altura","paginas":"","minutos":9,"componentes":["diagrama","calculadora","simulador","clasificar"],"enlaces":4,"detalle":"proximamente"},
+      {"id":"MET-05-03","titulo":"Masas de aire: qué son y cuáles visitan Uruguay","paginas":"","minutos":11,"componentes":["mapa","simulador","clasificar","tarjetas"],"enlaces":4,"detalle":"proximamente"}
+    ]},
+    {"id":"MET-07","titulo":"Frentes, depresiones y vientos del Río de la Plata","paginas":"","lecciones":[
+      {"id":"MET-07-01","titulo":"Frentes: qué son, qué cambia al pasar y cómo se dibujan","paginas":"","minutos":9,"componentes":["diagrama","emparejar","clasificar"],"enlaces":4,"detalle":"proximamente"},
+      {"id":"MET-07-02","titulo":"Frente frío: del viento norte al pampero","paginas":"","minutos":11,"componentes":["animacion","ordenar","diagrama","caso"],"enlaces":5,"detalle":"proximamente"},
+      {"id":"MET-07-03","titulo":"Frente cálido y frente estacionario: techos bajos y lluvia continua","paginas":"","minutos":9,"componentes":["diagrama","clasificar","situacion","animacion"],"enlaces":6,"detalle":"proximamente"},
+      {"id":"MET-07-06","titulo":"Antes y después del frente: las tablas de la clase","paginas":"","minutos":9,"componentes":["clasificar","completar","situacion"],"enlaces":4,"detalle":"proximamente"},
+      {"id":"MET-07-04","titulo":"Oclusiones y depresiones: cómo nace, crece y muere un ciclón extratropical","paginas":"","minutos":11,"componentes":["animacion","mapa","ordenar","emparejar"],"enlaces":4,"detalle":"proximamente"},
+      {"id":"MET-07-05","titulo":"Pampero, sudestada y viento norte: los vientos que mandan en el Río de la Plata","paginas":"","minutos":12,"componentes":["mapa","clasificar","simulador","situacion"],"enlaces":6,"detalle":"proximamente"}
+    ]},
     {"id":"MET-09","titulo":"Tormentas","paginas":"","lecciones":[
       {"id":"MET-09-01","titulo":"Ingredientes y tipos de tormentas","paginas":"","minutos":11,"componentes":["simulador","diagrama","clasificar","caso"],"enlaces":4,"detalle":"proximamente"},
       {"id":"MET-09-02","titulo":"Ciclo de vida de un cumulonimbus: desarrollo, madurez y disipación","paginas":"","minutos":10,"componentes":["animacion","ordenar","calculadora","clasificar"],"enlaces":5,"detalle":"proximamente"},
-      {"id":"MET-09-03","titulo":"Los peligros de una tormenta: turbulencia, granizo, rayos, rachas y hielo","paginas":"","minutos":12,"componentes":["diagrama","clasificar","simulador","situacion"],"enlaces":7,"detalle":"proximamente"},
+      {"id":"MET-09-03","titulo":"Los peligros de una tormenta: turbulencia, granizo, rayos, rachas y hielo","paginas":"","minutos":12,"componentes":["diagrama","clasificar","simulador","situacion"],"enlaces":8,"detalle":"proximamente"},
+      {"id":"MET-09-05","titulo":"Rayos, fuegos de San Telmo y deslumbramiento","paginas":"","minutos":7,"componentes":["clasificar","emparejar","situacion"],"enlaces":5,"detalle":"proximamente"},
       {"id":"MET-09-04","titulo":"Cómo evitar las tormentas: planificar, desviar y decidir","paginas":"","minutos":10,"componentes":["situacion","caso","ordenar","fraseologia"],"enlaces":6,"detalle":"proximamente"}
     ]},
     {"id":"MET-10","titulo":"Engelamiento","paginas":"","lecciones":[
       {"id":"MET-10-01","titulo":"Hielo en la estructura: cómo se forma y qué tipos hay","paginas":"","minutos":10,"componentes":["calculadora","diagrama","clasificar","simulador","enlace3d"],"enlaces":4,"detalle":"proximamente"},
       {"id":"MET-10-02","titulo":"Qué le hace el hielo al avión y qué hacer: prevención y escape","paginas":"","minutos":10,"componentes":["simulador","enlace3d","ordenar","situacion"],"enlaces":10,"detalle":"proximamente"},
       {"id":"MET-10-03","titulo":"Hielo en el carburador: el hielo que se forma con cielo claro","paginas":"","minutos":12,"componentes":["simulador","enlace3d","ordenar","clasificar","situacion"],"enlaces":11,"detalle":"proximamente"}
-    ]},
-    {"id":"MET-11","titulo":"Turbulencia y cizalladura","paginas":"","lecciones":[
-      {"id":"MET-11-01","titulo":"Turbulencia: causas, intensidades y cómo se vuela","paginas":"","minutos":10,"componentes":["diagrama","simulador","clasificar","situacion"],"enlaces":7,"detalle":"proximamente"},
-      {"id":"MET-11-02","titulo":"Ondas de montaña, rotores y turbulencia en aire claro","paginas":"","minutos":9,"componentes":["diagrama","animacion","clasificar","tarjetas"],"enlaces":5,"detalle":"proximamente"},
-      {"id":"MET-11-03","titulo":"Cizalladura del viento y microrráfagas","paginas":"","minutos":12,"componentes":["animacion","simulador","clasificar","situacion","enlace3d"],"enlaces":9,"detalle":"proximamente"}
     ]},
     {"id":"MET-12","titulo":"El clima de Uruguay y sus aeródromos","paginas":"","lecciones":[
       {"id":"MET-12-01","titulo":"El clima de Uruguay: estaciones, regiones y números","paginas":"","minutos":10,"componentes":["mapa","tarjetas","simulador","clasificar"],"enlaces":4,"detalle":"proximamente"},
@@ -849,29 +853,35 @@
     {"id":"MET-13","titulo":"METAR y SPECI: leer el tiempo actual","paginas":"","lecciones":[
       {"id":"MET-13-01","titulo":"METAR y SPECI: qué son y cómo está armado el mensaje","paginas":"","minutos":9,"componentes":["diagrama","ordenar","calculadora","diapositiva"],"enlaces":6,"detalle":"proximamente"},
       {"id":"MET-13-02","titulo":"METAR: viento, visibilidad y tiempo presente","paginas":"","minutos":12,"componentes":["calculadora","emparejar","tarjetas","caso"],"enlaces":5,"detalle":"proximamente"},
-      {"id":"MET-13-03","titulo":"METAR: nubes, temperaturas, QNH, información suplementaria y TREND","paginas":"","minutos":12,"componentes":["calculadora","completar","clasificar","caso","enlace3d"],"enlaces":7,"detalle":"proximamente"},
+      {"id":"MET-13-03","titulo":"METAR: nubes, temperaturas, QNH, información suplementaria y TREND","paginas":"","minutos":12,"componentes":["calculadora","completar","clasificar","caso","enlace3d"],"enlaces":8,"detalle":"proximamente"},
+      {"id":"MET-13-06","titulo":"La hoja de decodificación de la OMM: METAR y SPECI","paginas":"","minutos":12,"componentes":["diagrama","ordenar","clasificar","completar","calculadora"],"enlaces":5,"detalle":"proximamente"},
       {"id":"MET-13-04","titulo":"SPECI, TREND y la película de un día: cómo cambia el tiempo hora a hora","paginas":"","minutos":10,"componentes":["animacion","ordenar","tarjetas","situacion"],"enlaces":5,"detalle":"proximamente"},
-      {"id":"MET-13-05","titulo":"Taller: decodificá METAR reales de Uruguay y decidí","paginas":"","minutos":12,"componentes":["caso","calculadora","quiz","situacion"],"enlaces":7,"detalle":"proximamente"}
+      {"id":"MET-13-05","titulo":"Taller: decodificá METAR reales de Uruguay y decidí","paginas":"","minutos":12,"componentes":["caso","calculadora","quiz","situacion"],"enlaces":8,"detalle":"proximamente"},
+      {"id":"MET-13-07","titulo":"Práctica: siete METAR de la clase","paginas":"","minutos":12,"componentes":["caso","clasificar","calculadora","situacion"],"enlaces":6,"detalle":"proximamente"}
     ]},
     {"id":"MET-14","titulo":"TAF: el pronóstico de aeródromo","paginas":"","lecciones":[
       {"id":"MET-14-01","titulo":"El TAF: qué es y cómo se lee","paginas":"","minutos":11,"componentes":["diagrama","calculadora","completar","emparejar"],"enlaces":4,"detalle":"proximamente"},
-      {"id":"MET-14-02","titulo":"BECMG, TEMPO, FM y PROB: los grupos de cambio del TAF","paginas":"","minutos":11,"componentes":["simulador","clasificar","completar","caso"],"enlaces":4,"detalle":"proximamente"},
+      {"id":"MET-14-02","titulo":"BECMG, TEMPO, FM y PROB: los grupos de cambio del TAF","paginas":"","minutos":11,"componentes":["simulador","clasificar","completar","caso"],"enlaces":5,"detalle":"proximamente"},
+      {"id":"MET-14-04","titulo":"La hoja de decodificación del TAF y el TAF de la clase","paginas":"","minutos":11,"componentes":["diagrama","completar","emparejar","situacion"],"enlaces":4,"detalle":"proximamente"},
       {"id":"MET-14-03","titulo":"Usar el TAF para decidir: ventana de vuelo, peor caso y alternativo","paginas":"","minutos":11,"componentes":["situacion","caso","simulador","clasificar"],"enlaces":4,"detalle":"proximamente"}
     ]},
-    {"id":"MET-15","titulo":"Avisos para el vuelo: SIGMET, AIRMET, GAMET y aeronotificaciones","paginas":"","lecciones":[
+    {"id":"MET-15","titulo":"Avisos para el vuelo: SIGMET, SNOWTAM, AIRMET, GAMET y aeronotificaciones","paginas":"","lecciones":[
       {"id":"MET-15-01","titulo":"SIGMET: los fenómenos peligrosos en ruta","paginas":"","minutos":12,"componentes":["diagrama","mapa","emparejar","situacion"],"enlaces":6,"detalle":"proximamente"},
       {"id":"MET-15-02","titulo":"AIRMET y GAMET: el tiempo para vuelos a poca altura","paginas":"","minutos":11,"componentes":["diagrama","calculadora","clasificar","caso"],"enlaces":4,"detalle":"proximamente"},
-      {"id":"MET-15-03","titulo":"Avisos de aeródromo, cizalladura y alertas de INUMET","paginas":"","minutos":10,"componentes":["calculadora","emparejar","clasificar","situacion"],"enlaces":4,"detalle":"proximamente"},
+      {"id":"MET-15-03","titulo":"Avisos de aeródromo, cizalladura y alertas de INUMET","paginas":"","minutos":10,"componentes":["calculadora","emparejar","clasificar","situacion"],"enlaces":5,"detalle":"proximamente"},
+      {"id":"MET-15-05","titulo":"SNOWTAM: el aviso de pista contaminada","paginas":"","minutos":6,"componentes":["emparejar","completar","situacion"],"enlaces":4,"detalle":"proximamente"},
       {"id":"MET-15-04","titulo":"Aeronotificaciones: vos también sos una estación meteorológica","paginas":"","minutos":9,"componentes":["fraseologia","clasificar","ordenar","situacion"],"enlaces":7,"detalle":"proximamente"}
     ]},
     {"id":"MET-16","titulo":"Cartas, satélite y radar","paginas":"","lecciones":[
       {"id":"MET-16-01","titulo":"La carta de superficie: isobaras, frentes y el modelo de estación","paginas":"","minutos":11,"componentes":["mapa","diagrama","calculadora","simulador"],"enlaces":5,"detalle":"proximamente"},
-      {"id":"MET-16-02","titulo":"Cartas de tiempo significativo y de viento en altura","paginas":"","minutos":10,"componentes":["mapa","emparejar","calculadora","situacion"],"enlaces":4,"detalle":"proximamente"},
+      {"id":"MET-16-02","titulo":"Cartas de tiempo significativo y de viento en altura","paginas":"","minutos":10,"componentes":["mapa","emparejar","calculadora","situacion"],"enlaces":5,"detalle":"proximamente"},
+      {"id":"MET-16-05","titulo":"Cartas de altura: isohipsas y niveles de presión","paginas":"","minutos":8,"componentes":["emparejar","simulador","diagrama","completar"],"enlaces":5,"detalle":"proximamente"},
       {"id":"MET-16-03","titulo":"Imágenes de satélite: visible, infrarrojo y vapor de agua","paginas":"","minutos":10,"componentes":["mapa","simulador","clasificar","situacion"],"enlaces":4,"detalle":"proximamente"},
       {"id":"MET-16-04","titulo":"Radar meteorológico, rayos y pronóstico a muy corto plazo","paginas":"","minutos":10,"componentes":["simulador","animacion","clasificar","situacion"],"enlaces":4,"detalle":"proximamente"}
     ]},
-    {"id":"MET-17","titulo":"Servicios meteorológicos y briefing","paginas":"","lecciones":[
-      {"id":"MET-17-01","titulo":"Quién da el servicio meteorológico y dónde conseguir la información","paginas":"","minutos":9,"componentes":["diagrama","emparejar","clasificar","tarjetas"],"enlaces":5,"detalle":"proximamente"},
+    {"id":"MET-17","titulo":"Servicios meteorológicos, ATIS y briefing","paginas":"","lecciones":[
+      {"id":"MET-17-01","titulo":"Quién da el servicio meteorológico y dónde conseguir la información","paginas":"","minutos":9,"componentes":["diagrama","emparejar","clasificar","tarjetas"],"enlaces":6,"detalle":"proximamente"},
+      {"id":"MET-17-03","titulo":"ATIS y VOLMET: el tiempo por radio","paginas":"","minutos":7,"componentes":["ordenar","fraseologia","clasificar","situacion"],"enlaces":5,"detalle":"proximamente"},
       {"id":"MET-17-02","titulo":"El briefing meteorológico: método paso a paso","paginas":"","minutos":12,"componentes":["ordenar","calculadora","caso","situacion","enlace3d"],"enlaces":7,"detalle":"proximamente"}
     ]},
     {"id":"MET-18","titulo":"Mínimos VFR y decisión meteorológica","paginas":"","lecciones":[
@@ -883,34 +893,47 @@
     ]}
   ]},
   {"id":"NAV","orden":9,"titulo":"Navegación","fuente":"complementario","paginas":"","color":"#2F9E6B","icono":"compass","resumen":"Coordenadas, cartas, rumbo, viento y estima para llegar de un punto a otro.","examen":{"numPreguntas":80},"unidades":[
+    {"id":"NAV-14","titulo":"Navegar: qué es, qué hay que resolver y con qué métodos","paginas":"","lecciones":[
+      {"id":"NAV-14-01","titulo":"¿Qué es navegar? Cuatro tareas y cinco condiciones del avión","paginas":"","minutos":8,"componentes":["diagrama","clasificar","situacion","tarjetas"],"enlaces":5,"detalle":"proximamente"},
+      {"id":"NAV-14-02","titulo":"Los cuatro problemas: situación, dirección, distancia y tiempo","paginas":"","minutos":9,"componentes":["emparejar","clasificar","ordenar","tarjetas"],"enlaces":5,"detalle":"proximamente"},
+      {"id":"NAV-14-03","titulo":"Tres métodos para navegar: a la vista, a estima y con radioayudas","paginas":"","minutos":9,"componentes":["clasificar","animacion","situacion","ordenar"],"enlaces":6,"detalle":"proximamente"},
+      {"id":"NAV-14-04","titulo":"Las reglas que rodean la navegación VFR: mínimos y niveles de crucero","paginas":"","minutos":9,"componentes":["calculadora","clasificar","emparejar","diagrama"],"enlaces":5,"detalle":"proximamente"}
+    ]},
     {"id":"NAV-01","titulo":"La Tierra, las coordenadas y las unidades","paginas":"","lecciones":[
-      {"id":"NAV-01-01","titulo":"La Tierra, la latitud y la longitud","paginas":"","minutos":10,"componentes":["diagrama","simulador","completar","mapa"],"enlaces":2,"detalle":"proximamente"},
-      {"id":"NAV-01-02","titulo":"La milla náutica, el nudo y el círculo máximo","paginas":"","minutos":10,"componentes":["simulador","diagrama","calculadora","ordenar"],"enlaces":2,"detalle":"proximamente"},
+      {"id":"NAV-01-05","titulo":"El planeta: forma, giro, inclinación y los cuatro paralelos especiales","paginas":"","minutos":9,"componentes":["diagrama","simulador","emparejar","completar"],"enlaces":4,"detalle":"proximamente"},
+      {"id":"NAV-01-01","titulo":"La Tierra, la latitud y la longitud","paginas":"","minutos":10,"componentes":["diagrama","simulador","completar","mapa"],"enlaces":4,"detalle":"proximamente"},
+      {"id":"NAV-01-02","titulo":"La milla náutica, el nudo y el círculo máximo","paginas":"","minutos":10,"componentes":["simulador","diagrama","calculadora","ordenar"],"enlaces":4,"detalle":"proximamente"},
       {"id":"NAV-01-03","titulo":"Las unidades de la navegación y cómo convertirlas","paginas":"","minutos":11,"componentes":["calculadora","emparejar","tarjetas","simulador"],"enlaces":4,"detalle":"proximamente"},
-      {"id":"NAV-01-04","titulo":"El tiempo en navegación: UTC, hora local y la luz del día","paginas":"","minutos":10,"componentes":["simulador","calculadora","clasificar","situacion"],"enlaces":3,"detalle":"proximamente"}
+      {"id":"NAV-01-04","titulo":"El tiempo en navegación: UTC, hora local y la luz del día","paginas":"","minutos":10,"componentes":["simulador","calculadora","clasificar","situacion"],"enlaces":5,"detalle":"proximamente"}
     ]},
     {"id":"NAV-02","titulo":"Las cartas aeronáuticas","paginas":"","lecciones":[
-      {"id":"NAV-02-01","titulo":"La carta: proyección y escala","paginas":"","minutos":10,"componentes":["diagrama","calculadora","ordenar","clasificar"],"enlaces":2,"detalle":"proximamente"},
-      {"id":"NAV-02-02","titulo":"Relieve, obstáculos y alturas en la carta","paginas":"","minutos":9,"componentes":["diagrama","clasificar","simulador","emparejar"],"enlaces":3,"detalle":"proximamente"},
-      {"id":"NAV-02-03","titulo":"Símbolos y leyenda: leer la carta de un vistazo","paginas":"","minutos":9,"componentes":["diagrama","emparejar","situacion","tarjetas"],"enlaces":4,"detalle":"proximamente"},
-      {"id":"NAV-02-04","titulo":"Las cartas de Uruguay y su vigencia (AIRAC)","paginas":"","minutos":10,"componentes":["emparejar","calculadora","situacion","tarjetas"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"NAV-02-01","titulo":"La carta: proyección y escala","paginas":"","minutos":10,"componentes":["diagrama","calculadora","ordenar","clasificar"],"enlaces":5,"detalle":"proximamente"},
+      {"id":"NAV-02-06","titulo":"Mapa y carta: cómo debe ser una buena carta","paginas":"","minutos":7,"componentes":["clasificar","emparejar","situacion"],"enlaces":4,"detalle":"proximamente"},
+      {"id":"NAV-02-07","titulo":"Las tres familias de proyecciones: azimutal, cilíndrica y cónica","paginas":"","minutos":11,"componentes":["diagrama","clasificar","emparejar","tarjetas"],"enlaces":4,"detalle":"proximamente"},
+      {"id":"NAV-02-08","titulo":"La Carta Aeronáutica Mundial OACI 1:1 000 000","paginas":"","minutos":9,"componentes":["calculadora","clasificar","emparejar","situacion"],"enlaces":4,"detalle":"proximamente"},
+      {"id":"NAV-02-02","titulo":"Relieve, obstáculos y alturas en la carta","paginas":"","minutos":9,"componentes":["diagrama","clasificar","simulador","emparejar"],"enlaces":4,"detalle":"proximamente"},
+      {"id":"NAV-02-03","titulo":"Símbolos y leyenda: leer la carta de un vistazo","paginas":"","minutos":9,"componentes":["diagrama","emparejar","situacion","tarjetas"],"enlaces":5,"detalle":"proximamente"},
+      {"id":"NAV-02-09","titulo":"La carta de aproximación visual y los planos de aeródromo, de estacionamiento y de atraque","paginas":"","minutos":9,"componentes":["emparejar","clasificar","situacion"],"enlaces":5,"detalle":"proximamente"},
+      {"id":"NAV-02-04","titulo":"Las cartas de Uruguay y su vigencia (AIRAC)","paginas":"","minutos":10,"componentes":["emparejar","calculadora","situacion","tarjetas"],"enlaces":5,"detalle":"proximamente"},
       {"id":"NAV-02-05","titulo":"Preparar la carta para volar","paginas":"","minutos":11,"componentes":["ordenar","mapa","diagrama","situacion"],"enlaces":4,"detalle":"proximamente"}
     ]},
     {"id":"NAV-03","titulo":"Direcciones: rumbos, nortes y variación magnética","paginas":"","lecciones":[
-      {"id":"NAV-03-01","titulo":"Los grados, los puntos cardinales y el recíproco","paginas":"","minutos":8,"componentes":["diagrama","simulador","emparejar","enlace3d"],"enlaces":4,"detalle":"proximamente"},
+      {"id":"NAV-03-01","titulo":"Los grados, los puntos cardinales y el recíproco","paginas":"","minutos":8,"componentes":["diagrama","simulador","emparejar","enlace3d"],"enlaces":5,"detalle":"proximamente"},
       {"id":"NAV-03-02","titulo":"Los tres nortes: verdadero, magnético y de brújula","paginas":"","minutos":9,"componentes":["diagrama","clasificar","animacion","enlace3d"],"enlaces":6,"detalle":"proximamente"},
       {"id":"NAV-03-03","titulo":"La variación magnética de Uruguay y cómo cambia con el tiempo","paginas":"","minutos":11,"componentes":["mapa","simulador","situacion","diapositiva"],"enlaces":2,"detalle":"proximamente"},
       {"id":"NAV-03-04","titulo":"De verdadero a magnético: \"Este reste, oeste sume\"","paginas":"","minutos":10,"componentes":["calculadora","simulador","completar","quiz"],"enlaces":2,"detalle":"proximamente"},
-      {"id":"NAV-03-05","titulo":"El desvío y la tarjeta de la brújula","paginas":"","minutos":10,"componentes":["diagrama","ordenar","simulador","enlace3d"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"NAV-03-05","titulo":"El desvío y la tarjeta de la brújula","paginas":"","minutos":10,"componentes":["diagrama","ordenar","simulador","enlace3d","calculadora"],"enlaces":3,"detalle":"proximamente"},
       {"id":"NAV-03-06","titulo":"Medir la ruta en la carta: transportador, plotter y meridianos","paginas":"","minutos":11,"componentes":["simulador","diagrama","situacion","calculadora"],"enlaces":4,"detalle":"proximamente"},
       {"id":"NAV-03-07","titulo":"La brújula y el direccional en la navegación","paginas":"","minutos":10,"componentes":["simulador","animacion","enlace3d","situacion"],"enlaces":5,"detalle":"proximamente"}
     ]},
     {"id":"NAV-04","titulo":"Velocidad, tiempo, distancia y combustible","paginas":"","lecciones":[
-      {"id":"NAV-04-01","titulo":"Distancia, velocidad y tiempo: D = V × T","paginas":"","minutos":10,"componentes":["simulador","calculadora","completar","quiz"],"enlaces":4,"detalle":"proximamente"},
+      {"id":"NAV-04-01","titulo":"Distancia, velocidad y tiempo: D = V × T","paginas":"","minutos":10,"componentes":["simulador","calculadora","completar","quiz"],"enlaces":5,"detalle":"proximamente"},
       {"id":"NAV-04-02","titulo":"Las velocidades: de la indicada a la velocidad sobre el suelo","paginas":"","minutos":11,"componentes":["simulador","animacion","calculadora","situacion"],"enlaces":7,"detalle":"proximamente"},
-      {"id":"NAV-04-03","titulo":"Combustible: consumo, autonomía y alcance","paginas":"","minutos":10,"componentes":["diagrama","calculadora","simulador","situacion"],"enlaces":5,"detalle":"proximamente"},
-      {"id":"NAV-04-04","titulo":"La computadora de vuelo E6B: la cara de cálculo","paginas":"","minutos":11,"componentes":["calculadora","animacion","ordenar","emparejar"],"enlaces":1,"detalle":"proximamente"},
-      {"id":"NAV-04-05","titulo":"Problemas de tiempo, combustible y conversiones","paginas":"","minutos":10,"componentes":["quiz","calculadora","caso","situacion"],"enlaces":2,"detalle":"proximamente"}
+      {"id":"NAV-04-03","titulo":"Combustible: consumo, autonomía y alcance","paginas":"","minutos":10,"componentes":["diagrama","calculadora","simulador","situacion"],"enlaces":6,"detalle":"proximamente"},
+      {"id":"NAV-04-04","titulo":"La computadora de vuelo E6B: la cara de cálculo","paginas":"","minutos":11,"componentes":["calculadora","animacion","ordenar","emparejar"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"NAV-04-06","titulo":"Tiempo, velocidad y distancia: los ejercicios de la clase","paginas":"","minutos":10,"componentes":["calculadora","completar","ordenar","clasificar"],"enlaces":5,"detalle":"proximamente"},
+      {"id":"NAV-04-07","titulo":"La E6B: su historia, sus partes y el vuelo 143 de Air Canada","paginas":"","minutos":8,"componentes":["diagrama","caso","emparejar","situacion"],"enlaces":6,"detalle":"proximamente"},
+      {"id":"NAV-04-05","titulo":"Problemas de tiempo, combustible y conversiones","paginas":"","minutos":10,"componentes":["quiz","calculadora","caso","situacion"],"enlaces":3,"detalle":"proximamente"}
     ]},
     {"id":"NAV-05","titulo":"El viento y el triángulo de velocidades","paginas":"","lecciones":[
       {"id":"NAV-05-01","titulo":"Rumbo, ruta y derrota: el viento empuja","paginas":"","minutos":10,"componentes":["animacion","emparejar","simulador","clasificar"],"enlaces":6,"detalle":"proximamente"},
@@ -921,7 +944,7 @@
       {"id":"NAV-05-06","titulo":"Viento en altura, ida y vuelta, y qué hace el viento con tu plan","paginas":"","minutos":11,"componentes":["simulador","mapa","caso","situacion"],"enlaces":6,"detalle":"proximamente"}
     ]},
     {"id":"NAV-06","titulo":"Navegación a la estima","paginas":"","lecciones":[
-      {"id":"NAV-06-01","titulo":"Qué es navegar a la estima","paginas":"","minutos":9,"componentes":["animacion","diagrama","clasificar","tarjetas"],"enlaces":5,"detalle":"proximamente"},
+      {"id":"NAV-06-01","titulo":"Qué es navegar a la estima","paginas":"","minutos":9,"componentes":["animacion","diagrama","clasificar","tarjetas"],"enlaces":6,"detalle":"proximamente"},
       {"id":"NAV-06-02","titulo":"De la ruta verdadera al rumbo de brújula: la cadena completa","paginas":"","minutos":12,"componentes":["calculadora","ordenar","simulador","quiz"],"enlaces":4,"detalle":"proximamente"},
       {"id":"NAV-06-03","titulo":"Tiempo y combustible por tramo: ETE, ETA y combustible","paginas":"","minutos":10,"componentes":["calculadora","diagrama","simulador","situacion"],"enlaces":7,"detalle":"proximamente"},
       {"id":"NAV-06-04","titulo":"Puntos de control: comparar, anotar y actualizar","paginas":"","minutos":11,"componentes":["simulador","calculadora","ordenar","situacion"],"enlaces":4,"detalle":"proximamente"},
@@ -930,7 +953,7 @@
       {"id":"NAV-06-07","titulo":"Calcular el viento real en vuelo","paginas":"","minutos":11,"componentes":["simulador","calculadora","caso","animacion"],"enlaces":3,"detalle":"proximamente"}
     ]},
     {"id":"NAV-07","titulo":"Navegación por referencias visuales (pilotaje)","paginas":"","lecciones":[
-      {"id":"NAV-07-01","titulo":"Pilotaje: navegar mirando afuera","paginas":"","minutos":9,"componentes":["diagrama","situacion","ordenar","diapositiva"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"NAV-07-01","titulo":"Pilotaje: navegar mirando afuera","paginas":"","minutos":9,"componentes":["diagrama","situacion","ordenar","diapositiva"],"enlaces":4,"detalle":"proximamente"},
       {"id":"NAV-07-02","titulo":"Qué se ve desde el aire: referencias del terreno","paginas":"","minutos":10,"componentes":["clasificar","simulador","emparejar","situacion"],"enlaces":3,"detalle":"proximamente"},
       {"id":"NAV-07-03","titulo":"Elegir buenos puntos de control: línea guía, tope y punto de ataque","paginas":"","minutos":11,"componentes":["mapa","clasificar","situacion","emparejar"],"enlaces":4,"detalle":"proximamente"},
       {"id":"NAV-07-04","titulo":"Uruguay desde el aire","paginas":"","minutos":11,"componentes":["mapa","emparejar","tarjetas","simulador"],"enlaces":4,"detalle":"proximamente"},
@@ -953,22 +976,28 @@
       {"id":"NAV-09-03","titulo":"Usar el GPS y la tableta en VFR sin perder la cabeza","paginas":"","minutos":10,"componentes":["clasificar","ordenar","situacion","caso"],"enlaces":3,"detalle":"proximamente"},
       {"id":"NAV-09-04","titulo":"Integridad, fallas y navegación de área (RAIM, RNAV y PBN)","paginas":"","minutos":10,"componentes":["animacion","situacion","diagrama","tarjetas"],"enlaces":2,"detalle":"proximamente"}
     ]},
-    {"id":"NAV-10","titulo":"Planificar una navegación","paginas":"","lecciones":[
-      {"id":"NAV-10-01","titulo":"Las etapas de la planificación","paginas":"","minutos":9,"componentes":["ordenar","diagrama","clasificar","situacion"],"enlaces":5,"detalle":"proximamente"},
-      {"id":"NAV-10-02","titulo":"Elegir la ruta y la altitud: espacios, obstáculos y niveles de crucero","paginas":"","minutos":12,"componentes":["mapa","calculadora","simulador","situacion"],"enlaces":11,"detalle":"proximamente"},
-      {"id":"NAV-10-03","titulo":"El aeródromo de destino y el alternativo","paginas":"","minutos":10,"componentes":["tarjetas","situacion","mapa","clasificar"],"enlaces":4,"detalle":"proximamente"},
-      {"id":"NAV-10-04","titulo":"La hoja de ruta (log de navegación)","paginas":"","minutos":12,"componentes":["calculadora","diagrama","ordenar","caso"],"enlaces":5,"detalle":"proximamente"},
-      {"id":"NAV-10-05","titulo":"Combustible, reservas, peso y carga","paginas":"","minutos":12,"componentes":["calculadora","simulador","situacion","tarjetas"],"enlaces":7,"detalle":"proximamente"},
-      {"id":"NAV-10-06","titulo":"NOTAM, AIP y el briefing aeronáutico","paginas":"","minutos":10,"componentes":["diagrama","emparejar","situacion","tarjetas"],"enlaces":5,"detalle":"proximamente"},
-      {"id":"NAV-10-07","titulo":"El plan de vuelo OACI (VFR) según el AIP de Uruguay","paginas":"","minutos":12,"componentes":["diagrama","completar","ordenar","situacion"],"enlaces":7,"detalle":"proximamente"},
-      {"id":"NAV-10-08","titulo":"Taller: planificá una navegación completa","paginas":"","minutos":14,"componentes":["caso","calculadora","situacion","ordenar","mapa"],"enlaces":8,"detalle":"proximamente"}
+    {"id":"NAV-10","titulo":"Planificar una navegación: la guía de la escuela, la hoja y el plan de vuelo","paginas":"","lecciones":[
+      {"id":"NAV-10-01","titulo":"Las etapas de la planificación","paginas":"","minutos":9,"componentes":["ordenar","diagrama","clasificar","situacion"],"enlaces":7,"detalle":"proximamente"},
+      {"id":"NAV-10-09","titulo":"Los diez pasos de una navegación VFR","paginas":"","minutos":9,"componentes":["ordenar","clasificar","emparejar","situacion"],"enlaces":6,"detalle":"proximamente"},
+      {"id":"NAV-10-10","titulo":"La guía de planificación VFR: la lista de verificación completa","paginas":"","minutos":12,"componentes":["ordenar","caso","clasificar","situacion"],"enlaces":6,"detalle":"proximamente"},
+      {"id":"NAV-10-02","titulo":"Elegir la ruta y la altitud: espacios, obstáculos y niveles de crucero","paginas":"","minutos":12,"componentes":["mapa","calculadora","simulador","situacion"],"enlaces":12,"detalle":"proximamente"},
+      {"id":"NAV-10-03","titulo":"El aeródromo de destino y el alternativo","paginas":"","minutos":10,"componentes":["tarjetas","situacion","mapa","clasificar"],"enlaces":6,"detalle":"proximamente"},
+      {"id":"NAV-10-11","titulo":"Despegue, aterrizaje, ascenso (TOC) y descenso (TOD) en el plan operacional","paginas":"","minutos":12,"componentes":["calculadora","diagrama","completar","situacion"],"enlaces":7,"detalle":"proximamente"},
+      {"id":"NAV-10-04","titulo":"La hoja de ruta (log de navegación)","paginas":"","minutos":12,"componentes":["calculadora","diagrama","ordenar","caso"],"enlaces":6,"detalle":"proximamente"},
+      {"id":"NAV-10-12","titulo":"La hoja de navegación VFR de la escuela, columna por columna","paginas":"","minutos":12,"componentes":["calculadora","diagrama","completar","caso"],"enlaces":6,"detalle":"proximamente"},
+      {"id":"NAV-10-05","titulo":"Combustible, reservas, peso y carga","paginas":"","minutos":12,"componentes":["calculadora","simulador","situacion","tarjetas"],"enlaces":9,"detalle":"proximamente"},
+      {"id":"NAV-10-06","titulo":"NOTAM, AIP y el briefing aeronáutico","paginas":"","minutos":10,"componentes":["diagrama","emparejar","situacion","tarjetas","completar"],"enlaces":5,"detalle":"proximamente"},
+      {"id":"NAV-10-07","titulo":"El plan de vuelo OACI (VFR) según el AIP de Uruguay","paginas":"","minutos":12,"componentes":["diagrama","completar","ordenar","situacion"],"enlaces":9,"detalle":"proximamente"},
+      {"id":"NAV-10-13","titulo":"El formulario del plan de vuelo OACI (1): casillas 7 a 10","paginas":"","minutos":10,"componentes":["completar","clasificar","emparejar","tarjetas"],"enlaces":6,"detalle":"proximamente"},
+      {"id":"NAV-10-14","titulo":"El formulario del plan de vuelo OACI (2): casillas 13 a 19","paginas":"","minutos":12,"componentes":["completar","calculadora","clasificar","ordenar"],"enlaces":7,"detalle":"proximamente"},
+      {"id":"NAV-10-08","titulo":"Taller: planificá una navegación completa","paginas":"","minutos":14,"componentes":["caso","calculadora","situacion","ordenar","mapa"],"enlaces":11,"detalle":"proximamente"}
     ]},
     {"id":"NAV-11","titulo":"Ejecutar la navegación en vuelo","paginas":"","lecciones":[
       {"id":"NAV-11-01","titulo":"Antes de despegar y la salida hacia la ruta","paginas":"","minutos":10,"componentes":["ordenar","enlace3d","situacion","diapositiva"],"enlaces":8,"detalle":"proximamente"},
       {"id":"NAV-11-02","titulo":"El ciclo de crucero: chequeos cada 15 minutos","paginas":"","minutos":11,"componentes":["ordenar","animacion","situacion","enlace3d"],"enlaces":8,"detalle":"proximamente"},
       {"id":"NAV-11-03","titulo":"Informar la posición: frecuencias, TIBA y códigos Q","paginas":"","minutos":11,"componentes":["fraseologia","emparejar","tarjetas","situacion"],"enlaces":11,"detalle":"proximamente"},
       {"id":"NAV-11-04","titulo":"Cambios de plan: desvíos y decisiones en ruta","paginas":"","minutos":11,"componentes":["situacion","calculadora","ordenar","caso"],"enlaces":6,"detalle":"proximamente"},
-      {"id":"NAV-11-05","titulo":"Llegada, descenso 3:1 y cierre del vuelo","paginas":"","minutos":10,"componentes":["calculadora","animacion","ordenar","situacion"],"enlaces":7,"detalle":"proximamente"}
+      {"id":"NAV-11-05","titulo":"Llegada, descenso 3:1 y cierre del vuelo","paginas":"","minutos":10,"componentes":["calculadora","animacion","ordenar","situacion"],"enlaces":8,"detalle":"proximamente"}
     ]},
     {"id":"NAV-12","titulo":"Si te perdés: procedimientos y emergencias de navegación","paginas":"","lecciones":[
       {"id":"NAV-12-01","titulo":"Qué es estar perdido y cómo se llega hasta ahí","paginas":"","minutos":9,"componentes":["diagrama","animacion","clasificar","situacion"],"enlaces":6,"detalle":"proximamente"},
@@ -983,19 +1012,43 @@
       {"id":"NAV-13-02","titulo":"Repaso final: el mapa mental de la navegación","paginas":"","minutos":11,"componentes":["diagrama","situacion","tarjetas","quiz"],"enlaces":16,"detalle":"proximamente"}
     ]}
   ]},
-  {"id":"REG","orden":10,"titulo":"Reglamentación","fuente":"complementario","paginas":"","color":"#9A5CD0","icono":"book","resumen":"Licencias, reglas del aire y espacio aéreo: lo que te exige la norma.","examen":{"numPreguntas":80},"unidades":[
+  {"id":"REG","orden":10,"titulo":"Reglamentación","fuente":"complementario","paginas":"","color":"#9A5CD0","icono":"book","resumen":"Licencias, reglas del aire y espacio aéreo: lo que te exige la norma.","examen":{"numPreguntas":100},"unidades":[
     {"id":"REG-01","titulo":"El sistema normativo: de Chicago a DINACIA","paginas":"","lecciones":[
-      {"id":"REG-01-01","titulo":"Quién manda en el aire: el Convenio de Chicago, la OACI y los Anexos","paginas":"","minutos":9,"componentes":["clasificar","diagrama","tarjetas"],"enlaces":2,"detalle":"proximamente"},
-      {"id":"REG-01-02","titulo":"DINACIA y las autoridades del sistema aeronáutico de Uruguay","paginas":"","minutos":10,"componentes":["diagrama","clasificar","caso"],"enlaces":3,"detalle":"proximamente"},
-      {"id":"REG-01-03","titulo":"La pirámide de normas: Código Aeronáutico, decretos, RAU y LAR","paginas":"","minutos":11,"componentes":["ordenar","emparejar","simulador","situacion"],"enlaces":1,"detalle":"proximamente"},
-      {"id":"REG-01-04","titulo":"El AIP, los NOTAM y las circulares: dónde está lo que cambia","paginas":"","minutos":10,"componentes":["diagrama","clasificar","simulador"],"enlaces":3,"detalle":"proximamente"},
-      {"id":"REG-01-05","titulo":"Cómo leer una norma: LAR 91.315(a)(1) y su vocabulario","paginas":"","minutos":8,"componentes":["completar","clasificar","simulador"],"enlaces":1,"detalle":"proximamente"}
+      {"id":"REG-01-06","titulo":"Derecho aeronáutico: de dónde salen las normas y qué ramas del derecho toca","paginas":"","minutos":8,"componentes":["clasificar","emparejar","tarjetas"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"REG-01-07","titulo":"La OACI por dentro: Asamblea, Consejo, comités y oficinas","paginas":"","minutos":9,"componentes":["diagrama","ordenar","completar","emparejar"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"REG-01-08","titulo":"Los Anexos del 1 al 19: qué regula cada uno","paginas":"","minutos":10,"componentes":["emparejar","clasificar","tarjetas","situacion"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"REG-01-01","titulo":"Quién manda en el aire: el Convenio de Chicago, la OACI y los Anexos","paginas":"","minutos":9,"componentes":["clasificar","diagrama","tarjetas"],"enlaces":5,"detalle":"proximamente"},
+      {"id":"REG-01-09","titulo":"DINACIA: sus cometidos según el Decreto 21/999 y el vínculo con la Fuerza Aérea","paginas":"","minutos":10,"componentes":["clasificar","emparejar","tarjetas","situacion"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"REG-01-02","titulo":"DINACIA y las autoridades del sistema aeronáutico de Uruguay","paginas":"","minutos":10,"componentes":["diagrama","clasificar","caso"],"enlaces":5,"detalle":"proximamente"},
+      {"id":"REG-01-03","titulo":"La pirámide de normas: Código Aeronáutico, decretos, RAU y LAR","paginas":"","minutos":11,"componentes":["ordenar","emparejar","simulador","situacion"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"REG-01-04","titulo":"El AIP, los NOTAM y las circulares: dónde está lo que cambia","paginas":"","minutos":10,"componentes":["diagrama","clasificar","simulador","emparejar"],"enlaces":4,"detalle":"proximamente"},
+      {"id":"REG-01-05","titulo":"Cómo leer una norma: LAR 91.315(a)(1) y su vocabulario","paginas":"","minutos":8,"componentes":["completar","clasificar","simulador"],"enlaces":1,"detalle":"proximamente"},
+      {"id":"REG-01-10","titulo":"El vocabulario de la norma: las definiciones que se preguntan","paginas":"","minutos":11,"componentes":["emparejar","diagrama","completar","clasificar"],"enlaces":3,"detalle":"proximamente"}
+    ]},
+    {"id":"REG-13","titulo":"El Convenio de Chicago: primera parte (artículos 1 a 42)","paginas":"","lecciones":[
+      {"id":"REG-13-01","titulo":"Soberanía y territorio: los artículos 1 a 4 del Convenio","paginas":"","minutos":9,"componentes":["clasificar","situacion","tarjetas"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"REG-13-02","titulo":"Volar sobre otro país: los artículos 5 a 16","paginas":"","minutos":11,"componentes":["ordenar","clasificar","emparejar","tarjetas"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"REG-13-03","titulo":"Nacionalidad, documentos y licencias: los artículos 17 a 42","paginas":"","minutos":11,"componentes":["clasificar","emparejar","completar","situacion"],"enlaces":3,"detalle":"proximamente"}
+    ]},
+    {"id":"REG-14","titulo":"El Código Aeronáutico: la ley madre (Ley 14.305)","paginas":"","lecciones":[
+      {"id":"REG-14-01","titulo":"El Código Aeronáutico: soberanía, ámbito y jurisdicción (arts. 1 a 6)","paginas":"","minutos":10,"componentes":["clasificar","situacion","completar"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"REG-14-02","titulo":"Circulación aérea (I): sobrevolar, aterrizar donde corresponde y obedecer (arts. 7 a 18)","paginas":"","minutos":11,"componentes":["ordenar","clasificar","caso","tarjetas"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"REG-14-03","titulo":"Circulación aérea (II): marcas, documentos, equipos y prohibiciones (arts. 19 a 27)","paginas":"","minutos":10,"componentes":["emparejar","situacion","clasificar"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"REG-14-04","titulo":"Aeronaves: públicas y privadas, nacionalidad y matrícula (arts. 28 a 37 y 61 a 62)","paginas":"","minutos":10,"componentes":["clasificar","clasificar","tarjetas","calculadora"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"REG-14-05","titulo":"Aeródromos, aeropuertos y servicios de protección al vuelo (arts. 63 a 80)","paginas":"","minutos":10,"componentes":["clasificar","emparejar","situacion"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"REG-14-06","titulo":"Personal aeronáutico y comandante: licencias, facultades y obligaciones (arts. 81 a 91)","paginas":"","minutos":11,"componentes":["clasificar","situacion","emparejar"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"REG-14-07","titulo":"Accidentes, asistencia y búsqueda en el Código (arts. 92 a 105)","paginas":"","minutos":10,"componentes":["clasificar","ordenar","situacion"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"REG-14-08","titulo":"Servicios aéreos privados, aeroclubes y el explotador (arts. 106 a 127)","paginas":"","minutos":10,"componentes":["clasificar","situacion","tarjetas"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"REG-14-09","titulo":"Responsabilidad, abordaje y seguros (arts. 164 a 186)","paginas":"","minutos":11,"componentes":["calculadora","clasificar","situacion"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"REG-14-10","titulo":"Infracciones y sanciones administrativas (arts. 192 a 197)","paginas":"","minutos":8,"componentes":["ordenar","clasificar","situacion"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"REG-14-11","titulo":"Delitos aeronáuticos (I): violencia, peligro y conducción ilegítima (arts. 198 a 203)","paginas":"","minutos":11,"componentes":["clasificar","situacion","completar","tarjetas"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"REG-14-12","titulo":"Delitos aeronáuticos (II): inhabilitación, alcohol, zonas prohibidas y asistencia (arts. 204 a 209)","paginas":"","minutos":11,"componentes":["clasificar","situacion","caso"],"enlaces":3,"detalle":"proximamente"}
     ]},
     {"id":"REG-02","titulo":"Tu licencia: alumno piloto y piloto privado","paginas":"","lecciones":[
       {"id":"REG-02-01","titulo":"Licencias y habilitaciones: qué es cada una","paginas":"","minutos":8,"componentes":["diagrama","clasificar","situacion","enlace3d"],"enlaces":3,"detalle":"proximamente"},
       {"id":"REG-02-02","titulo":"La licencia de alumno piloto: requisitos y trámite","paginas":"","minutos":9,"componentes":["ordenar","completar","situacion"],"enlaces":4,"detalle":"proximamente"},
       {"id":"REG-02-03","titulo":"Tus límites como alumno piloto","paginas":"","minutos":10,"componentes":["situacion","clasificar","caso","calculadora"],"enlaces":3,"detalle":"proximamente"},
-      {"id":"REG-02-04","titulo":"Cómo se llega a piloto privado: los requisitos de la licencia","paginas":"","minutos":12,"componentes":["calculadora","diapositiva","tarjetas","ordenar"],"enlaces":2,"detalle":"proximamente"},
+      {"id":"REG-02-04","titulo":"Cómo se llega a piloto privado: los requisitos de la licencia","paginas":"","minutos":12,"componentes":["calculadora","diapositiva","tarjetas","ordenar","emparejar"],"enlaces":2,"detalle":"proximamente"},
       {"id":"REG-02-05","titulo":"Qué podés hacer con la licencia de piloto privado","paginas":"","minutos":9,"componentes":["situacion","clasificar","diapositiva"],"enlaces":2,"detalle":"proximamente"},
       {"id":"REG-02-06","titulo":"Mantener tus atribuciones: vigencia, experiencia reciente y repaso de vuelo","paginas":"","minutos":12,"componentes":["simulador","situacion","ordenar","calculadora"],"enlaces":2,"detalle":"proximamente"},
       {"id":"REG-02-07","titulo":"La bitácora de vuelo personal","paginas":"","minutos":8,"componentes":["completar","clasificar","emparejar"],"enlaces":2,"detalle":"proximamente"},
@@ -1004,15 +1057,15 @@
     {"id":"REG-03","titulo":"El certificado médico y tu aptitud para volar","paginas":"","lecciones":[
       {"id":"REG-03-01","titulo":"El certificado médico aeronáutico (LAR 67): clases y vigencia","paginas":"","minutos":9,"componentes":["simulador","clasificar","situacion","ordenar"],"enlaces":4,"detalle":"proximamente"},
       {"id":"REG-03-02","titulo":"Aptitud para volar: cuándo no volar aunque el certificado esté vigente","paginas":"","minutos":9,"componentes":["diapositiva","situacion","ordenar"],"enlaces":2,"detalle":"proximamente"},
-      {"id":"REG-03-03","titulo":"Alcohol, drogas y medicamentos: lo que dice la norma","paginas":"","minutos":9,"componentes":["clasificar","situacion","diapositiva","enlace3d"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"REG-03-03","titulo":"Alcohol, drogas y medicamentos: lo que dice la norma","paginas":"","minutos":9,"componentes":["clasificar","situacion","diapositiva","enlace3d"],"enlaces":5,"detalle":"proximamente"},
       {"id":"REG-03-04","titulo":"Casos: ¿estoy en condiciones de volar hoy?","paginas":"","minutos":8,"componentes":["situacion","calculadora","caso"],"enlaces":2,"detalle":"proximamente"}
     ]},
     {"id":"REG-04","titulo":"El piloto al mando y la operación del avión","paginas":"","lecciones":[
-      {"id":"REG-04-01","titulo":"El piloto al mando: autoridad y responsabilidad","paginas":"","minutos":10,"componentes":["diapositiva","situacion","caso","clasificar"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"REG-04-01","titulo":"El piloto al mando: autoridad y responsabilidad","paginas":"","minutos":10,"componentes":["diapositiva","situacion","caso","clasificar"],"enlaces":4,"detalle":"proximamente"},
       {"id":"REG-04-02","titulo":"Antes de volar: las medidas previas que exige la norma","paginas":"","minutos":11,"componentes":["ordenar","calculadora","situacion","enlace3d"],"enlaces":5,"detalle":"proximamente"},
       {"id":"REG-04-03","titulo":"Lo que no se puede hacer (o solo con permiso): acrobacia, formación, objetos y más","paginas":"","minutos":11,"componentes":["clasificar","simulador","situacion","animacion"],"enlaces":2,"detalle":"proximamente"},
-      {"id":"REG-04-04","titulo":"Equipos obligatorios, ELT, transpondedor y equipos inoperativos","paginas":"","minutos":12,"componentes":["clasificar","situacion","enlace3d","diagrama"],"enlaces":9,"detalle":"proximamente"},
-      {"id":"REG-04-05","titulo":"Documentos a bordo y libros de la aeronave","paginas":"","minutos":10,"componentes":["clasificar","situacion","diagrama"],"enlaces":4,"detalle":"proximamente"},
+      {"id":"REG-04-04","titulo":"Equipos obligatorios, ELT, transpondedor y equipos inoperativos","paginas":"","minutos":12,"componentes":["clasificar","situacion","enlace3d","diagrama","tarjetas"],"enlaces":9,"detalle":"proximamente"},
+      {"id":"REG-04-05","titulo":"Documentos a bordo y libros de la aeronave","paginas":"","minutos":10,"componentes":["clasificar","situacion","diagrama","clasificar"],"enlaces":7,"detalle":"proximamente"},
       {"id":"REG-04-06","titulo":"Pasajeros: briefing, cinturones y seguridad a bordo","paginas":"","minutos":8,"componentes":["ordenar","enlace3d","situacion"],"enlaces":4,"detalle":"proximamente"},
       {"id":"REG-04-07","titulo":"Aeronavegabilidad y mantenimiento: lo que le toca al piloto","paginas":"","minutos":10,"componentes":["ordenar","clasificar","situacion","enlace3d"],"enlaces":9,"detalle":"proximamente"}
     ]},
@@ -1025,16 +1078,17 @@
       {"id":"REG-05-06","titulo":"Luces de las aeronaves: rojo a la izquierda, verde a la derecha","paginas":"","minutos":9,"componentes":["diagrama","emparejar","simulador","enlace3d"],"enlaces":3,"detalle":"proximamente"}
     ]},
     {"id":"REG-06","titulo":"Reglas de vuelo visual (VFR): mínimos, horario y alturas","paginas":"","lecciones":[
-      {"id":"REG-06-01","titulo":"VFR e IFR: dos juegos de reglas y los límites del VFR","paginas":"","minutos":10,"componentes":["clasificar","simulador","situacion"],"enlaces":4,"detalle":"proximamente"},
-      {"id":"REG-06-02","titulo":"Mínimos VMC: visibilidad y distancia a las nubes","paginas":"","minutos":11,"componentes":["simulador","tarjetas","situacion","diagrama"],"enlaces":4,"detalle":"proximamente"},
-      {"id":"REG-06-03","titulo":"En una zona de control: techo, visibilidad y el VFR especial","paginas":"","minutos":11,"componentes":["simulador","situacion","completar","fraseologia"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"REG-06-07","titulo":"La hoja de la clase: las reglas VFR básicas en una página","paginas":"","minutos":11,"componentes":["clasificar","emparejar","diagrama","completar"],"enlaces":4,"detalle":"proximamente"},
+      {"id":"REG-06-01","titulo":"VFR e IFR: dos juegos de reglas y los límites del VFR","paginas":"","minutos":10,"componentes":["clasificar","simulador","situacion"],"enlaces":5,"detalle":"proximamente"},
+      {"id":"REG-06-02","titulo":"Mínimos VMC: visibilidad y distancia a las nubes","paginas":"","minutos":11,"componentes":["simulador","tarjetas","situacion","diagrama","completar"],"enlaces":5,"detalle":"proximamente"},
+      {"id":"REG-06-03","titulo":"En una zona de control: techo, visibilidad y el VFR especial","paginas":"","minutos":11,"componentes":["simulador","situacion","completar","fraseologia"],"enlaces":4,"detalle":"proximamente"},
       {"id":"REG-06-04","titulo":"VFR de noche: lo que cambia en la norma","paginas":"","minutos":10,"componentes":["ordenar","calculadora","situacion","clasificar"],"enlaces":4,"detalle":"proximamente"},
       {"id":"REG-06-05","titulo":"Alturas mínimas de seguridad: 1000 ft y 500 ft","paginas":"","minutos":11,"componentes":["simulador","situacion","calculadora","caso"],"enlaces":4,"detalle":"proximamente"},
       {"id":"REG-06-06","titulo":"Volar sobre el agua: el Río de la Plata, el mar y la distancia a la costa","paginas":"","minutos":10,"componentes":["simulador","mapa","clasificar"],"enlaces":2,"detalle":"proximamente"}
     ]},
     {"id":"REG-07","titulo":"Altímetro, niveles de crucero y espacio aéreo","paginas":"","lecciones":[
       {"id":"REG-07-01","titulo":"Ajuste del altímetro: QNH, 1013,2 hPa y la altitud de transición","paginas":"","minutos":10,"componentes":["calculadora","diagrama","situacion","enlace3d"],"enlaces":6,"detalle":"proximamente"},
-      {"id":"REG-07-02","titulo":"Niveles de crucero VFR: 3500 y 5500 ft hacia el este; 4500 y 6500 hacia el oeste","paginas":"","minutos":10,"componentes":["calculadora","clasificar","simulador","completar"],"enlaces":7,"detalle":"proximamente"},
+      {"id":"REG-07-02","titulo":"Niveles de crucero VFR: 3500 y 5500 ft hacia el este; 4500 y 6500 hacia el oeste","paginas":"","minutos":10,"componentes":["calculadora","clasificar","simulador","completar","emparejar"],"enlaces":8,"detalle":"proximamente"},
       {"id":"REG-07-03","titulo":"Las clases de espacio aéreo y lo que le exigen a un VFR","paginas":"","minutos":11,"componentes":["clasificar","simulador","diagrama","situacion"],"enlaces":7,"detalle":"proximamente"},
       {"id":"REG-07-04","titulo":"El espacio aéreo de Uruguay: lo que te toca volar","paginas":"","minutos":10,"componentes":["mapa","simulador","emparejar","situacion"],"enlaces":9,"detalle":"proximamente"},
       {"id":"REG-07-05","titulo":"Radio, autorización y transpondedor: qué se exige al VFR","paginas":"","minutos":10,"componentes":["clasificar","fraseologia","situacion"],"enlaces":7,"detalle":"proximamente"},
@@ -1059,90 +1113,108 @@
       {"id":"REG-10-01","titulo":"Interceptación: qué es, por qué ocurre y qué hacés","paginas":"","minutos":10,"componentes":["situacion","ordenar","clasificar","enlace3d"],"enlaces":10,"detalle":"proximamente"},
       {"id":"REG-10-02","titulo":"Las señales de la interceptación: serie 1 y serie 2","paginas":"","minutos":11,"componentes":["emparejar","enlace3d","fraseologia","tarjetas"],"enlaces":8,"detalle":"proximamente"},
       {"id":"REG-10-03","titulo":"Interferencia ilícita: el código 7500 y qué hacer","paginas":"","minutos":9,"componentes":["clasificar","situacion","enlace3d"],"enlaces":7,"detalle":"proximamente"},
-      {"id":"REG-10-04","titulo":"Taller: entraste a una zona prohibida","paginas":"","minutos":10,"componentes":["mapa","situacion","ordenar","caso"],"enlaces":11,"detalle":"proximamente"}
+      {"id":"REG-10-04","titulo":"Taller: entraste a una zona prohibida","paginas":"","minutos":10,"componentes":["mapa","situacion","ordenar","caso"],"enlaces":12,"detalle":"proximamente"}
     ]},
     {"id":"REG-11","titulo":"Búsqueda y salvamento, ELT, accidentes e incidentes","paginas":"","lecciones":[
       {"id":"REG-11-01","titulo":"Quién te busca: el sistema de búsqueda y salvamento de Uruguay","paginas":"","minutos":9,"componentes":["clasificar","diagrama","ordenar","tarjetas"],"enlaces":11,"detalle":"proximamente"},
       {"id":"REG-11-02","titulo":"Las fases de emergencia: INCERFA, ALERFA y DETRESFA","paginas":"","minutos":10,"componentes":["simulador","clasificar","situacion","completar"],"enlaces":7,"detalle":"proximamente"},
       {"id":"REG-11-03","titulo":"Si ves un accidente o escuchás un pedido de ayuda: qué informás","paginas":"","minutos":8,"componentes":["completar","situacion","fraseologia"],"enlaces":7,"detalle":"proximamente"},
       {"id":"REG-11-04","titulo":"El ELT: la baliza que avisa por vos","paginas":"","minutos":10,"componentes":["diagrama","emparejar","situacion","enlace3d"],"enlaces":7,"detalle":"proximamente"},
-      {"id":"REG-11-05","titulo":"Accidente, incidente grave e incidente: qué son y qué hay que notificar","paginas":"","minutos":11,"componentes":["clasificar","ordenar","caso","completar"],"enlaces":6,"detalle":"proximamente"},
+      {"id":"REG-11-05","titulo":"Accidente, incidente grave e incidente: qué son y qué hay que notificar","paginas":"","minutos":11,"componentes":["clasificar","ordenar","caso","completar"],"enlaces":7,"detalle":"proximamente"},
       {"id":"REG-11-06","titulo":"Cuasi choques y AIRPROX: reportar para aprender","paginas":"","minutos":9,"componentes":["completar","clasificar","situacion"],"enlaces":6,"detalle":"proximamente"}
     ]},
     {"id":"REG-12","titulo":"Operación en aeródromos, vuelos internacionales y otros usuarios del cielo","paginas":"","lecciones":[
       {"id":"REG-12-01","titulo":"Moverse en el aeródromo: marcas, luces y líneas de espera","paginas":"","minutos":10,"componentes":["mapa","clasificar","situacion","emparejar"],"enlaces":9,"detalle":"proximamente"},
-      {"id":"REG-12-02","titulo":"Aterrizaje forzoso y aterrizaje de precaución: lo que dice la norma","paginas":"","minutos":9,"componentes":["ordenar","situacion","enlace3d","clasificar"],"enlaces":13,"detalle":"proximamente"},
+      {"id":"REG-12-02","titulo":"Aterrizaje forzoso y aterrizaje de precaución: lo que dice la norma","paginas":"","minutos":9,"componentes":["ordenar","situacion","enlace3d","clasificar"],"enlaces":14,"detalle":"proximamente"},
       {"id":"REG-12-03","titulo":"Vuelos internacionales de un piloto privado","paginas":"","minutos":11,"componentes":["clasificar","mapa","situacion","ordenar"],"enlaces":13,"detalle":"proximamente"},
       {"id":"REG-12-04","titulo":"Otros usuarios del cielo: planeadores, paracaidistas, globos, ultralivianos y drones","paginas":"","minutos":10,"componentes":["ordenar","mapa","clasificar","situacion"],"enlaces":9,"detalle":"proximamente"},
-      {"id":"REG-12-05","titulo":"Volar por dinero: lo que un piloto privado no puede hacer","paginas":"","minutos":9,"componentes":["clasificar","emparejar","situacion"],"enlaces":6,"detalle":"proximamente"},
+      {"id":"REG-12-05","titulo":"Volar por dinero: lo que un piloto privado no puede hacer","paginas":"","minutos":9,"componentes":["clasificar","emparejar","situacion"],"enlaces":8,"detalle":"proximamente"},
       {"id":"REG-12-06","titulo":"Taller: tu primera travesía con pasajero, todo en regla","paginas":"","minutos":12,"componentes":["ordenar","calculadora","clasificar","situacion","caso"],"enlaces":24,"detalle":"proximamente"}
     ]}
   ]},
   {"id":"PER","orden":11,"titulo":"Performance y Peso y Balance","fuente":"complementario","paginas":"","color":"#8FB32A","icono":"gauge","resumen":"Cuánta pista, cuánta carga y cuánto combustible: performance y peso y balance.","examen":{"numPreguntas":60},"unidades":[
     {"id":"PER-01","titulo":"Performance: qué es y cómo se lee el manual","paginas":"","lecciones":[
-      {"id":"PER-01-01","titulo":"Qué es la performance y de qué depende","paginas":"","minutos":8,"componentes":["diapositiva","clasificar","emparejar"],"enlaces":6,"detalle":"proximamente"},
-      {"id":"PER-01-02","titulo":"Leer las tablas del POH: entrar, interpolar y ser conservador","paginas":"","minutos":10,"componentes":["diagrama","calculadora","ordenar"],"enlaces":4,"detalle":"proximamente"},
+      {"id":"PER-01-01","titulo":"Qué es la performance y de qué depende","paginas":"","minutos":8,"componentes":["diapositiva","clasificar","emparejar"],"enlaces":7,"detalle":"proximamente"},
+      {"id":"PER-01-02","titulo":"Leer las tablas del POH: entrar, interpolar y ser conservador","paginas":"","minutos":10,"componentes":["diagrama","calculadora","ordenar"],"enlaces":8,"detalle":"proximamente"},
       {"id":"PER-01-03","titulo":"Unidades y conversiones del piloto","paginas":"","minutos":9,"componentes":["calculadora","completar","caso"],"enlaces":3,"detalle":"proximamente"}
     ]},
     {"id":"PER-02","titulo":"Densidad del aire y altitud densidad","paginas":"","lecciones":[
       {"id":"PER-02-01","titulo":"La densidad del aire: de qué depende y por qué manda","paginas":"","minutos":9,"componentes":["animacion","simulador","enlace3d"],"enlaces":5,"detalle":"proximamente"},
       {"id":"PER-02-02","titulo":"Altitud de presión: la que marca el altímetro en 1013","paginas":"","minutos":10,"componentes":["calculadora","simulador","completar"],"enlaces":5,"detalle":"proximamente"},
-      {"id":"PER-02-03","titulo":"Altitud densidad: cómo se calcula","paginas":"","minutos":11,"componentes":["calculadora","simulador","completar"],"enlaces":4,"detalle":"proximamente"},
-      {"id":"PER-02-04","titulo":"Qué le hace la altitud densidad a tu C150","paginas":"","minutos":10,"componentes":["diagrama","simulador","situacion"],"enlaces":5,"detalle":"proximamente"}
+      {"id":"PER-02-03","titulo":"Altitud densidad: cómo se calcula","paginas":"","minutos":11,"componentes":["calculadora","simulador","completar"],"enlaces":5,"detalle":"proximamente"},
+      {"id":"PER-02-05","titulo":"El gráfico de altitud densidad y la presión según la altura","paginas":"","minutos":10,"componentes":["calculadora","diagrama","completar","clasificar"],"enlaces":6,"detalle":"proximamente"},
+      {"id":"PER-02-04","titulo":"Qué le hace la altitud densidad a tu C150","paginas":"","minutos":10,"componentes":["diagrama","simulador","situacion"],"enlaces":6,"detalle":"proximamente"}
     ]},
     {"id":"PER-03","titulo":"Despegue","paginas":"","lecciones":[
-      {"id":"PER-03-01","titulo":"La carrera de despegue: qué la alarga","paginas":"","minutos":10,"componentes":["animacion","simulador","enlace3d"],"enlaces":7,"detalle":"proximamente"},
-      {"id":"PER-03-02","titulo":"La tabla de despegue del POH (Fig. 5-4)","paginas":"","minutos":11,"componentes":["calculadora","diagrama","situacion"],"enlaces":4,"detalle":"proximamente"},
-      {"id":"PER-03-03","titulo":"Viento y despegue: el 10 % cada 9 nudos","paginas":"","minutos":9,"componentes":["simulador","calculadora","situacion"],"enlaces":4,"detalle":"proximamente"},
-      {"id":"PER-03-04","titulo":"Técnica, flaps y la pregunta: ¿alcanza la pista?","paginas":"","minutos":11,"componentes":["ordenar","situacion","enlace3d"],"enlaces":5,"detalle":"proximamente"}
-    ]},
-    {"id":"PER-04","titulo":"Ascenso","paginas":"","lecciones":[
-      {"id":"PER-04-01","titulo":"Vx y Vy: dos formas de subir","paginas":"","minutos":10,"componentes":["animacion","simulador","enlace3d"],"enlaces":6,"detalle":"proximamente"},
-      {"id":"PER-04-02","titulo":"La tabla de ascenso: tiempo, combustible y distancia (Fig. 5-6)","paginas":"","minutos":11,"componentes":["calculadora","diagrama","completar"],"enlaces":5,"detalle":"proximamente"},
-      {"id":"PER-04-03","titulo":"Techo, gradiente y obstáculos","paginas":"","minutos":10,"componentes":["calculadora","simulador","situacion"],"enlaces":5,"detalle":"proximamente"}
-    ]},
-    {"id":"PER-05","titulo":"Crucero y consumo","paginas":"","lecciones":[
-      {"id":"PER-05-01","titulo":"Potencia, RPM y velocidad de crucero","paginas":"","minutos":10,"componentes":["simulador","diagrama","enlace3d"],"enlaces":6,"detalle":"proximamente"},
-      {"id":"PER-05-02","titulo":"Leer la tabla de crucero (Fig. 5-7) y el consumo","paginas":"","minutos":10,"componentes":["calculadora","completar","emparejar"],"enlaces":4,"detalle":"proximamente"},
-      {"id":"PER-05-03","titulo":"Mezcla pobre: más autonomía sin pasarse","paginas":"","minutos":10,"componentes":["animacion","simulador","enlace3d"],"enlaces":5,"detalle":"proximamente"},
-      {"id":"PER-05-04","titulo":"Elegir altitud y potencia: el viento manda","paginas":"","minutos":11,"componentes":["simulador","calculadora","situacion"],"enlaces":5,"detalle":"proximamente"}
-    ]},
-    {"id":"PER-06","titulo":"Combustible, autonomía y reservas","paginas":"","lecciones":[
-      {"id":"PER-06-01","titulo":"El combustible del C150: cuánto hay, cuánto sirve y cuánto pesa","paginas":"","minutos":10,"componentes":["diagrama","simulador","calculadora"],"enlaces":4,"detalle":"proximamente"},
-      {"id":"PER-06-02","titulo":"Autonomía y alcance","paginas":"","minutos":10,"componentes":["calculadora","diagrama","simulador"],"enlaces":4,"detalle":"proximamente"},
-      {"id":"PER-06-03","titulo":"Reservas: lo legal y lo sensato","paginas":"","minutos":9,"componentes":["calculadora","clasificar","situacion"],"enlaces":5,"detalle":"proximamente"},
-      {"id":"PER-06-04","titulo":"Plan de combustible completo: el ejemplo del POH","paginas":"","minutos":12,"componentes":["ordenar","calculadora","caso"],"enlaces":5,"detalle":"proximamente"}
-    ]},
-    {"id":"PER-07","titulo":"Aterrizaje","paginas":"","lecciones":[
-      {"id":"PER-07-01","titulo":"La distancia de aterrizaje: qué la alarga","paginas":"","minutos":10,"componentes":["simulador","animacion","enlace3d"],"enlaces":5,"detalle":"proximamente"},
-      {"id":"PER-07-02","titulo":"La tabla de aterrizaje del POH (Fig. 5-10)","paginas":"","minutos":10,"componentes":["calculadora","diagrama","completar"],"enlaces":4,"detalle":"proximamente"},
-      {"id":"PER-07-03","titulo":"Aterrizar con margen: ¿alcanza y qué hago si no?","paginas":"","minutos":10,"componentes":["situacion","ordenar","diagrama"],"enlaces":5,"detalle":"proximamente"}
+      {"id":"PER-03-01","titulo":"La carrera de despegue: qué la alarga","paginas":"","minutos":10,"componentes":["animacion","simulador","enlace3d"],"enlaces":10,"detalle":"proximamente"},
+      {"id":"PER-03-02","titulo":"La tabla de despegue del POH (Fig. 5-4)","paginas":"","minutos":11,"componentes":["calculadora","diagrama","situacion"],"enlaces":7,"detalle":"proximamente"},
+      {"id":"PER-03-05","titulo":"La tabla de despegue de la clase: un C172 a 2450 lb, en °C","paginas":"","minutos":10,"componentes":["calculadora","diagrama","completar","situacion"],"enlaces":6,"detalle":"proximamente"},
+      {"id":"PER-03-06","titulo":"La tabla antigua del C150 con viento de frente: 1600 lb, en °F","paginas":"","minutos":9,"componentes":["calculadora","diagrama","completar","situacion"],"enlaces":5,"detalle":"proximamente"},
+      {"id":"PER-03-03","titulo":"Viento y despegue: el 10 % cada 9 nudos","paginas":"","minutos":9,"componentes":["simulador","calculadora","situacion"],"enlaces":6,"detalle":"proximamente"},
+      {"id":"PER-03-04","titulo":"Técnica, flaps y la pregunta: ¿alcanza la pista?","paginas":"","minutos":11,"componentes":["ordenar","situacion","enlace3d"],"enlaces":7,"detalle":"proximamente"}
     ]},
     {"id":"PER-08","titulo":"La pista: pasto, pendiente y superficie","paginas":"","lecciones":[
       {"id":"PER-08-01","titulo":"Pasto, tierra y pistas blandas","paginas":"","minutos":10,"componentes":["simulador","completar","situacion"],"enlaces":5,"detalle":"proximamente"},
       {"id":"PER-08-02","titulo":"Pendiente de la pista","paginas":"","minutos":9,"componentes":["diagrama","simulador","situacion"],"enlaces":4,"detalle":"proximamente"},
       {"id":"PER-08-03","titulo":"Pista mojada, contaminada y frenado","paginas":"","minutos":9,"componentes":["simulador","animacion","clasificar"],"enlaces":5,"detalle":"proximamente"}
     ]},
+    {"id":"PER-04","titulo":"Ascenso","paginas":"","lecciones":[
+      {"id":"PER-04-01","titulo":"Vx y Vy: dos formas de subir","paginas":"","minutos":10,"componentes":["animacion","simulador","enlace3d"],"enlaces":9,"detalle":"proximamente"},
+      {"id":"PER-04-02","titulo":"La tabla de ascenso: tiempo, combustible y distancia (Fig. 5-6)","paginas":"","minutos":11,"componentes":["calculadora","diagrama","completar"],"enlaces":7,"detalle":"proximamente"},
+      {"id":"PER-04-04","titulo":"Las tablas de ascenso de la clase: régimen y tiempo, combustible y distancia","paginas":"","minutos":11,"componentes":["calculadora","diagrama","completar","clasificar"],"enlaces":6,"detalle":"proximamente"},
+      {"id":"PER-04-03","titulo":"Techo, gradiente y obstáculos","paginas":"","minutos":10,"componentes":["calculadora","simulador","situacion"],"enlaces":5,"detalle":"proximamente"}
+    ]},
+    {"id":"PER-05","titulo":"Crucero y consumo","paginas":"","lecciones":[
+      {"id":"PER-05-01","titulo":"Potencia, RPM y velocidad de crucero","paginas":"","minutos":10,"componentes":["simulador","diagrama","enlace3d"],"enlaces":7,"detalle":"proximamente"},
+      {"id":"PER-05-02","titulo":"Leer la tabla de crucero (Fig. 5-7) y el consumo","paginas":"","minutos":10,"componentes":["calculadora","completar","emparejar"],"enlaces":6,"detalle":"proximamente"},
+      {"id":"PER-05-05","titulo":"La tabla de crucero y alcance de la clase: mezcla rica y pobre","paginas":"","minutos":11,"componentes":["calculadora","clasificar","completar","situacion"],"enlaces":6,"detalle":"proximamente"},
+      {"id":"PER-05-03","titulo":"Mezcla pobre: más autonomía sin pasarse","paginas":"","minutos":10,"componentes":["animacion","simulador","enlace3d"],"enlaces":6,"detalle":"proximamente"},
+      {"id":"PER-05-04","titulo":"Elegir altitud y potencia: el viento manda","paginas":"","minutos":11,"componentes":["simulador","calculadora","situacion"],"enlaces":5,"detalle":"proximamente"},
+      {"id":"PER-05-06","titulo":"El descenso: potencia reducida, mezcla y calefacción del carburador","paginas":"","minutos":8,"componentes":["ordenar","situacion","clasificar"],"enlaces":6,"detalle":"proximamente"}
+    ]},
+    {"id":"PER-06","titulo":"Combustible, autonomía y reservas","paginas":"","lecciones":[
+      {"id":"PER-06-01","titulo":"El combustible del C150: cuánto hay, cuánto sirve y cuánto pesa","paginas":"","minutos":10,"componentes":["diagrama","simulador","calculadora"],"enlaces":4,"detalle":"proximamente"},
+      {"id":"PER-06-02","titulo":"Autonomía y alcance","paginas":"","minutos":10,"componentes":["calculadora","diagrama","simulador"],"enlaces":5,"detalle":"proximamente"},
+      {"id":"PER-06-03","titulo":"Reservas: lo legal y lo sensato","paginas":"","minutos":9,"componentes":["calculadora","clasificar","situacion"],"enlaces":5,"detalle":"proximamente"},
+      {"id":"PER-06-04","titulo":"Plan de combustible completo: el ejemplo del POH","paginas":"","minutos":12,"componentes":["ordenar","calculadora","caso"],"enlaces":5,"detalle":"proximamente"}
+    ]},
+    {"id":"PER-07","titulo":"Aterrizaje","paginas":"","lecciones":[
+      {"id":"PER-07-01","titulo":"La distancia de aterrizaje: qué la alarga","paginas":"","minutos":10,"componentes":["simulador","animacion","enlace3d"],"enlaces":6,"detalle":"proximamente"},
+      {"id":"PER-07-04","titulo":"La aproximación estabilizada: la IAS manda","paginas":"","minutos":9,"componentes":["calculadora","clasificar","situacion","ordenar"],"enlaces":6,"detalle":"proximamente"},
+      {"id":"PER-07-02","titulo":"La tabla de aterrizaje del POH (Fig. 5-10)","paginas":"","minutos":10,"componentes":["calculadora","diagrama","completar"],"enlaces":5,"detalle":"proximamente"},
+      {"id":"PER-07-03","titulo":"Aterrizar con margen: ¿alcanza y qué hago si no?","paginas":"","minutos":10,"componentes":["situacion","ordenar","diagrama"],"enlaces":7,"detalle":"proximamente"}
+    ]},
     {"id":"PER-09","titulo":"Viento y viento cruzado","paginas":"","lecciones":[
-      {"id":"PER-09-01","titulo":"Componentes del viento sobre la pista","paginas":"","minutos":10,"componentes":["calculadora","diagrama","completar"],"enlaces":6,"detalle":"proximamente"},
-      {"id":"PER-09-02","titulo":"El viento cruzado y el C150: demostrado, límite y criterio","paginas":"","minutos":11,"componentes":["simulador","enlace3d","situacion"],"enlaces":7,"detalle":"proximamente"},
+      {"id":"PER-09-01","titulo":"Componentes del viento sobre la pista","paginas":"","minutos":10,"componentes":["calculadora","diagrama","completar"],"enlaces":7,"detalle":"proximamente"},
+      {"id":"PER-09-05","titulo":"El gráfico de viento cruzado de la clase","paginas":"","minutos":9,"componentes":["calculadora","diagrama","completar","clasificar"],"enlaces":6,"detalle":"proximamente"},
+      {"id":"PER-09-02","titulo":"El viento cruzado y el C150: demostrado, límite y criterio","paginas":"","minutos":11,"componentes":["simulador","enlace3d","situacion"],"enlaces":8,"detalle":"proximamente"},
       {"id":"PER-09-03","titulo":"Ráfagas y velocidad de aproximación","paginas":"","minutos":9,"componentes":["calculadora","simulador","clasificar"],"enlaces":5,"detalle":"proximamente"},
       {"id":"PER-09-04","titulo":"Elegí la pista: viento, ráfagas y decisión de salir","paginas":"","minutos":10,"componentes":["mapa","situacion","situacion"],"enlaces":5,"detalle":"proximamente"}
     ]},
+    {"id":"PER-14","titulo":"Práctica: la hoja de ejercicios de performance","paginas":"","lecciones":[
+      {"id":"PER-14-01","titulo":"Práctica 1: seis despegues de la hoja de ejercicios","paginas":"","minutos":12,"componentes":["caso","calculadora","completar","situacion"],"enlaces":5,"detalle":"proximamente"},
+      {"id":"PER-14-02","titulo":"Práctica 2: cinco ascensos de la hoja de ejercicios","paginas":"","minutos":11,"componentes":["caso","calculadora","completar","clasificar"],"enlaces":5,"detalle":"proximamente"},
+      {"id":"PER-14-03","titulo":"Práctica 3: seis puntos de crucero de la hoja de ejercicios","paginas":"","minutos":12,"componentes":["caso","calculadora","completar","situacion"],"enlaces":5,"detalle":"proximamente"},
+      {"id":"PER-14-04","titulo":"Práctica 4: seis aterrizajes con la tabla del C150M","paginas":"","minutos":11,"componentes":["caso","calculadora","completar","situacion"],"enlaces":5,"detalle":"proximamente"}
+    ]},
     {"id":"PER-10","titulo":"Peso y balance: los conceptos","paginas":"","lecciones":[
       {"id":"PER-10-01","titulo":"Por qué importa el peso","paginas":"","minutos":10,"componentes":["simulador","diagrama","tarjetas"],"enlaces":6,"detalle":"proximamente"},
-      {"id":"PER-10-02","titulo":"Centro de gravedad, brazo y momento","paginas":"","minutos":11,"componentes":["simulador","completar","animacion"],"enlaces":4,"detalle":"proximamente"},
+      {"id":"PER-10-02","titulo":"Centro de gravedad, brazo y momento","paginas":"","minutos":11,"componentes":["simulador","completar","animacion"],"enlaces":5,"detalle":"proximamente"},
+      {"id":"PER-10-05","titulo":"El vocabulario de los pesos y las categorías de certificación","paginas":"","minutos":9,"componentes":["emparejar","calculadora","clasificar","situacion"],"enlaces":6,"detalle":"proximamente"},
       {"id":"PER-10-03","titulo":"Qué le hace el CG al vuelo","paginas":"","minutos":10,"componentes":["diagrama","simulador","enlace3d"],"enlaces":6,"detalle":"proximamente"},
       {"id":"PER-10-04","titulo":"Los datos del C150M: datum, brazos y límites","paginas":"","minutos":10,"componentes":["diagrama","emparejar","tarjetas"],"enlaces":4,"detalle":"proximamente"}
     ]},
     {"id":"PER-11","titulo":"Peso y balance: el cálculo","paginas":"","lecciones":[
-      {"id":"PER-11-01","titulo":"El cálculo paso a paso: el ejemplo del POH","paginas":"","minutos":11,"componentes":["calculadora","ordenar","completar"],"enlaces":4,"detalle":"proximamente"},
-      {"id":"PER-11-02","titulo":"La envolvente del CG","paginas":"","minutos":11,"componentes":["diagrama","clasificar","simulador"],"enlaces":3,"detalle":"proximamente"},
-      {"id":"PER-11-03","titulo":"Dos personas, equipaje y combustible: el caso de todos los días","paginas":"","minutos":12,"componentes":["calculadora","situacion","ordenar"],"enlaces":4,"detalle":"proximamente"}
+      {"id":"PER-11-04","titulo":"Pesar el avión y calcular su CG vacío","paginas":"","minutos":11,"componentes":["calculadora","ordenar","completar","clasificar"],"enlaces":6,"detalle":"proximamente"},
+      {"id":"PER-11-01","titulo":"El cálculo paso a paso: el ejemplo del POH","paginas":"","minutos":11,"componentes":["calculadora","ordenar","completar"],"enlaces":5,"detalle":"proximamente"},
+      {"id":"PER-11-02","titulo":"La envolvente del CG","paginas":"","minutos":11,"componentes":["diagrama","clasificar","simulador"],"enlaces":4,"detalle":"proximamente"},
+      {"id":"PER-11-05","titulo":"La planilla de carga y la envolvente: un ejemplo de cuatro plazas","paginas":"","minutos":12,"componentes":["calculadora","diagrama","clasificar","situacion"],"enlaces":6,"detalle":"proximamente"},
+      {"id":"PER-11-03","titulo":"Dos personas, equipaje y combustible: el caso de todos los días","paginas":"","minutos":12,"componentes":["calculadora","situacion","ordenar"],"enlaces":5,"detalle":"proximamente"}
     ]},
     {"id":"PER-12","titulo":"La carga en la práctica","paginas":"","lecciones":[
-      {"id":"PER-12-01","titulo":"¿Cuánto combustible puedo cargar?","paginas":"","minutos":9,"componentes":["calculadora","simulador","situacion"],"enlaces":4,"detalle":"proximamente"},
-      {"id":"PER-12-02","titulo":"El peso del avión de la escuela: planilla, pesaje y datos propios","paginas":"","minutos":10,"componentes":["diagrama","clasificar","tarjetas"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"PER-12-01","titulo":"¿Cuánto combustible puedo cargar?","paginas":"","minutos":9,"componentes":["calculadora","simulador","situacion"],"enlaces":5,"detalle":"proximamente"},
+      {"id":"PER-12-02","titulo":"El peso del avión de la escuela: planilla, pesaje y datos propios","paginas":"","minutos":10,"componentes":["diagrama","clasificar","tarjetas"],"enlaces":5,"detalle":"proximamente"},
+      {"id":"PER-12-04","titulo":"La lista de equipos: qué trae el manual y cómo cambia el peso vacío","paginas":"","minutos":8,"componentes":["emparejar","diagrama","calculadora","clasificar"],"enlaces":5,"detalle":"proximamente"},
       {"id":"PER-12-03","titulo":"Cargar y asegurar: equipaje, pasajeros y seguridad","paginas":"","minutos":9,"componentes":["clasificar","situacion","enlace3d"],"enlaces":5,"detalle":"proximamente"}
     ]},
     {"id":"PER-13","titulo":"Talleres de planificación","paginas":"","lecciones":[
@@ -1151,77 +1223,241 @@
       {"id":"PER-13-03","titulo":"Taller 3: tu hoja de performance y el repaso final","paginas":"","minutos":15,"componentes":["tarjetas","calculadora","quiz"],"enlaces":9,"detalle":"proximamente"}
     ]}
   ]},
-  {"id":"FHU","orden":12,"titulo":"Factores Humanos","fuente":"complementario","paginas":"","color":"#C2557A","icono":"eye","resumen":"El piloto como parte del sistema: salud, atención, fatiga y decisiones.","examen":{"numPreguntas":40},"unidades":[
-    {"id":"FHU-01","titulo":"Qué son los factores humanos","paginas":"","lecciones":[
-      {"id":"FHU-01-01","titulo":"Por qué importan los factores humanos","paginas":"","minutos":8,"componentes":["diapositiva","clasificar","tarjetas"],"enlaces":3,"detalle":"proximamente"},
-      {"id":"FHU-01-02","titulo":"Los modelos: SHELL y el queso suizo","paginas":"","minutos":10,"componentes":["diagrama","animacion","emparejar"],"enlaces":4,"detalle":"proximamente"}
-    ]},
+  {"id":"FHU","orden":12,"titulo":"Factores Humanos","fuente":"complementario","paginas":"","color":"#C2557A","icono":"eye","resumen":"El piloto como parte del sistema: salud, atención, fatiga y decisiones.","examen":{"numPreguntas":80},"unidades":[
     {"id":"FHU-02","titulo":"El cuerpo y la atmósfera","paginas":"","lecciones":[
-      {"id":"FHU-02-01","titulo":"La atmósfera: presión, oxígeno y altura","paginas":"","minutos":9,"componentes":["simulador","clasificar","completar"],"enlaces":3,"detalle":"proximamente"},
-      {"id":"FHU-02-02","titulo":"Respirar y llevar el oxígeno a las células","paginas":"","minutos":9,"componentes":["animacion","diagrama","completar"],"enlaces":3,"detalle":"proximamente"}
+      {"id":"FHU-02-03","titulo":"Metabolismo: el motor del cuerpo y su combustible","paginas":"","minutos":8,"componentes":["diagrama","clasificar","emparejar"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"FHU-02-01","titulo":"La atmósfera: presión, oxígeno y altura","paginas":"","minutos":9,"componentes":["simulador","clasificar","completar","diagrama"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"FHU-02-04","titulo":"Cuatro leyes de los gases que explican todo","paginas":"","minutos":10,"componentes":["simulador","emparejar","completar"],"enlaces":4,"detalle":"proximamente"},
+      {"id":"FHU-02-02","titulo":"Respirar y llevar el oxígeno a las células","paginas":"","minutos":9,"componentes":["animacion","diagrama","completar","ordenar"],"enlaces":3,"detalle":"proximamente"}
     ]},
     {"id":"FHU-03","titulo":"Hipoxia e hiperventilación","paginas":"","lecciones":[
-      {"id":"FHU-03-01","titulo":"Hipoxia: qué es y los cuatro tipos","paginas":"","minutos":9,"componentes":["clasificar","diagrama","tarjetas"],"enlaces":3,"detalle":"proximamente"},
-      {"id":"FHU-03-02","titulo":"Síntomas, altitud y tiempo útil de conciencia","paginas":"","minutos":10,"componentes":["simulador","diagrama","ordenar"],"enlaces":3,"detalle":"proximamente"},
-      {"id":"FHU-03-03","titulo":"Hipoxia: prevención y qué hacer","paginas":"","minutos":9,"componentes":["calculadora","situacion","ordenar"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"FHU-03-01","titulo":"Hipoxia: qué es y los tipos (cuatro clásicos, cinco en la clase)","paginas":"","minutos":9,"componentes":["clasificar","diagrama","tarjetas","clasificar"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"FHU-03-02","titulo":"Síntomas, altitud y tiempo útil de conciencia","paginas":"","minutos":10,"componentes":["simulador","diagrama","ordenar"],"enlaces":4,"detalle":"proximamente"},
+      {"id":"FHU-03-03","titulo":"Hipoxia: prevención y qué hacer","paginas":"","minutos":9,"componentes":["calculadora","situacion","ordenar"],"enlaces":5,"detalle":"proximamente"},
+      {"id":"FHU-03-05","titulo":"Hipoxia en el tablero: etapas, tiempo útil y factores","paginas":"","minutos":10,"componentes":["simulador","clasificar","emparejar","situacion"],"enlaces":4,"detalle":"proximamente"},
       {"id":"FHU-03-04","titulo":"Hiperventilación y cómo distinguirla de la hipoxia","paginas":"","minutos":9,"componentes":["simulador","clasificar","situacion"],"enlaces":3,"detalle":"proximamente"}
+    ]},
+    {"id":"FHU-15","titulo":"Oxígeno a bordo y presurización de cabina","paginas":"","lecciones":[
+      {"id":"FHU-15-01","titulo":"Sistemas de oxígeno: gas, líquido, sólido y generadores","paginas":"","minutos":10,"componentes":["clasificar","emparejar","tarjetas"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"FHU-15-02","titulo":"Reguladores, máscaras y el chequeo PRICE","paginas":"","minutos":10,"componentes":["diagrama","emparejar","clasificar"],"enlaces":4,"detalle":"proximamente"},
+      {"id":"FHU-15-03","titulo":"Cuándo hay que usar oxígeno: el LAR 91 y la FAA","paginas":"","minutos":10,"componentes":["calculadora","clasificar","situacion"],"enlaces":4,"detalle":"proximamente"},
+      {"id":"FHU-15-04","titulo":"Presurización de cabina","paginas":"","minutos":8,"componentes":["animacion","clasificar","tarjetas"],"enlaces":3,"detalle":"proximamente"}
     ]},
     {"id":"FHU-04","titulo":"Monóxido de carbono","paginas":"","lecciones":[
       {"id":"FHU-04-01","titulo":"Monóxido de carbono: de dónde sale en el C150","paginas":"","minutos":9,"componentes":["diagrama","animacion","clasificar"],"enlaces":4,"detalle":"proximamente"},
       {"id":"FHU-04-02","titulo":"Síntomas y cómo detectarlo","paginas":"","minutos":8,"componentes":["ordenar","situacion","tarjetas"],"enlaces":3,"detalle":"proximamente"},
-      {"id":"FHU-04-03","titulo":"Qué hacer en el aire y cómo prevenirlo en tierra","paginas":"","minutos":9,"componentes":["ordenar","fraseologia","situacion"],"enlaces":4,"detalle":"proximamente"}
+      {"id":"FHU-04-03","titulo":"Qué hacer en el aire y cómo prevenirlo en tierra","paginas":"","minutos":9,"componentes":["ordenar","fraseologia","situacion"],"enlaces":5,"detalle":"proximamente"}
     ]},
-    {"id":"FHU-05","titulo":"Oído, senos y presión","paginas":"","lecciones":[
-      {"id":"FHU-05-01","titulo":"El oído: presión y bloqueo","paginas":"","minutos":9,"componentes":["animacion","simulador","ordenar"],"enlaces":4,"detalle":"proximamente"},
-      {"id":"FHU-05-02","titulo":"Senos, dientes, gases, buceo y ruido","paginas":"","minutos":9,"componentes":["emparejar","calculadora","situacion"],"enlaces":4,"detalle":"proximamente"}
-    ]},
-    {"id":"FHU-06","titulo":"Desorientación espacial e ilusiones","paginas":"","lecciones":[
-      {"id":"FHU-06-01","titulo":"Los tres sentidos del equilibrio","paginas":"","minutos":9,"componentes":["diagrama","animacion","clasificar"],"enlaces":4,"detalle":"proximamente"},
-      {"id":"FHU-06-02","titulo":"Ilusiones del oído interno","paginas":"","minutos":10,"componentes":["simulador","animacion","emparejar","enlace3d"],"enlaces":5,"detalle":"proximamente"},
-      {"id":"FHU-06-03","titulo":"Ilusiones visuales","paginas":"","minutos":10,"componentes":["simulador","clasificar","situacion"],"enlaces":4,"detalle":"proximamente"},
-      {"id":"FHU-06-04","titulo":"Evitar y recuperar: instrumentos y VFR hacia IMC","paginas":"","minutos":10,"componentes":["situacion","ordenar","enlace3d"],"enlaces":7,"detalle":"proximamente"},
-      {"id":"FHU-06-05","titulo":"Mareo de vuelo (cinetosis)","paginas":"","minutos":8,"componentes":["clasificar","situacion","tarjetas"],"enlaces":5,"detalle":"proximamente"}
+    {"id":"FHU-05","titulo":"Disbarismos, oído y ruido","paginas":"","lecciones":[
+      {"id":"FHU-05-03","titulo":"Enfermedad descompresiva: burbujas de nitrógeno","paginas":"","minutos":10,"componentes":["clasificar","emparejar","situacion"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"FHU-05-04","titulo":"Gases atrapados: estómago y dientes","paginas":"","minutos":8,"componentes":["clasificar","completar","tarjetas"],"enlaces":4,"detalle":"proximamente"},
+      {"id":"FHU-05-01","titulo":"El oído: presión y bloqueo","paginas":"","minutos":9,"componentes":["animacion","simulador","ordenar"],"enlaces":5,"detalle":"proximamente"},
+      {"id":"FHU-05-02","titulo":"Senos, dientes, gases, buceo y ruido","paginas":"","minutos":9,"componentes":["emparejar","calculadora","situacion"],"enlaces":6,"detalle":"proximamente"},
+      {"id":"FHU-05-05","titulo":"Ruido y audición en la cabina","paginas":"","minutos":10,"componentes":["calculadora","emparejar","clasificar"],"enlaces":4,"detalle":"proximamente"}
     ]},
     {"id":"FHU-07","titulo":"Visión y escaneo","paginas":"","lecciones":[
       {"id":"FHU-07-01","titulo":"El ojo: conos, bastones y límites","paginas":"","minutos":9,"componentes":["diagrama","simulador","animacion"],"enlaces":4,"detalle":"proximamente"},
       {"id":"FHU-07-02","titulo":"Ver y evitar: el escaneo del tránsito","paginas":"","minutos":10,"componentes":["simulador","animacion","situacion"],"enlaces":5,"detalle":"proximamente"},
-      {"id":"FHU-07-03","titulo":"Visión nocturna y deslumbramiento","paginas":"","minutos":9,"componentes":["clasificar","tarjetas","caso"],"enlaces":5,"detalle":"proximamente"}
+      {"id":"FHU-07-03","titulo":"Visión nocturna y deslumbramiento","paginas":"","minutos":9,"componentes":["clasificar","tarjetas","caso"],"enlaces":7,"detalle":"proximamente"},
+      {"id":"FHU-07-04","titulo":"Gafas de sol del piloto: radiación, lentes y tintes","paginas":"","minutos":9,"componentes":["clasificar","emparejar","situacion"],"enlaces":4,"detalle":"proximamente"}
+    ]},
+    {"id":"FHU-06","titulo":"Desorientación espacial, ilusiones y mareo de vuelo","paginas":"","lecciones":[
+      {"id":"FHU-06-01","titulo":"Los tres sentidos del equilibrio","paginas":"","minutos":9,"componentes":["diagrama","animacion","clasificar"],"enlaces":5,"detalle":"proximamente"},
+      {"id":"FHU-06-06","titulo":"Desorientación espacial: tres tipos y cuatro causas","paginas":"","minutos":10,"componentes":["clasificar","emparejar","situacion"],"enlaces":4,"detalle":"proximamente"},
+      {"id":"FHU-06-02","titulo":"Ilusiones del oído interno","paginas":"","minutos":10,"componentes":["simulador","animacion","emparejar","enlace3d"],"enlaces":5,"detalle":"proximamente"},
+      {"id":"FHU-06-03","titulo":"Ilusiones visuales","paginas":"","minutos":10,"componentes":["simulador","clasificar","situacion"],"enlaces":5,"detalle":"proximamente"},
+      {"id":"FHU-06-07","titulo":"De noche y sin referencias: agujero negro, autocinesis y vección","paginas":"","minutos":10,"componentes":["animacion","emparejar","situacion"],"enlaces":4,"detalle":"proximamente"},
+      {"id":"FHU-06-04","titulo":"Evitar y recuperar: instrumentos y VFR hacia IMC","paginas":"","minutos":10,"componentes":["situacion","ordenar","enlace3d"],"enlaces":9,"detalle":"proximamente"},
+      {"id":"FHU-06-05","titulo":"Mareo de vuelo (cinetosis)","paginas":"","minutos":8,"componentes":["clasificar","situacion","tarjetas"],"enlaces":5,"detalle":"proximamente"}
     ]},
     {"id":"FHU-08","titulo":"Salud y aptitud para volar","paginas":"","lecciones":[
-      {"id":"FHU-08-01","titulo":"IMSAFE: ¿estoy en condiciones de volar?","paginas":"","minutos":9,"componentes":["calculadora","emparejar","situacion"],"enlaces":4,"detalle":"proximamente"},
-      {"id":"FHU-08-02","titulo":"Alcohol, drogas y medicamentos","paginas":"","minutos":10,"componentes":["clasificar","simulador","caso"],"enlaces":4,"detalle":"proximamente"},
-      {"id":"FHU-08-03","titulo":"Fatiga y sueño","paginas":"","minutos":10,"componentes":["simulador","clasificar","situacion"],"enlaces":3,"detalle":"proximamente"},
-      {"id":"FHU-08-04","titulo":"Alimentación, hidratación y calor","paginas":"","minutos":8,"componentes":["clasificar","situacion","tarjetas"],"enlaces":5,"detalle":"proximamente"}
+      {"id":"FHU-08-01","titulo":"IMSAFE: ¿estoy en condiciones de volar?","paginas":"","minutos":9,"componentes":["calculadora","emparejar","situacion","clasificar"],"enlaces":4,"detalle":"proximamente"},
+      {"id":"FHU-08-02","titulo":"Alcohol, drogas y medicamentos","paginas":"","minutos":10,"componentes":["clasificar","simulador","caso"],"enlaces":5,"detalle":"proximamente"},
+      {"id":"FHU-08-07","titulo":"Medicamentos de venta libre: la regla de las cinco dosis","paginas":"","minutos":10,"componentes":["calculadora","clasificar","emparejar"],"enlaces":4,"detalle":"proximamente"},
+      {"id":"FHU-08-03","titulo":"Fatiga y sueño","paginas":"","minutos":10,"componentes":["simulador","clasificar","situacion","clasificar"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"FHU-08-05","titulo":"Apnea del sueño: dormir sin descansar","paginas":"","minutos":9,"componentes":["clasificar","emparejar","situacion"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"FHU-08-04","titulo":"Alimentación, hidratación y calor","paginas":"","minutos":8,"componentes":["clasificar","situacion","tarjetas"],"enlaces":5,"detalle":"proximamente"},
+      {"id":"FHU-08-06","titulo":"Acondicionamiento físico para el vuelo","paginas":"","minutos":8,"componentes":["ordenar","clasificar","tarjetas"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"FHU-08-09","titulo":"Cirugía láser del ojo y volar","paginas":"","minutos":9,"componentes":["clasificar","emparejar","situacion"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"FHU-08-08","titulo":"Certificación médica: cómo es el trámite","paginas":"","minutos":9,"componentes":["ordenar","clasificar","situacion"],"enlaces":3,"detalle":"proximamente"}
     ]},
-    {"id":"FHU-09","titulo":"Estrés y emociones","paginas":"","lecciones":[
-      {"id":"FHU-09-01","titulo":"El estrés y el rendimiento","paginas":"","minutos":9,"componentes":["simulador","animacion","clasificar"],"enlaces":3,"detalle":"proximamente"},
-      {"id":"FHU-09-02","titulo":"Manejar las presiones y las emociones","paginas":"","minutos":10,"componentes":["emparejar","animacion","situacion"],"enlaces":4,"detalle":"proximamente"}
+    {"id":"FHU-01","titulo":"Qué son los factores humanos y el CRM","paginas":"","lecciones":[
+      {"id":"FHU-01-01","titulo":"Por qué importan los factores humanos","paginas":"","minutos":8,"componentes":["diapositiva","clasificar","tarjetas"],"enlaces":5,"detalle":"proximamente"},
+      {"id":"FHU-01-03","titulo":"Qué es el CRM y qué busca","paginas":"","minutos":9,"componentes":["diagrama","completar","clasificar"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"FHU-01-02","titulo":"Los modelos: SHELL y el queso suizo","paginas":"","minutos":10,"componentes":["diagrama","animacion","emparejar"],"enlaces":5,"detalle":"proximamente"}
     ]},
-    {"id":"FHU-10","titulo":"Toma de decisiones aeronáuticas (ADM)","paginas":"","lecciones":[
-      {"id":"FHU-10-01","titulo":"Qué es el ADM: del juicio al proceso (3P)","paginas":"","minutos":9,"componentes":["diapositiva","clasificar","situacion"],"enlaces":4,"detalle":"proximamente"},
-      {"id":"FHU-10-02","titulo":"El modelo DECIDE","paginas":"","minutos":10,"componentes":["ordenar","situacion","completar"],"enlaces":4,"detalle":"proximamente"},
-      {"id":"FHU-10-03","titulo":"Las cinco actitudes peligrosas","paginas":"","minutos":10,"componentes":["emparejar","completar","caso"],"enlaces":3,"detalle":"proximamente"},
-      {"id":"FHU-10-04","titulo":"Riesgos: PAVE y mínimos personales","paginas":"","minutos":10,"componentes":["calculadora","diagrama","situacion"],"enlaces":4,"detalle":"proximamente"},
-      {"id":"FHU-10-05","titulo":"Sesgos y trampas del juicio","paginas":"","minutos":10,"componentes":["clasificar","situacion","tarjetas"],"enlaces":3,"detalle":"proximamente"}
+    {"id":"FHU-12","titulo":"Error humano, amenazas y errores","paginas":"","lecciones":[
+      {"id":"FHU-12-04","titulo":"Los cuatro errores de la clase","paginas":"","minutos":10,"componentes":["clasificar","emparejar","caso"],"enlaces":4,"detalle":"proximamente"},
+      {"id":"FHU-12-02","titulo":"Errores y violaciones","paginas":"","minutos":9,"componentes":["clasificar","caso","calculadora"],"enlaces":5,"detalle":"proximamente"},
+      {"id":"FHU-12-01","titulo":"Amenazas, errores y estados no deseados (TEM)","paginas":"","minutos":10,"componentes":["diagrama","clasificar","situacion"],"enlaces":4,"detalle":"proximamente"},
+      {"id":"FHU-12-03","titulo":"Listas de verificación y cabina estéril","paginas":"","minutos":10,"componentes":["ordenar","enlace3d","situacion"],"enlaces":8,"detalle":"proximamente"}
+    ]},
+    {"id":"FHU-16","titulo":"Comunicación efectiva","paginas":"","lecciones":[
+      {"id":"FHU-16-01","titulo":"El proceso de comunicar: emisor, mensaje, canal, receptor y feedback","paginas":"","minutos":9,"componentes":["diagrama","emparejar","clasificar"],"enlaces":4,"detalle":"proximamente"},
+      {"id":"FHU-16-02","titulo":"Cuando la comunicación falla: las cifras del ASRS","paginas":"","minutos":9,"componentes":["ordenar","clasificar","situacion"],"enlaces":4,"detalle":"proximamente"},
+      {"id":"FHU-16-03","titulo":"Escuchar, colacionar y la regla de la doble redundancia","paginas":"","minutos":10,"componentes":["situacion","clasificar","emparejar"],"enlaces":4,"detalle":"proximamente"}
     ]},
     {"id":"FHU-11","titulo":"Conciencia situacional","paginas":"","lecciones":[
-      {"id":"FHU-11-01","titulo":"Percibir, comprender y proyectar","paginas":"","minutos":9,"componentes":["diapositiva","clasificar","situacion"],"enlaces":5,"detalle":"proximamente"},
+      {"id":"FHU-11-01","titulo":"Percibir, comprender y proyectar","paginas":"","minutos":9,"componentes":["diapositiva","clasificar","situacion"],"enlaces":7,"detalle":"proximamente"},
+      {"id":"FHU-11-04","titulo":"La percepción nos engaña: expectativas, necesidades y estilo","paginas":"","minutos":9,"componentes":["clasificar","situacion","emparejar"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"FHU-11-05","titulo":"Qué ayuda y qué hace perder la conciencia situacional","paginas":"","minutos":10,"componentes":["clasificar","ordenar","emparejar"],"enlaces":4,"detalle":"proximamente"},
       {"id":"FHU-11-02","titulo":"Perderla: señales y fijación","paginas":"","minutos":10,"componentes":["caso","ordenar","clasificar"],"enlaces":4,"detalle":"proximamente"},
       {"id":"FHU-11-03","titulo":"Carga de trabajo y prioridades","paginas":"","minutos":10,"componentes":["simulador","ordenar","situacion"],"enlaces":3,"detalle":"proximamente"}
     ]},
-    {"id":"FHU-12","titulo":"Gestión de amenazas y errores","paginas":"","lecciones":[
-      {"id":"FHU-12-01","titulo":"Amenazas, errores y estados no deseados (TEM)","paginas":"","minutos":10,"componentes":["diagrama","clasificar","situacion"],"enlaces":4,"detalle":"proximamente"},
-      {"id":"FHU-12-02","titulo":"Errores y violaciones","paginas":"","minutos":9,"componentes":["clasificar","caso","calculadora"],"enlaces":4,"detalle":"proximamente"},
-      {"id":"FHU-12-03","titulo":"Listas de verificación y cabina estéril","paginas":"","minutos":10,"componentes":["ordenar","enlace3d","situacion"],"enlaces":6,"detalle":"proximamente"}
+    {"id":"FHU-10","titulo":"Toma de decisiones y gestión del riesgo (ADM)","paginas":"","lecciones":[
+      {"id":"FHU-10-01","titulo":"Qué es el ADM: del juicio al proceso (3P)","paginas":"","minutos":9,"componentes":["diapositiva","clasificar","situacion"],"enlaces":6,"detalle":"proximamente"},
+      {"id":"FHU-10-02","titulo":"El modelo DECIDE","paginas":"","minutos":10,"componentes":["ordenar","situacion","completar"],"enlaces":4,"detalle":"proximamente"},
+      {"id":"FHU-10-06","titulo":"Peligro y riesgo: la matriz de probabilidad y gravedad","paginas":"","minutos":10,"componentes":["simulador","clasificar","situacion"],"enlaces":4,"detalle":"proximamente"},
+      {"id":"FHU-10-04","titulo":"Riesgos: PAVE y mínimos personales","paginas":"","minutos":10,"componentes":["calculadora","diagrama","situacion","clasificar"],"enlaces":7,"detalle":"proximamente"},
+      {"id":"FHU-10-09","titulo":"Tus mínimos personales en seis pasos","paginas":"","minutos":11,"componentes":["calculadora","ordenar","clasificar"],"enlaces":4,"detalle":"proximamente"},
+      {"id":"FHU-10-03","titulo":"Las cinco actitudes peligrosas","paginas":"","minutos":10,"componentes":["emparejar","completar","caso"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"FHU-10-05","titulo":"Sesgos y trampas del juicio","paginas":"","minutos":10,"componentes":["clasificar","situacion","tarjetas"],"enlaces":4,"detalle":"proximamente"},
+      {"id":"FHU-10-07","titulo":"Trampas operativas: del VFR al IMC, scud running y volar fuera de la envolvente","paginas":"","minutos":10,"componentes":["clasificar","caso","situacion"],"enlaces":4,"detalle":"proximamente"},
+      {"id":"FHU-10-08","titulo":"3P con números: radio y régimen de viraje","paginas":"","minutos":10,"componentes":["calculadora","situacion","emparejar"],"enlaces":3,"detalle":"proximamente"}
+    ]},
+    {"id":"FHU-09","titulo":"Estrés y emociones","paginas":"","lecciones":[
+      {"id":"FHU-09-01","titulo":"El estrés y el rendimiento","paginas":"","minutos":9,"componentes":["simulador","animacion","clasificar"],"enlaces":5,"detalle":"proximamente"},
+      {"id":"FHU-09-03","titulo":"De dónde viene el estrés: situacional, psíquico, físico y tipo A","paginas":"","minutos":9,"componentes":["clasificar","emparejar","situacion"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"FHU-09-04","titulo":"Consecuencias, señales y prevención del estrés","paginas":"","minutos":11,"componentes":["clasificar","tarjetas","situacion"],"enlaces":4,"detalle":"proximamente"},
+      {"id":"FHU-09-02","titulo":"Manejar las presiones y las emociones","paginas":"","minutos":10,"componentes":["emparejar","animacion","situacion"],"enlaces":4,"detalle":"proximamente"}
+    ]},
+    {"id":"FHU-17","titulo":"Automatización y factor humano","paginas":"","lecciones":[
+      {"id":"FHU-17-01","titulo":"Automatizar: qué es y por qué se hace","paginas":"","minutos":8,"componentes":["clasificar","emparejar","situacion"],"enlaces":4,"detalle":"proximamente"},
+      {"id":"FHU-17-02","titulo":"Cuando la automatización hace perder al piloto","paginas":"","minutos":10,"componentes":["clasificar","tarjetas","situacion"],"enlaces":4,"detalle":"proximamente"}
     ]},
     {"id":"FHU-13","titulo":"Piloto solo: CRM y SRM","paginas":"","lecciones":[
-      {"id":"FHU-13-01","titulo":"CRM, SRM y el traspaso de comandos","paginas":"","minutos":10,"componentes":["diapositiva","fraseologia","emparejar"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"FHU-13-01","titulo":"CRM, SRM y el traspaso de comandos","paginas":"","minutos":10,"componentes":["diapositiva","fraseologia","emparejar"],"enlaces":6,"detalle":"proximamente"},
+      {"id":"FHU-13-04","titulo":"El chequeo de las 5P: plan, avión, piloto, pasajeros y programación","paginas":"","minutos":10,"componentes":["clasificar","ordenar","situacion"],"enlaces":4,"detalle":"proximamente"},
       {"id":"FHU-13-02","titulo":"Comunicación asertiva y liderazgo","paginas":"","minutos":9,"componentes":["emparejar","fraseologia","situacion"],"enlaces":4,"detalle":"proximamente"},
       {"id":"FHU-13-03","titulo":"Pedir ayuda a tiempo","paginas":"","minutos":9,"componentes":["fraseologia","ordenar","situacion"],"enlaces":5,"detalle":"proximamente"}
     ]},
     {"id":"FHU-14","titulo":"Integración: casos y decisión","paginas":"","lecciones":[
       {"id":"FHU-14-01","titulo":"Casos reales tipo","paginas":"","minutos":12,"componentes":["caso","clasificar","quiz"],"enlaces":5,"detalle":"proximamente"},
-      {"id":"FHU-14-02","titulo":"Taller: tu GO / NO-GO personal y repaso","paginas":"","minutos":12,"componentes":["calculadora","tarjetas","quiz"],"enlaces":5,"detalle":"proximamente"}
+      {"id":"FHU-14-02","titulo":"Taller: tu GO / NO-GO personal y repaso","paginas":"","minutos":12,"componentes":["calculadora","tarjetas","quiz"],"enlaces":8,"detalle":"proximamente"}
+    ]}
+  ]},
+  {"id":"OPE","orden":13,"titulo":"Procedimientos Operacionales","fuente":"complementario","paginas":"","color":"#A9774B","icono":"checklist","resumen":"Del hangar al apagado: señales del aeródromo, circuitos, radio, listas y cada etapa del vuelo.","examen":{"numPreguntas":40},"unidades":[
+    {"id":"OPE-01","titulo":"Pistas: marcas y luces","paginas":"","lecciones":[
+      {"id":"OPE-01-01","titulo":"Pista, umbral y cabecera","paginas":"","minutos":6,"componentes":["diagrama","clasificar","emparejar"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"OPE-01-02","titulo":"El número de la pista","paginas":"","minutos":8,"componentes":["simulador","emparejar","completar","situacion"],"enlaces":4,"detalle":"proximamente"},
+      {"id":"OPE-01-03","titulo":"El eje, las pistas visuales e instrumentales y las líneas amarillas","paginas":"","minutos":7,"componentes":["clasificar","animacion","completar"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"OPE-01-04","titulo":"Pista cerrada, umbral desplazado y zona de chorro","paginas":"","minutos":9,"componentes":["diagrama","clasificar","situacion"],"enlaces":4,"detalle":"proximamente"},
+      {"id":"OPE-01-05","titulo":"Las pistas de Carrasco","paginas":"","minutos":6,"componentes":["mapa","emparejar","calculadora"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"OPE-01-06","titulo":"Luces de pista: bordes, umbral y eje","paginas":"","minutos":9,"componentes":["diagrama","clasificar","simulador"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"OPE-01-07","titulo":"Luces de aproximación y PAPI","paginas":"","minutos":9,"componentes":["simulador","emparejar","situacion","calculadora"],"enlaces":4,"detalle":"proximamente"}
+    ]},
+    {"id":"OPE-02","titulo":"Calles de rodaje y puntos de espera","paginas":"","lecciones":[
+      {"id":"OPE-02-01","titulo":"Calles de rodaje: letras, marcas amarillas y luces","paginas":"","minutos":8,"componentes":["diagrama","emparejar","situacion"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"OPE-02-02","titulo":"Las calles de rodaje de Carrasco","paginas":"","minutos":7,"componentes":["mapa","emparejar","tarjetas"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"OPE-02-03","titulo":"Punto de espera intermedio","paginas":"","minutos":5,"componentes":["clasificar","situacion","animacion"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"OPE-02-04","titulo":"El punto de espera de pista: cuatro líneas y una regla","paginas":"","minutos":10,"componentes":["diagrama","situacion","ordenar"],"enlaces":5,"detalle":"proximamente"},
+      {"id":"OPE-02-05","titulo":"Carteles, marcas pintadas y luces del punto de espera","paginas":"","minutos":7,"componentes":["clasificar","emparejar","situacion"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"OPE-02-06","titulo":"Los puntos de espera de Carrasco, ruta por ruta","paginas":"","minutos":10,"componentes":["mapa","ordenar","emparejar","situacion"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"OPE-02-07","titulo":"Puntos de espera dentro de la pista: LAHSO","paginas":"","minutos":6,"componentes":["diagrama","situacion","completar"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"OPE-02-08","titulo":"Incursión en pista","paginas":"","minutos":9,"componentes":["caso","situacion","tarjetas"],"enlaces":4,"detalle":"proximamente"}
+    ]},
+    {"id":"OPE-03","titulo":"Carteles, plataforma, Follow Me y señaleros","paginas":"","lecciones":[
+      {"id":"OPE-03-01","titulo":"Los seis tipos de carteles y los carteles rojos","paginas":"","minutos":10,"componentes":["emparejar","clasificar","situacion"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"OPE-03-02","titulo":"Carteles de ubicación y de dirección","paginas":"","minutos":8,"componentes":["diagrama","clasificar","situacion"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"OPE-03-03","titulo":"Carteles de destino, de información y de distancia remanente","paginas":"","minutos":8,"componentes":["emparejar","calculadora","situacion"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"OPE-03-04","titulo":"Plataforma y área de maniobras","paginas":"","minutos":8,"componentes":["clasificar","emparejar","situacion"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"OPE-03-05","titulo":"Puestos de estacionamiento y Follow Me","paginas":"","minutos":7,"componentes":["situacion","clasificar","tarjetas"],"enlaces":3,"detalle":"proximamente"},
+      {"id":"OPE-03-06","titulo":"El señalero y sus señas","paginas":"","minutos":10,"componentes":["emparejar","animacion","situacion","tarjetas"],"enlaces":4,"detalle":"proximamente"}
+    ]},
+    {"id":"OPE-04","titulo":"Espacio aéreo de Carrasco y circuitos de tránsito","paginas":"","lecciones":[
+      {"id":"OPE-04-01","titulo":"Frecuencias de la torre y límites del ATZ y el CTR","paginas":"","minutos":6,"componentes":["diapositiva","mapa"],"enlaces":4,"detalle":"pendiente"},
+      {"id":"OPE-04-02","titulo":"Los sectores de trabajo de Carrasco","paginas":"","minutos":6,"componentes":["diapositiva","clasificar"],"enlaces":4,"detalle":"pendiente"},
+      {"id":"OPE-04-03","titulo":"Zonas prohibidas y restringidas cerca de Carrasco","paginas":"","minutos":6,"componentes":["diapositiva","situacion"],"enlaces":4,"detalle":"pendiente"},
+      {"id":"OPE-04-04","titulo":"El espacio aéreo de Adami y los puntos de transferencia","paginas":"","minutos":9,"componentes":["diapositiva","ordenar"],"enlaces":4,"detalle":"pendiente"},
+      {"id":"OPE-04-05","titulo":"Qué es un circuito de tránsito y cómo se ingresa","paginas":"","minutos":10,"componentes":["diapositiva","ordenar"],"enlaces":4,"detalle":"pendiente"},
+      {"id":"OPE-04-06","titulo":"Las alturas y los tramos del circuito","paginas":"","minutos":8,"componentes":["diapositiva","calculadora"],"enlaces":5,"detalle":"pendiente"},
+      {"id":"OPE-04-07","titulo":"Los circuitos de Carrasco: izquierda, derecha y la R5","paginas":"","minutos":9,"componentes":["diapositiva","clasificar"],"enlaces":4,"detalle":"pendiente"}
+    ]},
+    {"id":"OPE-05","titulo":"Fraseología básica de la clase: de la puesta en marcha al hangar","paginas":"","lecciones":[
+      {"id":"OPE-05-01","titulo":"Alfabeto fonético y la estructura de todo mensaje","paginas":"","minutos":6,"componentes":["diapositiva","completar"],"enlaces":5,"detalle":"pendiente"},
+      {"id":"OPE-05-02","titulo":"Llamado previo a la puesta en marcha","paginas":"","minutos":8,"componentes":["diapositiva","fraseologia"],"enlaces":5,"detalle":"pendiente"},
+      {"id":"OPE-05-03","titulo":"Autorización de rodaje y cruce de pista","paginas":"","minutos":6,"componentes":["diapositiva","fraseologia"],"enlaces":4,"detalle":"pendiente"},
+      {"id":"OPE-05-04","titulo":"Listo para despegar: autorización, posición y mantenga","paginas":"","minutos":8,"componentes":["diapositiva","situacion"],"enlaces":4,"detalle":"pendiente"},
+      {"id":"OPE-05-05","titulo":"Regreso desde el sector y llamado en el circuito","paginas":"","minutos":10,"componentes":["diapositiva","ordenar"],"enlaces":4,"detalle":"pendiente"},
+      {"id":"OPE-05-06","titulo":"Aterrizar, despejar la pista y volver a los hangares","paginas":"","minutos":8,"componentes":["diapositiva","completar"],"enlaces":4,"detalle":"pendiente"},
+      {"id":"OPE-05-07","titulo":"Reglas del lenguaje en la práctica y transferencia de comandos","paginas":"","minutos":7,"componentes":["diapositiva","situacion"],"enlaces":4,"detalle":"pendiente"}
+    ]},
+    {"id":"OPE-06","titulo":"El avión de la clase y su manual (POH): sistemas, velocidades y emergencias","paginas":"","lecciones":[
+      {"id":"OPE-06-01","titulo":"El manual del avión (POH) y cómo está organizado","paginas":"","minutos":7,"componentes":["diapositiva","emparejar"],"enlaces":3,"detalle":"pendiente"},
+      {"id":"OPE-06-02","titulo":"El motor y el sistema de combustible","paginas":"","minutos":7,"componentes":["diapositiva","calculadora"],"enlaces":6,"detalle":"pendiente"},
+      {"id":"OPE-06-03","titulo":"Aceite: capacidad, límites e instrumentos","paginas":"","minutos":6,"componentes":["diapositiva","simulador"],"enlaces":4,"detalle":"pendiente"},
+      {"id":"OPE-06-04","titulo":"Sistema eléctrico: master, alternador y sobrevoltaje","paginas":"","minutos":10,"componentes":["diapositiva","situacion"],"enlaces":5,"detalle":"pendiente"},
+      {"id":"OPE-06-05","titulo":"Disyuntores y fusibles","paginas":"","minutos":6,"componentes":["diapositiva","diagrama"],"enlaces":3,"detalle":"pendiente"},
+      {"id":"OPE-06-06","titulo":"Mezcla, primer, magnetos y starter","paginas":"","minutos":8,"componentes":["diapositiva","ordenar"],"enlaces":6,"detalle":"pendiente"},
+      {"id":"OPE-06-07","titulo":"Calefacción del carburador y hielo","paginas":"","minutos":6,"componentes":["diapositiva","simulador"],"enlaces":4,"detalle":"pendiente"},
+      {"id":"OPE-06-08","titulo":"Flaps eléctricos","paginas":"","minutos":6,"componentes":["diapositiva","simulador"],"enlaces":4,"detalle":"pendiente"},
+      {"id":"OPE-06-09","titulo":"Las velocidades operativas","paginas":"","minutos":12,"componentes":["diapositiva","diagrama"],"enlaces":4,"detalle":"pendiente"},
+      {"id":"OPE-06-10","titulo":"Emergencias en tierra: fuego en el arranque y falla de motor en la carrera","paginas":"","minutos":6,"componentes":["diapositiva","ordenar"],"enlaces":5,"detalle":"pendiente"},
+      {"id":"OPE-06-11","titulo":"Falla de motor en el aire: reencendido y aterrizaje forzoso","paginas":"","minutos":6,"componentes":["diapositiva","situacion"],"enlaces":7,"detalle":"pendiente"},
+      {"id":"OPE-06-12","titulo":"Fuego en vuelo, fuego eléctrico y tirabuzón","paginas":"","minutos":6,"componentes":["diapositiva","clasificar"],"enlaces":4,"detalle":"pendiente"}
+    ]},
+    {"id":"OPE-07","titulo":"Antes de volar: presentación, documentos y walk-around","paginas":"","lecciones":[
+      {"id":"OPE-07-01","titulo":"Horarios, puntualidad y qué llevar","paginas":"","minutos":6,"componentes":["diapositiva","clasificar"],"enlaces":4,"detalle":"pendiente"},
+      {"id":"OPE-07-02","titulo":"Qué se le presenta al instructor antes de cada vuelo","paginas":"","minutos":5,"componentes":["diapositiva","clasificar"],"enlaces":4,"detalle":"pendiente"},
+      {"id":"OPE-07-03","titulo":"Walk-around: la primera mirada, calzas y traba de comandos","paginas":"","minutos":12,"componentes":["diapositiva","ordenar"],"enlaces":8,"detalle":"pendiente"},
+      {"id":"OPE-07-04","titulo":"Walk-around: cola, alas, flaps y alerones","paginas":"","minutos":12,"componentes":["diapositiva","animacion"],"enlaces":5,"detalle":"pendiente"},
+      {"id":"OPE-07-05","titulo":"Combustible y aceite","paginas":"","minutos":10,"componentes":["diapositiva","animacion"],"enlaces":6,"detalle":"pendiente"},
+      {"id":"OPE-07-06","titulo":"Hélice, motor y tren de nariz","paginas":"","minutos":10,"componentes":["diapositiva","clasificar"],"enlaces":4,"detalle":"pendiente"},
+      {"id":"OPE-07-07","titulo":"Parabrisas, orden y luces de noche","paginas":"","minutos":6,"componentes":["diapositiva","completar"],"enlaces":4,"detalle":"pendiente"}
+    ]},
+    {"id":"OPE-08","titulo":"La guía de briefing","paginas":"","lecciones":[
+      {"id":"OPE-08-01","titulo":"La guía de briefing prevuelo y de vuelo","paginas":"","minutos":6,"componentes":["diapositiva","ordenar"],"enlaces":3,"detalle":"pendiente"},
+      {"id":"OPE-08-02","titulo":"Emergencias, equipo personal, post vuelo y I'M SAFE","paginas":"","minutos":5,"componentes":["diapositiva","tarjetas"],"enlaces":3,"detalle":"pendiente"}
+    ]},
+    {"id":"OPE-09","titulo":"Puesta en marcha","paginas":"","lecciones":[
+      {"id":"OPE-09-01","titulo":"Preparar la puesta en marcha","paginas":"","minutos":7,"componentes":["diapositiva","calculadora"],"enlaces":6,"detalle":"pendiente"},
+      {"id":"OPE-09-02","titulo":"Arrancar, presión de aceite y motor ahogado","paginas":"","minutos":7,"componentes":["diapositiva","situacion"],"enlaces":7,"detalle":"pendiente"}
+    ]},
+    {"id":"OPE-10","titulo":"Rodaje","paginas":"","lecciones":[
+      {"id":"OPE-10-01","titulo":"Arrancar el rodaje: potencia, prueba de frenos y velocidad","paginas":"","minutos":6,"componentes":["diapositiva","simulador"],"enlaces":6,"detalle":"pendiente"},
+      {"id":"OPE-10-02","titulo":"Rodar con viento: dónde poner los comandos","paginas":"","minutos":6,"componentes":["diapositiva","simulador"],"enlaces":5,"detalle":"pendiente"}
+    ]},
+    {"id":"OPE-11","titulo":"Prueba de motor y briefing de emergencia antes del despegue","paginas":"","lecciones":[
+      {"id":"OPE-11-01","titulo":"Dónde y cómo hacer la prueba de motor","paginas":"","minutos":6,"componentes":["diapositiva","clasificar"],"enlaces":4,"detalle":"pendiente"},
+      {"id":"OPE-11-02","titulo":"La prueba paso a paso: comandos, magnetos y carburador","paginas":"","minutos":7,"componentes":["diapositiva","ordenar"],"enlaces":9,"detalle":"pendiente"},
+      {"id":"OPE-11-03","titulo":"Briefing de emergencia antes del despegue","paginas":"","minutos":6,"componentes":["diapositiva","situacion"],"enlaces":4,"detalle":"pendiente"}
+    ]},
+    {"id":"OPE-12","titulo":"Despegue normal y con viento cruzado","paginas":"","lecciones":[
+      {"id":"OPE-12-01","titulo":"Fases del despegue y tipos de despegue","paginas":"","minutos":6,"componentes":["diapositiva","animacion"],"enlaces":3,"detalle":"pendiente"},
+      {"id":"OPE-12-02","titulo":"Despegue normal: por qué contra el viento y cómo se hace","paginas":"","minutos":10,"componentes":["diapositiva","simulador"],"enlaces":6,"detalle":"pendiente"},
+      {"id":"OPE-12-03","titulo":"Errores comunes del despegue normal","paginas":"","minutos":7,"componentes":["diapositiva","clasificar"],"enlaces":4,"detalle":"pendiente"},
+      {"id":"OPE-12-04","titulo":"Despegue con viento cruzado","paginas":"","minutos":12,"componentes":["diapositiva","calculadora"],"enlaces":5,"detalle":"pendiente"}
+    ]},
+    {"id":"OPE-13","titulo":"Las maniobras básicas: recto y nivelado, virajes, ascensos y descensos","paginas":"","lecciones":[
+      {"id":"OPE-13-01","titulo":"Las cuatro maniobras básicas y el compensador","paginas":"","minutos":10,"componentes":["diapositiva","ordenar"],"enlaces":7,"detalle":"pendiente"},
+      {"id":"OPE-13-02","titulo":"Vuelo recto y nivelado","paginas":"","minutos":8,"componentes":["diapositiva","simulador"],"enlaces":7,"detalle":"pendiente"},
+      {"id":"OPE-13-03","titulo":"Virajes","paginas":"","minutos":8,"componentes":["diapositiva","emparejar"],"enlaces":7,"detalle":"pendiente"},
+      {"id":"OPE-13-04","titulo":"Ascensos","paginas":"","minutos":9,"componentes":["diapositiva","calculadora"],"enlaces":7,"detalle":"pendiente"},
+      {"id":"OPE-13-05","titulo":"Ascensos en viraje","paginas":"","minutos":7,"componentes":["diapositiva","simulador"],"enlaces":5,"detalle":"pendiente"},
+      {"id":"OPE-13-06","titulo":"Descensos","paginas":"","minutos":10,"componentes":["diapositiva","simulador"],"enlaces":7,"detalle":"pendiente"},
+      {"id":"OPE-13-07","titulo":"Descensos en viraje y planeo","paginas":"","minutos":7,"componentes":["diapositiva","ordenar"],"enlaces":4,"detalle":"pendiente"},
+      {"id":"OPE-13-08","titulo":"Actitud y potencia","paginas":"","minutos":6,"componentes":["diapositiva","simulador"],"enlaces":5,"detalle":"pendiente"}
+    ]},
+    {"id":"OPE-14","titulo":"Aproximación y aterrizaje","paginas":"","lecciones":[
+      {"id":"OPE-14-01","titulo":"El tramo de base: el tramo clave","paginas":"","minutos":9,"componentes":["diapositiva","situacion"],"enlaces":5,"detalle":"pendiente"},
+      {"id":"OPE-14-02","titulo":"El viraje a final: nunca aumentes la inclinación","paginas":"","minutos":6,"componentes":["diapositiva","simulador"],"enlaces":4,"detalle":"pendiente"},
+      {"id":"OPE-14-03","titulo":"Referencias visuales y aproximación estabilizada","paginas":"","minutos":9,"componentes":["diapositiva","simulador"],"enlaces":4,"detalle":"pendiente"},
+      {"id":"OPE-14-04","titulo":"Alto o bajo en la senda: qué hago","paginas":"","minutos":12,"componentes":["diapositiva","diagrama"],"enlaces":6,"detalle":"pendiente"},
+      {"id":"OPE-14-05","titulo":"Objetivo de la aproximación y tipos de aterrizaje","paginas":"","minutos":7,"componentes":["diapositiva","tarjetas"],"enlaces":3,"detalle":"pendiente"},
+      {"id":"OPE-14-06","titulo":"La restablecida, el toque y la carrera de aterrizaje","paginas":"","minutos":12,"componentes":["diapositiva","animacion"],"enlaces":6,"detalle":"pendiente"},
+      {"id":"OPE-14-07","titulo":"Errores comunes: rebote, inflado y toque con la nariz","paginas":"","minutos":12,"componentes":["diapositiva","clasificar"],"enlaces":3,"detalle":"pendiente"},
+      {"id":"OPE-14-08","titulo":"Aterrizaje normal y checklist de aterrizaje","paginas":"","minutos":8,"componentes":["diapositiva","completar"],"enlaces":4,"detalle":"pendiente"},
+      {"id":"OPE-14-09","titulo":"Aproximación y aterrizaje con viento cruzado","paginas":"","minutos":10,"componentes":["diapositiva","simulador"],"enlaces":5,"detalle":"pendiente"},
+      {"id":"OPE-14-10","titulo":"Aterrizaje en aire turbulento","paginas":"","minutos":10,"componentes":["diapositiva","calculadora"],"enlaces":3,"detalle":"pendiente"}
+    ]},
+    {"id":"OPE-15","titulo":"Arremetida (go-around)","paginas":"","lecciones":[
+      {"id":"OPE-15-01","titulo":"Cuándo arremeter","paginas":"","minutos":8,"componentes":["diapositiva","situacion"],"enlaces":2,"detalle":"pendiente"},
+      {"id":"OPE-15-02","titulo":"Cómo arremeter paso a paso y errores comunes","paginas":"","minutos":10,"componentes":["diapositiva","ordenar"],"enlaces":6,"detalle":"pendiente"}
+    ]},
+    {"id":"OPE-16","titulo":"Apagado, post-vuelo y amarrado","paginas":"","lecciones":[
+      {"id":"OPE-16-01","titulo":"Apagado del motor según la checklist","paginas":"","minutos":5,"componentes":["diapositiva","ordenar"],"enlaces":6,"detalle":"pendiente"},
+      {"id":"OPE-16-02","titulo":"Inspección post-vuelo y cómo dejar el avión","paginas":"","minutos":10,"componentes":["diapositiva","clasificar"],"enlaces":4,"detalle":"pendiente"},
+      {"id":"OPE-16-03","titulo":"Amarrar el avión","paginas":"","minutos":6,"componentes":["diapositiva","ordenar"],"enlaces":4,"detalle":"pendiente"}
     ]}
   ]}
 ]}

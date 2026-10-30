@@ -38,7 +38,8 @@ const RESUMEN = {
   NAV: 'Coordenadas, cartas, rumbo, viento y estima para llegar de un punto a otro.',
   REG: 'Licencias, reglas del aire y espacio aéreo: lo que te exige la norma.',
   PER: 'Cuánta pista, cuánta carga y cuánto combustible: performance y peso y balance.',
-  FHU: 'El piloto como parte del sistema: salud, atención, fatiga y decisiones.'
+  FHU: 'El piloto como parte del sistema: salud, atención, fatiga y decisiones.',
+  OPE: 'Del hangar al apagado: señales del aeródromo, circuitos, radio, listas y cada etapa del vuelo.'
 };
 
 function readJson(p) { return JSON.parse(fs.readFileSync(p, 'utf8')); }
@@ -72,12 +73,13 @@ function build() {
       try { const p = readJson(path.join(PLAN_DIR, m.id + '.json')); num = p.examenModulo && p.examenModulo.numPreguntas || null; } catch (e) { /* sin plan */ }
       return {
         id: m.id, orden: i + 1, titulo: m.titulo, fuente: m.fuente === 'aerosur' ? 'aerosur' : 'complementario',
-        paginas: m.paginas || '', color: m.color, icono: m.iconoApp || 'cap', resumen: RESUMEN[m.id] || '',
+        paginas: m.fuente === 'aerosur' ? (m.paginas || '') : '', color: m.color, icono: m.iconoApp || 'cap', resumen: RESUMEN[m.id] || '',
         examen: { numPreguntas: num },
         unidades: m.unidades.map((u) => ({
-          id: u.id, titulo: u.titulo, paginas: u.paginas || '',
+          // «paginas» son páginas del CURSO de 1422 diapositivas: los módulos complementarios no las muestran (OPE trae las diapositivas de su propia clase, que no son las del curso)
+          id: u.id, titulo: u.titulo, paginas: m.fuente === 'aerosur' ? (u.paginas || '') : '',
           lecciones: u.lecciones.map((l) => ({
-            id: l.id, titulo: l.titulo, paginas: l.paginas || '', minutos: l.minutos || 0,
+            id: l.id, titulo: l.titulo, paginas: m.fuente === 'aerosur' ? (l.paginas || '') : '', minutos: l.minutos || 0,
             // una lección ya adaptada manda con sus componentes y enlaces reales (el plan puede haberse reordenado al adaptar)
             componentes: conContenido.has(l.id) ? conContenido.get(l.id).componentes : (l.componentes || []),
             enlaces: conContenido.has(l.id) ? conContenido.get(l.id).enlaces : (l.enlaces || 0), detalle: detalleDe(l.id, l.detalle, conContenido)
