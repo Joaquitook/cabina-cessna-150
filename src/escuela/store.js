@@ -15,6 +15,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
  *     minutos:   { 'YYYY-MM-DD': n },                                        // minutos estudiados por día (para "esta semana")
  *     tarjetas:  { 'INT-03-02:0': { ef:2.5, n:0, due:20000, last:19999 } },   // repaso espaciado de las TARJETAS (SM-2 simple): clave 'lección:índice de la carta';
  *                                                                              //   ef facilidad (1.3–3.5) · n repasos seguidos bien · due y last = NÚMERO DE DÍA (Store.diaDe) del próximo repaso y del último
+ *     libre:     { 'INT-01-01|p2.0|0': 'texto' },                              // lo escrito en los huecos LIBRES del componente `completar` (bitácora): clave 'lección|componente|hueco', texto ≤ 160, máx. 200;
+ *                                                                              //   antes vivía en la clave aparte 'c150.escuela.libre.v1' (se migra una vez y se borra); sale en exportar / importar y se borra con reset
  *     insignias: { primera: ms, … },
  *     ultima:    { leccion:'INT-01-01', paso:n, t:ms } | null,                // "Continuar donde dejaste"
  *     prefs:     { mapa:'tarjetas'|'camino' } }
@@ -34,6 +36,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
  *     s.tarjeta(leccion, idx) → registro|null · s.tarjetaRepasar(leccion, idx, calidad) → registro nuevo · s.tarjetas() → copia de todos
  *     s.tarjetasDeLeccion(leccion) → {idx: registro} · s.tarjetasVencidas(hoyDia?) → [{leccion, idx, ef, n, due, last, atraso}] (la más atrasada primero;
  *       es lo que va a usar la pantalla "Repaso del día") · s.hoyDia()
+ *   s.libre(clave) → texto | '' · s.libreGuardar(clave, texto) → texto guardado ('' borra) · s.libres() → copia de todos
  *   s.racha(hoy?) → días de racha vigente    s.minutosSemana(hoy?)      s.insignias() · s.otorgar(id) → bool
  *   s.exportar() → texto JSON    s.importar(texto) → {ok, error?, lecciones}      s.reset()      s.onChange(fn) → desuscribir
  *   s.pref(k, v?)  s.persistente
@@ -116,8 +119,10 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
    * volver a verla; last = día del último repaso. Los días son NÚMEROS DE DÍA enteros (no fechas ni milisegundos): así las pruebas no dependen del reloj
    * ni de la zona horaria. El intervalo previo es due − last.
    *   calidad 5 (La sabía) · 3 (Más o menos) · 1 (No la sabía)  →  <3 reinicia: vuelve mañana; 1.er acierto 2 días (1 si fue "más o menos"), 2.º 6 días (3 si fue "más o menos"),
-   *   después el intervalo anterior × ef (× 1.2 si fue "más o menos"). Siempre avanza al menos un día. */
-  var EF0 = 2.5, EF_MIN = 1.3, EF_MAX = 3.5;
+   *   después el intervalo anterior × ef (× 1.2 si fue "más o menos"). Siempre avanza al menos un día y nunca más de 365 (Store.DIAS_MAX).
+ *   Una carta que todavía no toca (hoy < due) y se califica bien NO cambia (n, intervalo ni fecha): repasar de más no la adelanta. */
+  var EF0 = 2.5, EF_MIN = 1.3, EF_MAX = 3.5, DIAS_MAX = 365;      // ningún intervalo pasa de un año: una carta nunca desaparece del repaso por un número desbordado
+  Store.DIAS_MAX = DIAS_MAX;
   Store.CALIDAD = { sabia: 5, medio: 3, nosabia: 1 };
   var ID_TARJETA = /^[A-Z]{3}-\d{2}-\d{2}:\d{1,3}$/;
   Store.tarjetaId = function (leccion, idx) { return String(leccion) + ':' + Math.max(0, Math.floor(num(idx, 0))); };
@@ -128,13 +133,18 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   function saneTarjeta(r) {
     if (!isObj(r)) return null;
     var due = Math.round(num(r.due, NaN)), last = Math.round(num(r.last, NaN));
-    if (isNaN(due) || isNaN(last) || due < 0 || last < 0 || due > 400000 || last > 400000) return null;
+    if (isNaN(due) || isNaN(last) || due < 0 || last < 0 || last > 400000) return null;
+    if (due > last + DIAS_MAX) due = last + DIAS_MAX;      // un registro con un intervalo desbordado (de una versión anterior) se recorta en vez de perderse
+    if (due > 400000) return null;
     return { ef: Math.round(clamp(num(r.ef, EF0), EF_MIN, EF_MAX) * 100) / 100, n: clamp(Math.round(num(r.n, 0)), 0, 999), due: due, last: last };
   }
   Store.sm2 = function (rec, calidad, hoy) {
     hoy = Math.round(num(hoy, 0));
-    var r = saneTarjeta(rec) || { ef: EF0, n: 0, due: hoy, last: hoy };
+    var vieja = saneTarjeta(rec), r = vieja || { ef: EF0, n: 0, due: hoy, last: hoy };
     var q = typeof calidad === 'string' ? (Store.CALIDAD[calidad] !== undefined ? Store.CALIDAD[calidad] : 1) : clamp(Math.round(num(calidad, 0)), 0, 5);
+    // repasar de más no la deja más sabida: una carta que todavía no toca y que se vuelve a calificar bien (la misma tarde, o unos días antes) queda exactamente igual;
+    // si falla, sí vuelve mañana (el olvido es real aunque no tocara)
+    if (vieja && hoy < vieja.due && q >= 3) return { ef: vieja.ef, n: vieja.n, due: vieja.due, last: vieja.last };
     var ef = Math.round(clamp(r.ef + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02)), EF_MIN, EF_MAX) * 100) / 100;
     var prev = Math.max(1, r.due - r.last), n, dias;
     if (q < 3) { n = 0; dias = 1; }
@@ -144,7 +154,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       else if (n === 2) dias = q === 3 ? 3 : 6;
       else dias = q === 3 ? Math.max(prev + 1, Math.round(prev * 1.2)) : Math.max(prev + 1, Math.round(prev * ef));
     }
-    return { ef: ef, n: n, due: hoy + dias, last: hoy };
+    return { ef: ef, n: n, due: hoy + Math.min(dias, DIAS_MAX), last: hoy };
   };
   /** Los registros que ya vencieron el día `hoy`, de mayor a menor atraso (y por clave si empatan). La pantalla "Repaso del día" arranca de acá. */
   Store.tarjetasPendientes = function (registros, hoy) {
@@ -160,8 +170,13 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   };
 
   Store.vacio = function () {
-    return { v: 1, lecciones: {}, respuestas: {}, mazo: {}, tarjetas: {}, racha: { dias: 0, ultimo: '', gracia: '', mejor: 0 }, minutos: {}, insignias: {}, ultima: null, prefs: {} };
+    return { v: 1, lecciones: {}, respuestas: {}, mazo: {}, tarjetas: {}, libre: {}, racha: { dias: 0, ultimo: '', gracia: '', mejor: 0 }, minutos: {}, insignias: {}, ultima: null, prefs: {} };
   };
+
+  /** Lo escrito en un hueco libre (la bitácora de INT-01-01): texto corto, sin espacios de más; vacío o no-texto → ''. */
+  var LIBRE_MAX = 200, KEY_LIBRE_VIEJA = 'c150.escuela.libre.v1';
+  function libreTexto(v) { return typeof v === 'string' ? v.trim().slice(0, 160) : ''; }
+  Store.LIBRE_MAX = LIBRE_MAX;
 
   function saneLec(r) {
     if (!isObj(r)) return null;
@@ -182,6 +197,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       if (okKey(m) && isObj(e) && typeof e.tipo === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(e.prox || '')) s.mazo[m] = { tipo: e.tipo.slice(0, 30), ref: String(e.ref === undefined ? '' : e.ref).slice(0, 60), caja: clamp(Math.round(num(e.caja, 1)), 1, 5), prox: e.prox, t: Math.max(0, num(e.t, 0)) };
     }
     if (isObj(o.tarjetas)) for (var tk in o.tarjetas) { if (ID_TARJETA.test(tk)) { var tr = saneTarjeta(o.tarjetas[tk]); if (tr) s.tarjetas[tk] = tr; } }
+    if (isObj(o.libre)) { var nl = 0; for (var lk in o.libre) { if (nl >= LIBRE_MAX) break; var lv = libreTexto(o.libre[lk]); if (okKey(lk) && lv) { s.libre[lk] = lv; nl++; } } }
     if (isObj(o.racha)) s.racha = { dias: Math.max(0, Math.round(num(o.racha.dias, 0))), ultimo: /^\d{4}-\d{2}-\d{2}$/.test(o.racha.ultimo || '') ? o.racha.ultimo : '', gracia: /^\d{4}-W\d{2}$/.test(o.racha.gracia || '') ? o.racha.gracia : '', mejor: Math.max(0, Math.round(num(o.racha.mejor, 0))) };
     if (isObj(o.minutos)) for (var d in o.minutos) { if (/^\d{4}-\d{2}-\d{2}$/.test(d)) s.minutos[d] = Math.max(0, Math.round(num(o.minutos[d], 0))); }
     if (isObj(o.insignias)) for (var n in o.insignias) { if (okKey(n)) s.insignias[n] = Math.max(0, num(o.insignias[n], 0)); }
@@ -204,6 +220,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     for (k in b.respuestas) { var r1 = s.respuestas[k], r2 = b.respuestas[k]; s.respuestas[k] = r1 ? { ok: Math.max(r1.ok, r2.ok), mal: Math.max(r1.mal, r2.mal), t: Math.max(r1.t, r2.t) } : r2; }
     for (k in b.mazo) { if (!s.mazo[k] || b.mazo[k].t > s.mazo[k].t) s.mazo[k] = b.mazo[k]; }
     for (k in b.tarjetas) { if (!s.tarjetas[k] || b.tarjetas[k].last > s.tarjetas[k].last || (b.tarjetas[k].last === s.tarjetas[k].last && b.tarjetas[k].n > s.tarjetas[k].n)) s.tarjetas[k] = b.tarjetas[k]; }
+    for (k in b.libre) { if (!s.libre[k] && Object.keys(s.libre).length < LIBRE_MAX) s.libre[k] = b.libre[k]; }      // lo escrito en este dispositivo manda; del otro se suma lo que acá falta
     if (b.racha.ultimo > s.racha.ultimo) s.racha = b.racha; else s.racha.mejor = Math.max(s.racha.mejor, b.racha.mejor);
     for (k in b.minutos) s.minutos[k] = Math.max(s.minutos[k] || 0, b.minutos[k]);
     for (k in b.insignias) if (!s.insignias[k] || b.insignias[k] < s.insignias[k]) s.insignias[k] = b.insignias[k];
@@ -217,16 +234,30 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     opts = opts || {};
     var storage = opts.storage !== undefined ? opts.storage : (function () { try { return root.localStorage || null; } catch (e) { return null; } })();
     var nowFn = typeof opts.now === 'function' ? opts.now : function () { return Date.now(); };
-    var st = null, listeners = [], persist = true;
+    var st = null, listeners = [], persist = true, viejaLibre = false;
 
     function leer() {
       try {
-        var raw = storage && storage.getItem(KEY);
-        if (!raw) return Store.vacio();
-        return Store.sanear(JSON.parse(raw));
+        var raw = storage && storage.getItem(KEY), est = raw ? Store.sanear(JSON.parse(raw)) : Store.vacio();
+        // migración única: lo escrito en los huecos libres (bitácora) vivía en otra clave de localStorage, fuera del progreso: pasa adentro y la clave vieja se borra
+        try {
+          var rv = storage && storage.getItem(KEY_LIBRE_VIEJA);
+          if (rv) {
+            viejaLibre = true;
+            var vo = JSON.parse(rv), vl = Store.sanear({ libre: vo }).libre;
+            for (var vk in vl) if (!est.libre[vk] && Object.keys(est.libre).length < LIBRE_MAX) est.libre[vk] = vl[vk];
+          }
+        } catch (e2) { /* clave vieja ilegible: se descarta */ }
+        return est;
       } catch (e) { persist = false; return Store.vacio(); }
     }
-    function S() { if (!st) st = leer(); return st; }
+    function S() {
+      if (!st) {
+        st = leer();
+        if (viejaLibre) { viejaLibre = false; guardar(); if (persist) { try { storage.removeItem(KEY_LIBRE_VIEJA); } catch (e) { /* idem */ } } }
+      }
+      return st;
+    }
     function guardar() {
       try { if (storage) { storage.setItem(KEY, JSON.stringify(st)); persist = true; } else persist = false; } catch (e) { persist = false; }
     }
@@ -342,6 +373,19 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       /** Cartas que ya tocan repasar (el día `hoyDia`, por defecto hoy), la más atrasada primero. */
       tarjetasVencidas: function (hoyN) { return Store.tarjetasPendientes(S().tarjetas, typeof hoyN === 'number' ? hoyN : Store.diaDe(nowFn())); },
 
+      /* huecos libres (la bitácora de INT-01-01 y las frases propias): lo escrito se guarda acá, con el resto del progreso, así sale en exportar / importar y se borra con reset */
+      libre: function (clave) { return okKey(clave) && typeof S().libre[clave] === 'string' ? S().libre[clave] : ''; },
+      libres: function () { return JSON.parse(JSON.stringify(S().libre)); },
+      /** Guarda (o borra, si el texto queda vacío) lo escrito en el hueco `clave`. No avisa a los oyentes (se llama en cada tecla). Devuelve el texto guardado. */
+      libreGuardar: function (clave, texto) {
+        if (!okKey(clave)) return '';
+        var t = libreTexto(texto), L = S().libre;
+        if (!t) { if (L[clave] === undefined) return ''; delete L[clave]; guardar(); return ''; }
+        if (L[clave] === undefined && Object.keys(L).length >= LIBRE_MAX) delete L[Object.keys(L)[0]];
+        L[clave] = t; guardar();
+        return t;
+      },
+
       /* racha, minutos e insignias */
       racha: function (f) { return Store.rachaVigente(S().racha, f || hoy()); },
       mejorRacha: function () { return S().racha.mejor; },
@@ -374,7 +418,11 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         cambio('importar');
         return { ok: true, lecciones: Object.keys(st.lecciones).length };
       },
-      reset: function () { st = Store.vacio(); cambio('reset'); },
+      reset: function () {
+        st = Store.vacio(); viejaLibre = false;
+        try { if (storage) storage.removeItem(KEY_LIBRE_VIEJA); } catch (e) { /* idem */ }      // la clave vieja de los huecos libres tampoco puede volver a la vida
+        cambio('reset');
+      },
       onChange: function (fn) { if (typeof fn !== 'function') return function () {}; listeners.push(fn); return function () { var i = listeners.indexOf(fn); if (i >= 0) listeners.splice(i, 1); }; }
     };
     return s;

@@ -588,6 +588,9 @@ const NQ = (t, d) => Mot.get(t).normalizar(JSON.parse(JSON.stringify(d)), ctxNod
   eq(NQ('ordenar', { pasos: ['uno', 'dos'], nota: 'Esto es a confirmar con el instructor' }).nota, '', 'ordenar: oculta las notas "a confirmar" del plan');
   eq(NQ('ordenar', b), b, 'ordenar: normalizar es idempotente');
   ok(NQ('ordenar', { items: ['a', 'b'], orden: ['x', 'y'] }) === null, 'ordenar: un `orden` que no resuelve → null (mejor la reserva que una clave equivocada)');
+  // un `orden` que deja pasos sin colocar (id mal escrito, repetido o faltante) no pierde pasos en silencio: → null
+  ok(NQ('ordenar', { items: ['a', 'b', 'c'], orden: ['a', 'b', 'zz'] }) === null && NQ('ordenar', { items: ['a', 'b', 'c'], orden: ['a', 'b'] }) === null && NQ('ordenar', { items: ['a', 'b', 'c'], orden: ['a', 'a', 'b'] }) === null && NQ('ordenar', { items: ['a', 'b', 'c'], orden: [1, 2, 9] }) === null, 'ordenar: un `orden` parcial (un id mal escrito, repetido o faltante) → null, no se descartan pasos en silencio');
+  eq(NQ('ordenar', { items: ['c', 'a', 'b'], orden: ['a', 'b', 'c'] }).items.length, 3, 'ordenar: un `orden` completo conserva todos los pasos');
   ok(NQ('ordenar', { items: ['a'] }) === null && NQ('ordenar', { items: [] }) === null && NQ('ordenar', { items: Array.from({ length: 17 }, (_, i) => 'p' + i) }) === null, 'ordenar: menos de 2 pasos o más de 16 → null');
   eq(NQ('ordenar', { items: [{ id: 'a', texto: 'x' }, { id: 'a', texto: 'y' }] }).items.map((x) => x.id), ['a', 'a_'], 'ordenar: ids repetidos se desambiguan');
   ok(['x', 1, null, [], { items: 5 }, { pasos: [1] }, { pasos: [{}, {}] }].every((d) => NQ('ordenar', d) === null), 'ordenar: datos basura → null sin tirar error');
@@ -600,6 +603,27 @@ const NQ = (t, d) => Mot.get(t).normalizar(JSON.parse(JSON.stringify(d)), ctxNod
   ok(I('75', '75', { unidad: '%' }) && I('75 %', '75', { unidad: '%' }) && I('75%', '75', { unidad: '%' }) && I('3 kt', '3', { unidad: 'kt' }) && !I('76 %', '75', { unidad: '%' }), 'completar.igual: una cifra con su unidad (se acepta con o sin la unidad)');
   ok(I('6:00', '06:00') && I('06:00', '6:00') && !I('6:30', '06:00') && !I('600', '06:00'), 'completar.igual: las horas "6:00" y "06:00" son la misma');
   ok(CM.igual('recuentos', { respuesta: 'recuento', alternativas: ['recuentos'] }) && CM.igual('4,5', { respuesta: '4.5' }) && !CM.igual('1', { respuesta: '', alternativas: [] }), 'completar.igual: alternativas, decimales con coma, respuesta vacía nunca coincide');
+  // la unidad escrita tiene que ser la del hueco (o ninguna): "75 kt" no vale por "75 %", "2 h" no vale por "2 min"
+  ok(!I('75 kt', '75', { unidad: '%' }) && !I('75kt', '75', { unidad: '%' }) && !I('2 h', '2 min') && !I('2 min', '2', { unidad: 'h' }) && !I('3 nudos', '3', { unidad: '%' }), 'completar.igual: una unidad distinta de la declarada (o de la que trae la respuesta) no se acepta aunque la cifra coincida');
+  ok(I('2 min', '2 min') && I('2 minutos', '2 min') && I('2', '2 min') && I('2 h', '2', { unidad: 'h' }) && I('2 horas', '2', { unidad: 'h' }) && I('75 por ciento', '75', { unidad: '%' }) && I('75', '75', { unidad: '%' }) && I('15 nudos', '15', { unidad: 'kt' }), 'completar.igual: la unidad correcta (o un sinónimo: horas = h, nudos = kt, por ciento = %) o ninguna sí');
+  ok(I('75 kt', '75') && I('75 %', '75') && I('6,5 kg', '6.5'), 'completar.igual: una respuesta pelada sin unidad declarada acepta la cifra con cualquier unidad (compatibilidad)');
+  ok(CM.mismaUnidad('h', 'horas') && CM.mismaUnidad('Kt', 'nudos') && CM.mismaUnidad('km', 'km') && !CM.mismaUnidad('kt', '%') && !CM.mismaUnidad('m', 'min') && eq2(CM.cifra('75 %'), { n: 75, u: '%' }) && eq2(CM.cifra('6,5'), { n: 6.5, u: '' }) && CM.cifra('uno') === null && CM.numero('-3 kt') === -3 && CM.numero('x') === null, 'completar.cifra / mismaUnidad / numero: la cifra y su unidad');
+  function eq2(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+  // huecos intercambiables (grupo): día / noche en cualquier orden, una vez cada uno
+  {
+    const dn = [{ respuesta: 'día', alternativas: ['dia'], grupo: 'dn' }, { respuesta: 'noche', alternativas: [], grupo: 'dn' }];
+    eq([CM.aceptaGrupo('día', dn, 0, []), CM.aceptaGrupo('noche', dn, 1, []), CM.aceptaGrupo('noche', dn, 0, []), CM.aceptaGrupo('día', dn, 1, [])], [0, 1, 1, 0], 'completar.aceptaGrupo: cada hueco acepta la respuesta propia o la del otro del grupo');
+    eq([CM.aceptaGrupo('noche', dn, 1, [1]), CM.aceptaGrupo('día', dn, 1, [0]), CM.aceptaGrupo('noche', dn, 0, [1]), CM.aceptaGrupo('día', dn, 0, [1]), CM.aceptaGrupo('noche', dn, 0, [0])], [-1, -1, -1, 0, 1], 'completar.aceptaGrupo: una respuesta ya ocupada por otro hueco no vale dos veces (la libre sí)');
+    eq([CM.aceptaGrupo('luna', dn, 0, []), CM.aceptaGrupo('', dn, 0, []), CM.aceptaGrupo('día', [], 0, []), CM.aceptaGrupo('día', null, 0, null)], [-1, -1, -1, -1], 'completar.aceptaGrupo: lo que no es de ninguno, vacío o sin grupo → -1 (sin tirar error)');
+    const g3 = [{ respuesta: 'a' }, { respuesta: 'b' }, { respuesta: 'c' }];
+    eq(['c', 'a', 'b'].map((t, i) => CM.aceptaGrupo(t, g3, i, [])), [2, 0, 1], 'completar.aceptaGrupo: grupos de tres (cualquier permutación)');
+    // sin grupo cada hueco sigue pidiendo SU respuesta (no se cuela la del vecino)
+    ok(!CM.igual('noche', dn[0]) && !CM.igual('día', dn[1]), 'completar.igual: sin grupo el hueco sólo acepta su propia respuesta');
+    const g = NQ('completar', { texto: 'Se vuela de [[b]], de [[c]] y por [[d]].', huecos: [{ id: 'b', correcta: 'día', grupo: 'dn' }, { id: 'c', correcta: 'noche', grupo: 'DN' }, { id: 'd', correcta: 'instrumentos', grupo: 'solo' }] });
+    eq(g.frases[0].huecos.map((x) => x.grupo), ['dn', 'dn', ''], 'completar: `grupo` se normaliza (minúscula) y un grupo de un solo hueco se ignora');
+    eq(NQ('completar', g), g, 'completar: con grupos, normalizar sigue siendo idempotente');
+    eq(NQ('completar', { frases: [{ texto: 'A ___ y B ___.', huecos: [{ respuesta: 'x', grupo: 'g' }, { respuesta: 'y', grupo: 'g' }] }, { texto: 'C ___.', huecos: [{ respuesta: 'z', grupo: 'g' }] }] }).frases.map((f) => f.huecos.map((x) => x.grupo).join()), ['g,g', ''], 'completar: el grupo vale dentro de UNA frase (el mismo id en otra frase no los junta)');
+  }
   eq(CM.partes('a ___ b ____ c'), [{ t: 'txt', v: 'a ' }, { t: 'hueco', k: 0 }, { t: 'txt', v: ' b ' }, { t: 'hueco', k: 1 }, { t: 'txt', v: ' c' }], 'completar.partes: cada ___ (3 o más guiones bajos) es un hueco, en orden');
   eq(CM.partes('sin huecos'), [{ t: 'txt', v: 'sin huecos' }], 'completar.partes: sin huecos');
   const fr = (n) => Array.from({ length: n }, (_, i) => ({ texto: 'f' + i + ' ___', huecos: [{ respuesta: 'r' + i }] }));
@@ -643,6 +667,13 @@ const NQ = (t, d) => Mot.get(t).normalizar(JSON.parse(JSON.stringify(d)), ctxNod
   eq(a.mazo.map((x) => x.idx + x.frente + x.dorso + x.pista), ['0F1D1P1', '1F2D2', '2F3D3'], 'tarjetas: {frente, dorso, pista} con su índice de mazo');
   eq(a.bloques.map((x) => x.id + ':' + x.nombre + ':' + x.n), ['1:Bloque 1:1', '2:Bloque 2:1'], 'tarjetas: los bloques salen del campo `bloque`, en orden de aparición');
   eq(NQ('tarjetas', a), a, 'tarjetas: normalizar es idempotente');
+  { // los bloques con nombre: una lista de textos (el 1.º es el bloque 1) o la forma canónica; normalizar los conserva
+    const nb = NQ('tarjetas', { mazo: [{ frente: 'F1', dorso: 'D1', bloque: 1 }, { frente: 'F2', dorso: 'D2', bloque: 2 }, { frente: 'F3', dorso: 'D3', bloque: 2 }], bloques: ['Primero', 'Segundo'] });
+    eq(nb.bloques.map((x) => x.id + ':' + x.nombre + ':' + x.n), ['1:Primero:1', '2:Segundo:2'], 'tarjetas: `bloques` como lista de nombres pone nombre al bloque 1, 2…');
+    eq(NQ('tarjetas', nb), nb, 'tarjetas: con bloques con nombre, normalizar sigue siendo idempotente (la forma canónica conserva los nombres)');
+    eq(NQ('tarjetas', { mazo: [{ frente: 'F1', dorso: 'D1', bloque: 1 }, { frente: 'F2', dorso: 'D2', bloque: 3 }], bloques: ['Uno', 'Dos', 'Tres'] }).bloques.map((x) => x.nombre), ['Uno', 'Tres'], 'tarjetas: el nombre sale por el número de bloque, no por el orden de aparición');
+    eq(NQ('tarjetas', { mazo: [{ frente: 'F1', dorso: 'D1', bloque: 1 }, { frente: 'F2', dorso: 'D2', bloque: 2 }], bloques: [{ id: '2', nombre: 'Dos' }] }).bloques.map((x) => x.nombre), ['Bloque 1', 'Dos'], 'tarjetas: `bloques` como objetos {id, nombre} (los que falten caen a «Bloque N»)');
+  }
   eq(NQ('tarjetas', { mazo: [{ frente: 'x', dorso: '' }, { frente: 'F', dorso: 'D' }, { dorso: 'solo' }, { pregunta: 'P', respuesta: 'R' }] }).mazo.map((x) => x.idx + x.frente), ['1F', '3P'], 'tarjetas: una carta sin los dos lados se descarta pero las otras CONSERVAN su índice original (es la clave del repaso)');
   eq(NQ('tarjetas', { tarjetas: [['a', 'b'], ['c', 'd', 'pista']] }).mazo.map((x) => x.frente + x.dorso + x.pista), ['ab', 'cdpista'], 'tarjetas: pares [frente, dorso, pista]');
   eq(NQ('tarjetas', { terminos: ['t1', 't2'], definiciones: ['d1', 'd2'] }).mazo.map((x) => x.frente + x.dorso), ['t1d1', 't2d2'], 'tarjetas: dos listas paralelas (términos / definiciones)');
@@ -673,6 +704,26 @@ const NQ = (t, d) => Mot.get(t).normalizar(JSON.parse(JSON.stringify(d)), ctxNod
   eq([se.cuenta(), se.resultados(), se.orden()], [{ sabia: 1, medio: 1, nosabia: 1 }, { 10: 'nosabia', 11: 'sabia', 12: 'medio' }, [10, 11, 12]], 'crearSesion: cuenta y resultados son los de la PRIMERA calificación de cada carta');
   { const rp = TJ.crearSesion([4, 5], { repaso: true }); eq([rp.repaso, rp.calificar('nosabia').persistir, rp.calificar('sabia').persistir, rp.calificar('sabia').persistir, rp.terminada()], [true, false, false, false, true], 'crearSesion({repaso}): la vuelta de repaso de las falladas no cambia cuándo vuelven (nada se guarda)'); eq(TJ.crearSesion([1]).repaso, false, 'crearSesion: una sesión normal guarda'); }
   ok(TJ.crearSesion([]).calificar('sabia') === null && TJ.crearSesion([]).actual() === null && TJ.crearSesion([]).terminada(), 'crearSesion: sesión vacía no tira error');
+  // los botones de calificar sólo prometen "Vuelve en…" cuando esa calificación sí reprograma la tarjeta
+  {
+    const sn = TJ.crearSesion([7, 8]), gs = [sn.guardaAhora()];
+    sn.calificar('nosabia'); gs.push(sn.guardaAhora());          // la 8, primera vez
+    sn.calificar('sabia'); gs.push(sn.guardaAhora());            // la 7 vuelve una vez (segunda vuelta): no cambia la fecha
+    sn.calificar('sabia'); gs.push(sn.guardaAhora());            // sesión terminada
+    eq(gs, [true, true, false, false], 'crearSesion.guardaAhora: sí en la primera calificación de cada tarjeta; no en la segunda vuelta de las que no sabías ni al terminar');
+    const rp = TJ.crearSesion([1, 2], { repaso: true });
+    eq([rp.guardaAhora(), (rp.calificar('sabia'), rp.guardaAhora())], [false, false], 'crearSesion.guardaAhora: un repaso extra nunca guarda ni promete fechas');
+    eq(TJ.crearSesion([]).guardaAhora(), false, 'crearSesion.guardaAhora: sesión vacía → no');
+  }
+  // "Repasar igual" (el mazo al día) arma una sesión de repaso que no guarda: nada de repasar de más inflando el repaso espaciado
+  {
+    const cs = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13].map((i) => ({ idx: i, frente: 'f', dorso: 'd', bloque: i < 8 ? 'a' : 'b' }));
+    eq([TJ.repasoIgual(cs, '', 12).length, TJ.repasoIgual(cs, 'b').join(), TJ.repasoIgual(cs, 'a', 3).join(), TJ.repasoIgual([], '')], [12, '8,9,10,11,12,13', '0,1,2', []], 'repasoIgual: hasta 12 del mazo (o del bloque elegido) en su orden');
+    const srcTar = fs.readFileSync(path.join(SRC, 'escuela', 'c-tarjetas.js'), 'utf8');
+    ok(/Repasar igual[\s\S]{0,260}repasoIgual\([^)]*\)\s*,\s*\{\s*repaso:\s*true\s*[,}]/.test(srcTar), 'c-tarjetas.js: el botón «Repasar igual» arranca la sesión con {repaso:true} (no persiste)');
+    ok(/empezar\(info\.cola\.length \? info\.cola : [^\n]*\{\s*repaso:\s*!info\.cola\.length\s*\}\)/.test(srcTar), 'c-tarjetas.js: un mazo sin tarjetas por tocar se repasa en modo repaso aunque no haya lobby');
+    ok(/var cuenta = !!S && sesion\.guardaAhora\(\)/.test(srcTar) && /cuenta && St && isFn\(St\.sm2\)/.test(srcTar), 'c-tarjetas.js: los rótulos «Vuelve …» de los botones sólo salen cuando la calificación cuenta (guardaAhora)');
+  }
   eq([1, 2, 6, 13, 20, 45, 100, 0, -3].map(TJ.etiquetaIntervalo), ['mañana', 'en 2 días', 'en 6 días', 'en 13 días', 'en 3 semanas', 'en 6 semanas', 'en 3 meses', 'mañana', 'mañana'], 'etiquetaIntervalo: mañana · días · semanas · meses');
   const lec = { componentes: [{ tipo: 'diagrama', datos: {} }, { tipo: 'tarjetas', datos: { mazo: [{ frente: 'x', dorso: 'y' }, { frente: 'p', dorso: 'q' }] } }] };
   ok(TJ.cartasDeLeccion(lec).length === 2 && TJ.cartaDe(lec, 1).frente === 'p' && TJ.cartaDe(lec, 5) === null && TJ.cartasDeLeccion({}).length === 0, 'cartaDe / cartasDeLeccion: encuentran la carta {lección, índice} para la pantalla "Repaso del día"');
@@ -695,6 +746,9 @@ const NQ = (t, d) => Mot.get(t).normalizar(JSON.parse(JSON.stringify(d)), ctxNod
       if (c.tipo === 'ordenar') {
         const idsO = r.items.map((x) => x.id);
         ok(r.items.length >= 2 && r.items.length <= 16 && new Set(idsO).size === idsO.length && r.items.every((x) => x.texto), w + ': 2 a 16 pasos con id único y texto');
+        { const kf = ['items', 'pasos', 'elementos', 'secuencia', 'etapas', 'fases', 'acciones', 'cargos', 'lista', 'tarjetas'].filter((q) => Array.isArray(c.datos[q]) && c.datos[q].length)[0];
+          const fuenteN = kf ? c.datos[kf].length : (Array.isArray(c.datos.orden) ? c.datos.orden.length : -1);
+          ok(r.items.length === fuenteN, w + ': normalizar no pierde pasos (' + r.items.length + ' de ' + fuenteN + ' escritos)'); }
         ok(OR.evaluar(idsO, idsO).completo && OR.evaluar(OR.barajar(idsO, idsO, 'p'), idsO).completo === false, w + ': el orden correcto es completo y la mezcla no lo es');
         ok(r.items.every((x) => !x.explicacion || x.explicacion.length > 8), w + ': las explicaciones son frases');
         const conEx = r.items.filter((x) => x.explicacion).length;
@@ -721,6 +775,18 @@ const NQ = (t, d) => Mot.get(t).normalizar(JSON.parse(JSON.stringify(d)), ctxNod
           conFicha.forEach((hu, a) => conFicha.forEach((hv, b) => { if (a < b && CM.igual(hu.respuesta, hv)) ok(false, w + ': dos huecos de una ronda aceptan la misma respuesta («' + hu.respuesta + '»): la clave sería ambigua'); }));
         });
         ok(r.distractores.every((d) => !r.frases.some((f) => f.huecos.some((hu) => hu.tipo !== 'libre' && CM.igual(d, hu)))), w + ': ninguna ficha de relleno es respuesta de algún hueco');
+        // huecos intercambiables: grupos de 2 o más en la misma frase, de huecos que se llenan (no libres), con respuestas distintas entre sí; cada uno acepta las de los demás
+        r.frases.forEach((f, k) => {
+          const porGrupo = {};
+          f.huecos.forEach((hu) => { if (hu.grupo) (porGrupo[hu.grupo] = porGrupo[hu.grupo] || []).push(hu); });
+          Object.keys(porGrupo).forEach((gk) => {
+            const defs = porGrupo[gk];
+            ok(defs.length >= 2 && defs.every((hu) => hu.tipo !== 'libre'), w + ' frase ' + (k + 1) + ': el grupo «' + gk + '» tiene 2 o más huecos que se llenan');
+            defs.forEach((hu, a) => defs.forEach((hv, b) => { if (a !== b) ok(!CM.igual(hu.respuesta, hv), w + ' frase ' + (k + 1) + ': dos huecos del grupo «' + gk + '» no pueden tener la misma respuesta («' + hu.respuesta + '»)'); }));
+            const perms = defs.map((hu, a) => CM.aceptaGrupo(hu.respuesta, defs, (a + 1) % defs.length, []));
+            eq(perms, defs.map((hu, a) => a), w + ' frase ' + (k + 1) + ': en el grupo «' + gk + '» cada hueco acepta la respuesta de otro (cualquier orden)');
+          });
+        });
       } else {
         const ix = r.mazo.map((x) => x.idx);
         ok(r.mazo.length >= 1 && new Set(ix).size === ix.length && r.mazo.every((x) => x.frente && x.dorso && Number.isInteger(x.idx) && x.idx >= 0 && x.idx < 1000), w + ': cartas con frente, dorso e índice único');
@@ -731,12 +797,71 @@ const NQ = (t, d) => Mot.get(t).normalizar(JSON.parse(JSON.stringify(d)), ctxNod
         const sess = TJ.armarSesion(r.mazo, {}, 20000, {});
         ok(sess.cola.length === Math.min(r.mazo.length, TJ.MAX_SESION) && sess.nuevas === r.mazo.length, w + ': la primera sesión toma hasta ' + TJ.MAX_SESION + ' cartas nuevas');
         if (r.bloques.length) ok(r.bloques.reduce((s, b) => s + b.n, 0) === r.mazo.filter((x) => x.bloque).length && r.bloques.every((b) => b.nombre), w + ': los bloques suman sus cartas');
+        // un mazo con bloques numéricos trae sus NOMBRES (el selector no puede decir «Bloque 3»): uno por cada número usado, sin repetir, y ninguno genérico
+        if (r.bloques.length) {
+          ok(r.bloques.every((b) => !/^Bloque \d+$/.test(b.nombre) && !/^\d+$/.test(b.nombre)), w + ': los bloques tienen nombre propio, no «Bloque N» (' + r.bloques.map((b) => b.nombre).join(' · ') + ')');
+          ok(new Set(r.bloques.map((b) => b.nombre)).size === r.bloques.length && r.bloques.every((b) => b.nombre.length >= 4 && b.nombre.length <= 40), w + ': nombres de bloque distintos y cortos');
+          ok(Array.isArray(c.datos.bloques) && c.datos.bloques.length >= r.bloques.length, w + ': `bloques` declara los nombres en los datos de la lección');
+        }
       }
     });
   });
   function ses1(l) { return TJ.cartasDeLeccion(l); }
   console.log('  Q1 · en las lecciones: ordenar ' + cuenta.ordenar + ' · completar ' + cuenta.completar + ' · tarjetas ' + cuenta.tarjetas);
   ok(cuenta.ordenar >= 10 && cuenta.completar >= 9 && cuenta.tarjetas >= 5, 'las lecciones usan ordenar (≥ 10), completar (≥ 9) y tarjetas (≥ 5)');
+  // la clave de cada «ordenar» publicado está respaldada por el TEXTO de su lección: cada paso aparece, en ese orden, en lo que la lección dice (objetivos, puntos clave, resumen).
+  // Un orden que la lección no establece (p. ej. «Pedís la carta» antes de «Agendás Medicina» en INT-07-06) hacía fallar a quien lo leía bien. Un «ordenar» nuevo exige su evidencia acá.
+  {
+    const EVIDENCIA = {
+      'INT-01-04#2': [/Gerente Responsable/, /Director de Operaciones/, /Jefe de Instrucción de Vuelo/, /Ayudante de Instrucción de Vuelo/, /más abajo, los Instructores de Vuelo/],
+      'INT-02-01#0': [/Le pasás tu mail al profe/, /El profe te agrega al curso/, /Te llega un mail de invitación/, /Ingresás al curso/],
+      'INT-03-04#2': [/Freno de estacionamiento puesto/, /Radios y transpondedor apagados/, /Luces apagadas/, /Mezcla en corte/, /Llave de encendido en OFF/, /Master en OFF/, /Traba de comandos puesta/],
+      'INT-04-04#0': [/nombre completo y tu número de cédula/, /listado de ingresos provisorios mensual/, /le entregás tu cédula al oficial de la PAN/, /verifica tu identidad y anota tus datos/, /pase que te entrega la PAN/, /para ingresar a los hangares/, /lo devolvés cuando te vas/],
+      'INT-04-06#2': [/Elegís el día de la visita/, /Completás el formulario/, /Lo hacés con la antelación mínima/, /Tu invitado recibe el pase provisorio/],
+      'INT-05-04#2': [/pasa primero el avión/, /segundo la persona/, /tercero el vehículo/],
+      'INT-06-02#3': [/Identificación/, /Análisis/, /Planeación/, /Mitigación/, /Control/],
+      'INT-07-06#1': [/desde que te inscribís/, /agendás por WhatsApp/, /estás a las 8 de la mañana/, /DINACIA: llevás una carta de la escuela/, /Al final tenés la licencia de alumno piloto y un libro de vuelo/],
+      'AER-02-08#3': [/Hasta 8°/, /12°: la capa turbulenta/, /16°–18°: la capa es muy extensa/, /18°–20°: casi no queda capa/],
+      'AER-03-04#3': [/bajá la nariz por debajo del horizonte/, /aplicá toda la potencia/, /recuperá la altura perdida/]
+    };
+    const textoDe = (l) => [].concat(l.objetivos || [], (l.contenido || []).map((p) => typeof p === 'string' ? p : [p.titulo, p.texto, p.ejemplo, p.ojo].filter(Boolean).join('\n')), [l.resumen || '']).join('\n');
+    const publicados = [];
+    todasLasLecciones.forEach((l) => l.componentes.forEach((c, i) => {
+      if (c.tipo !== 'ordenar') return;
+      const clave = l.id + '#' + i, r = Mot.get('ordenar').normalizar(JSON.parse(JSON.stringify(c.datos)), ctxNode, c);
+      publicados.push(clave);
+      const pats = EVIDENCIA[clave];
+      ok(!!pats && r && pats.length === r.items.length, clave + ': el «ordenar» tiene su evidencia revisada (un patrón de texto por paso, en el orden de la clave)');
+      if (!pats || !r) return;
+      const txt = textoDe(l);
+      let desde = 0;
+      pats.forEach((p, k) => {
+        const m = p.exec(txt.slice(desde));
+        ok(!!m, clave + ' paso ' + (k + 1) + ' («' + r.items[k].texto.slice(0, 50) + '»): la lección lo dice, después del paso anterior (' + p + ')');
+        if (m) desde += m.index + m[0].length;
+      });
+    }));
+    eq(publicados.sort(), Object.keys(EVIDENCIA).sort(), 'ordenar: cada «ordenar» publicado tiene evidencia revisada y cada evidencia corresponde a uno publicado');
+    // el caso que falló: INT-07-06 no ordena nada que la lección no establezca (ni la carta antes de agendar, ni agendar la cita después del psicofísico por mail)
+    const l76 = todasLasLecciones.find((l) => l.id === 'INT-07-06'), o76 = Mot.get('ordenar').normalizar(JSON.parse(JSON.stringify(l76.componentes.find((c) => c.tipo === 'ordenar').datos)), ctxNode, {});
+    ok(o76.items.length === 5 && !o76.items.some((x) => /carta de la escuela que acredite|Agendás la cita|Recibís el psicofísico por mail|Comprás un libro/.test(x.texto)), 'INT-07-06: sin pasos de posición ambigua (la carta, agendar la cita, recibir el psicofísico y el libro no se ordenan por separado)');
+    eq(o76.items.map((x) => x.id), ['inscripcion', 'agendar', 'psicofisico', 'ir-dinacia', 'recibir-licencia'], 'INT-07-06: inscripción → turno en Medicina → psicofísico → DINACIA → licencia');
+  }
+  // huecos intercambiables: toda frase con 2 o más huecos que se llenan está REVISADA (¿se pueden llenar en cualquier orden?): INT-01-03 «de día, de noche» es la única y lo declara con `grupo`
+  {
+    const revisadas = { 'INT-01-03': 'volar de ___ y de ___ → día / noche intercambiables (grupo «dn»)' }, multi = [];
+    todasLasLecciones.forEach((l) => l.componentes.forEach((c) => {
+      if (c.tipo !== 'completar') return;
+      const r = Mot.get('completar').normalizar(JSON.parse(JSON.stringify(c.datos)), ctxNode, c);
+      (r ? r.frases : []).forEach((f) => { if (f.huecos.filter((hu) => hu.tipo !== 'libre').length >= 2) multi.push(l.id); });
+    }));
+    eq(Array.from(new Set(multi)).sort(), Object.keys(revisadas), 'completar: toda frase con 2+ huecos que se llenan está revisada (si agregás una, decidí si sus huecos son intercambiables y declará `grupo`)');
+    const l13 = todasLasLecciones.find((l) => l.id === 'INT-01-03'), c13 = l13 && l13.componentes.find((c) => c.tipo === 'completar');
+    const r13 = c13 && Mot.get('completar').normalizar(JSON.parse(JSON.stringify(c13.datos)), ctxNode, c13), hs13 = r13 ? r13.frases[0].huecos : [];
+    const dn = hs13.filter((hu) => hu.grupo === 'dn');
+    eq(dn.map((hu) => hu.respuesta), ['día', 'noche'], 'INT-01-03: «de día, de noche» son un grupo de huecos intercambiables');
+    ok(dn.length === 2 && CM.aceptaGrupo('noche', dn, 0, []) === 1 && CM.aceptaGrupo('día', dn, 1, []) === 0 && CM.aceptaGrupo('noche', dn, 1, [1]) === -1, 'INT-01-03: «noche» sirve en el primer hueco y «día» en el segundo, pero no la misma dos veces');
+  }
 }
 // ---- los esbozos del plan para estos tres tipos: casi todos normalizan (sirven de seguro para los módulos que vienen)
 if (fs.existsSync(path.join(PLAN, 'INT.json')) && fs.existsSync(path.join(PLAN, 'AER.json'))) {
@@ -832,6 +957,31 @@ const N2 = (t, d) => Mot.get(t).normalizar(JSON.parse(JSON.stringify(d)), ctxNod
   eq(JSON.stringify(est(1)), JSON.stringify(est(1)), 'estadoFigura: es pura (mismo resultado al volver)');
   ok(N2('diapositiva', { pasos: [{ texto: 'x', figura: 'no-existe' }, { texto: 'y' }] }).pasos[0].escena.tipo === 'icono', 'diapositiva: una figura que no existe cae al ícono');
   ok(DI.duracionPaso('corto') >= 4 && DI.duracionPaso('x'.repeat(400)) <= 11 && DI.duracionPaso('hola', '', 6) === 6, 'duracionPaso: entre 4 y 11 segundos; `autoplay: N` fija los segundos');
+  // reproducción automática: el reloj (ctx.ahora() en MILISEGUNDOS) se congela fuera de pantalla / con la pestaña oculta y no salta de paso al volver
+  {
+    const est = { t0: 1000, ult: 1000 }, dur = 6, fr = [];
+    let t = 1000;
+    for (let i = 0; i < 20; i++) { t += 100; fr.push(DI.ticAuto(est, t, false, dur)); }                  // 2 s viendo la diapositiva
+    const antes = fr[fr.length - 1];
+    ok(Math.abs(antes - 2 / dur) < 1e-9, 'ticAuto: la fracción del paso es el tiempo transcurrido (ms) sobre la duración (s)');
+    let nulos = 0;
+    for (let i = 0; i < 300; i++) { t += 100; if (DI.ticAuto(est, t, true, dur) === null) nulos++; }       // 30 s fuera de pantalla (pausado)
+    eq(nulos, 300, 'ticAuto: en pausa devuelve null (no avanza)');
+    t += 100;
+    const despues = DI.ticAuto(est, t, false, dur);
+    ok(Math.abs(despues - (antes + 0.1 / dur)) < 1e-9 && despues < 1, 'ticAuto: tras 30 s en pausa el paso sigue donde estaba (+1 tic), no salta al siguiente (fracción ' + despues.toFixed(3) + ')');
+    // el navegador frena los tics de una pestaña oculta (uno por segundo, o ninguno): lo salteado tampoco cuenta
+    const e2 = { t0: 0, ult: 0 }; let t2 = 0, f2 = null;
+    for (let i = 0; i < 20; i++) { t2 += 100; f2 = DI.ticAuto(e2, t2, false, dur); }                       // 2 s
+    const a2 = f2; t2 += 60000; f2 = DI.ticAuto(e2, t2, false, dur);                                       // 60 s sin tics y vuelve
+    ok(Math.abs(f2 - (a2 + 0.1 / dur)) < 1e-9 && f2 < 1, 'ticAuto: tras 60 s sin tics (pestaña en segundo plano) el paso no salta (fracción ' + f2.toFixed(3) + ')');
+    const e3 = { t0: 0, ult: 0 }; let t3 = 0, f3 = null;
+    for (let i = 0; i < 70; i++) { t3 += 100; f3 = DI.ticAuto(e3, t3, false, dur); }                       // 7 s seguidos: el paso de 6 s termina
+    ok(f3 >= 1, 'ticAuto: con la diapositiva a la vista el paso termina a su hora (fracción ' + f3.toFixed(2) + ')');
+    ok(DI.ticAuto({ t0: 0, ult: 0 }, 500, false, 0) === 0.5 && DI.ticAuto({ t0: 5, ult: 0 }, 0, true, 4) === null, 'ticAuto: una duración inválida no divide por cero');
+    const srcDia = fs.readFileSync(path.join(SRC, 'escuela', 'c-diapositiva.js'), 'utf8');
+    ok(!/t0\s*\+=\s*0\.1/.test(srcDia) && /ticAuto\(reloj,\s*ctx\.ahora\(\)/.test(srcDia), 'c-diapositiva.js: el tic usa ticAuto con el reloj en milisegundos (no suma 0,1 a un reloj en ms)');
+  }
   eq([N2('diapositiva', { pasos: ['a', 'b'], autoplay: true }).autoplay, N2('diapositiva', { pasos: ['a', 'b'], autoplay: 7 }).segundos, N2('diapositiva', { pasos: ['a', 'b'] }).autoplay], [true, 7, false], 'diapositiva: `autoplay` true o segundos por paso; por defecto no se reproduce sola');
   eq(N2('diapositiva', JSON.parse(JSON.stringify(d))), d, 'diapositiva: normalizar es idempotente');
 }
@@ -883,6 +1033,13 @@ const N2 = (t, d) => Mot.get(t).normalizar(JSON.parse(JSON.stringify(d)), ctxNod
   ok(['x', 1, null, [], {}, { pasos: 5 }].every((x) => N2('caso', x) === null), 'caso: datos basura → null sin tirar error');
   ok(N2('caso', { contexto: 'c', pasos: [{ texto: 'nota para el instructor: a confirmar' }, { texto: 'ok' }, { texto: 'dos' }] }).pasos.length === 2, 'caso: oculta los textos «a confirmar» del plan');
   eq(N2('caso', JSON.parse(JSON.stringify(c))), c, 'caso.normalizar: idempotente');
+  // un caso inventado (ficticio) no dice «lo que pasó de verdad»: el rótulo del resultado depende de `ficticio`
+  eq([CA.rotuloResultado(true), CA.rotuloResultado(false), CA.rotuloResultado(undefined)], ['LO QUE PASA EN EL EJEMPLO', 'LO QUE PASÓ DE VERDAD', 'LO QUE PASÓ DE VERDAD'], 'caso.rotuloResultado: «lo que pasa en el ejemplo» si es ficticio, «lo que pasó de verdad» si es real');
+  {
+    const srcCaso = fs.readFileSync(path.join(SRC, 'escuela', 'c-caso.js'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    ok(/text:\s*rotuloResultado\(datos\.ficticio\)/.test(srcCaso) && (srcCaso.match(/PASÓ DE VERDAD/g) || []).length === 1, 'c-caso.js: el rótulo del resultado sale de rotuloResultado(datos.ficticio) (sin otro texto fijo «pasó de verdad»)');
+    ok(c.ficticio === false && v.ficticio === true, 'caso: ficticio sólo si el dato lo dice (los reales no lo son)');
+  }
 }
 
 // ---- mapa: normalizar, vistas (carnets), «Encontrá»
@@ -914,6 +1071,41 @@ const N2 = (t, d) => Mot.get(t).normalizar(JSON.parse(JSON.stringify(d)), ctxNod
   eq(N2('mapa', { puntos: [{ id: 'a', nombre: 'A', x: 1, y: 1 }, { id: 'b', nombre: 'B', x: 2, y: 2 }, { id: 'c', nombre: 'C', x: 3, y: 3 }], encontra: [{ id: 'b', pregunta: 'Elegí B' }, 'c', { id: 'nope' }] }).encontra.map((x) => x.id + ':' + x.pregunta.slice(0, 7)), ['b:Elegí B', 'c:¿Dónde '], 'mapa: `encontra` explícito (objetos o ids), descarta ids que no existen');
   eq(N2('mapa', { puntos: [{ id: 'a', nombre: 'A', x: 1, y: 1 }, { id: 'b', nombre: 'B', x: 2, y: 2 }], encontra: false }).encontra, [], 'mapa: `encontra:false` apaga el modo');
   ok(MA.evaluar(e, 'a', 'a') && !MA.evaluar(e, 'a', 'b') && !MA.evaluar(e, 'nope', 'nope'), 'mapa.evaluar: sólo acierta el lugar pedido (y que exista)');
+  // el número de un recorrido va en el medio de su tramo más largo (con 2 puntos, no sobre el pin de llegada)
+  {
+    eq([MA.puntoMedioRuta([[10, 10], [50, 10]]), MA.puntoMedioRuta([[0, 0], [10, 0], [10, 40]]), MA.puntoMedioRuta([[88, 12], [84, 24], [80, 36], [62, 31]])], [[30, 10], [10, 20], [71, 33.5]], 'mapa.puntoMedioRuta: la mitad del tramo más largo (2 puntos → el medio de la línea, no el de llegada)');
+    const p2 = [[20, 20], [60, 20]], m2 = MA.puntoMedioRuta(p2);
+    ok(m2[0] !== p2[1][0] && m2[0] > p2[0][0] && m2[0] < p2[1][0], 'mapa.puntoMedioRuta: una ruta de 2 puntos no pone el número encima del punto final');
+    eq([MA.puntoMedioRuta([]), MA.puntoMedioRuta([[5, 6]]), MA.puntoMedioRuta(null)], [[0, 0], [5, 6], [0, 0]], 'mapa.puntoMedioRuta: sin puntos o con uno solo no tira error');
+    const dm = N2('mapa', { fondo: 'plano-hangares-sur', puntos: [{ id: 'a', x: 30, y: 24, nombre: 'Uno' }, { id: 'b', x: 70, y: 24, nombre: 'Dos' }], zonas: [{ id: 'z', rect: [10, 40, 20, 10], nombre: 'Zona' }], rutas: [{ id: 'r', puntos: [[30, 24], [70, 24]], nombre: 'Ruta' }] });
+    const ins = MA.insignias(dm.items);
+    eq(ins.map((b) => b.id).sort(), ['r', 'z'], 'mapa.insignias: un número redondo por zona y por recorrido con número');
+    const rb = ins.find((b) => b.id === 'r');
+    ok(rb && rb.x === MP.px(50) && rb.y === MP.px(24),'mapa.insignias: el número del recorrido de 2 puntos queda en el medio de la línea');
+    eq(MA.insignias(dm.items, (it) => it.tipo === 'zona').map((b) => b.id), ['z'], 'mapa.insignias: respeta el filtro de capas visibles');
+    eq([MA.insignias(null), MA.insignias([null, {}])], [[], []], 'mapa.insignias: entradas raras no tiran error');
+    // un nombre de pin no se apoya en el número de una zona si hay otro lugar libre
+    const pin = { x: 100, y: 100, r: 17, largo: 12 };
+    const sinObs = MA.ubicarEtiquetas([pin], 1, []), conObs = MA.ubicarEtiquetas([pin], 1, [{ x: 100 + 17 + 8 + 30, y: 100, r: 13 }]);
+    ok(sinObs[0].pos === 'der' && conObs[0].pos !== 'der', 'mapa.ubicarEtiquetas: el nombre se corre si el lugar elegido taparía el número de una zona o recorrido');
+    eq(MA.ubicarEtiquetas([pin], 1, null)[0].pos, MA.ubicarEtiquetas([pin], 1)[0].pos, 'mapa.ubicarEtiquetas: los obstáculos son opcionales (compatibilidad)');
+  }
+  // áreas de toque de los pines: 44 px de diámetro a cualquier escala, sin pasarse sobre el vecino
+  {
+    const dPx = (esc, vec) => 2 * MA.radioToque(esc, vec) * esc;
+    ok([0.4, 0.55, 0.75, 1, 1.5].every((esc) => dPx(esc) >= 44 - 1e-9), 'mapa.radioToque: el área de toque mide al menos 44 px a escalas de 0,4 a 1,5 (' + [0.4, 0.55, 0.75, 1, 1.5].map((esc) => dPx(esc).toFixed(0)).join(' / ') + ')');
+    ok(MA.radioToque(0.55, 100) >= 40 - 1e-9 && MA.radioToque(1, 100) === 30 && MA.radioToque(0.55, 30) === 30 && MA.radioToque(0.55, 41) < 40 && MA.radioToque(0.55, 41) >= 30, 'mapa.radioToque: nunca menos de 30 unidades y, con un vecino cerca, no lo tapa');
+    ok(MA.radioToque(0, 0) === 30 && MA.radioToque(NaN, undefined) === 30, 'mapa.radioToque: escala o vecino inválidos no tiran error');
+    const srcMapa = fs.readFileSync(path.join(SRC, 'escuela', 'c-mapa.js'), 'utf8');
+    ok(/it\._hit\.setAttribute\('r', radioToque\(/.test(srcMapa), 'c-mapa.js: colocar() ajusta el área de toque de cada pin a la escala');
+  }
+  // el aviso de «Encontrá» no promete un parpadeo (con «reducir movimiento» el lugar pedido se ve marcado con un aro fijo, no parpadea)
+  {
+    const tf = MA.textoFallo('Hangar', 'Portón');
+    ok(/es el que está marcado/.test(tf) && !/parpade/i.test(tf) && /Hangar/.test(tf) && /Portón/.test(tf), 'mapa.textoFallo: «es el que está marcado», sin «parpadea»');
+    const srcMapa2 = fs.readFileSync(path.join(SRC, 'escuela', 'c-mapa.js'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    ok(/textoFallo\(porId\[id\]\.nombre, pedido\.nombre\)/.test(srcMapa2) && !/parpade/i.test(srcMapa2), 'c-mapa.js: el mensaje de «Encontrá» sale de textoFallo y no habla de parpadeos');
+  }
   eq(N2('mapa', JSON.parse(JSON.stringify(m))), m, 'mapa.normalizar: idempotente');
 }
 
@@ -959,6 +1151,21 @@ const N2 = (t, d) => Mot.get(t).normalizar(JSON.parse(JSON.stringify(d)), ctxNod
         let ov = 0; for (let a = 0; a < cajas.length; a++) for (let b = a + 1; b < cajas.length; b++) if (Math.min(cajas[a][2], cajas[b][2]) - Math.max(cajas[a][0], cajas[b][0]) > 0 && Math.min(cajas[a][3], cajas[b][3]) - Math.max(cajas[a][1], cajas[b][1]) > 0) ov++;
         ok(ov <= max, w + ': nombres que se pisan a escala ' + esc + ': ' + ov + ' (máx. ' + max + ')');
       });
+      // los números redondos de zonas y recorridos no quedan tapados por un pin ni por el nombre de un pin (a escala de computadora y de tableta: ninguno; en el celular más angosto, a lo sumo uno)
+      {
+        const ins = MA.insignias(r.items), pinesI = r.items.filter((it) => it.tipo === 'punto');
+        ins.forEach((b) => pinesI.forEach((p) => ok(Math.hypot(b.x - p.x * 6, b.y - p.y * 6) >= b.r + (p.grande ? 22 : 17), w + ': el número ' + b.n + ' de «' + b.id + '» no queda debajo del pin «' + p.nombre + '»')));
+        [[0.55, 1], [0.75, 0], [1.1, 0]].forEach(([esc, max]) => {
+          const pos = MA.ubicarEtiquetas(pts, esc, ins), f = Math.max(15, 11 / esc), cw = f * 0.58, al = f * 1.15;
+          let tapados = 0;
+          pos.forEach((p, i) => {
+            const wd = pts[i].largo * cw + 8, tx = pts[i].x + p.dx, ty = pts[i].y + p.dy, x0 = p.anchor === 'start' ? tx - 2 : p.anchor === 'end' ? tx - wd : tx - wd / 2, x1 = p.anchor === 'start' ? tx + wd : p.anchor === 'end' ? tx + 2 : tx + wd / 2;
+            const caja = [x0, ty - al * 0.78, x1, ty + al * 0.3];
+            ins.forEach((b) => { if (Math.min(caja[2], b.x + b.r) - Math.max(caja[0], b.x - b.r) > 0 && Math.min(caja[3], b.y + b.r) - Math.max(caja[1], b.y - b.r) > 0) tapados++; });
+          });
+          ok(tapados <= max, w + ': nombres de pines encima de números de zonas o recorridos a escala ' + esc + ': ' + tapados + ' (máx. ' + max + ')');
+        });
+      }
       r.vistas.forEach((v) => Object.keys(v.estados).forEach((z) => ok(r.items.some((it) => it.id === z && it.tipo === 'zona'), w + ': la vista «' + v.nombre + '» habla de una zona que existe')));
     } else if (c.tipo === 'caso') {
       ok(r.pasos.length >= 3 && r.pasos.length <= 8, w + ': 3 a 8 pasos');
@@ -1186,6 +1393,35 @@ seccion('calidad del contenido publicado (INT y AER-01..03): tipos, títulos, pr
       eq(malos, [], w + ': las escenas de «' + c.titulo + '» sólo nombran capas de la figura ' + c.datos.figura);
     });
   });
+  // preguntas autosuficientes: el test sortea preguntas de a una (y el repaso las mezcla entre lecciones), así que el enunciado y las opciones no pueden apoyarse en la pantalla ni en otra pregunta
+  {
+    const preguntasTodas = [];
+    lecciones.forEach((l) => {
+      (l.preguntas || []).forEach((q, k) => preguntasTodas.push({ ref: l.id + ' pregunta ' + (k + 1), q }));
+      l.componentes.forEach((c, i) => { if (c.tipo === 'quiz') (c.datos.preguntas || []).forEach((q, k) => preguntasTodas.push({ ref: l.id + ' quiz ' + i + ' pregunta ' + (k + 1), q })); });
+    });
+    const SIN_ANTECEDENTE = [
+      [/diapositiva/i, 'habla de «la diapositiva»'], [/\b(esta|en esta|según esta) (lección|página|pantalla|unidad|figura|imagen)\b/i, 'habla de «esta lección / pantalla»'],
+      [/\b(ese|este|aquel) (formulario|carnet|estudio|portón|dibujo|gráfico|esquema)\b/i, 'señala «ese formulario / carnet…» sin decir cuál'], [/\b(esos|estos|aquellos) (estudios|carnets|portones)\b(?! (de|del|que|a los|en)\b)/i, 'señala «esos estudios…» sin decir cuáles'],
+      [/\bsegún (el|lo que|lo) (dibujo|gráfico|esquema|mapa|ejemplo de arriba|anterior)\b/i, 'remite a algo de la pantalla']
+    ];
+    let revisadas = 0;
+    preguntasTodas.forEach(({ ref, q }) => {
+      revisadas++;
+      const textos = [['el enunciado', q.pregunta]].concat(q.opciones.map((o, i) => ['la opción ' + 'ABCDEF'.charAt(i), o]));
+      textos.forEach(([que, t]) => SIN_ANTECEDENTE.forEach(([re, msg]) => ok(!re.test(t), ref + ': ' + que + ' ' + msg + ' («' + String(t).slice(0, 70) + '»)')));
+      // «a esa hora» sólo si el enunciado trae una hora
+      q.opciones.forEach((o, i) => { if (/\ba esa hora\b/i.test(o)) ok(/\d{1,2}:\d{2}|\bhora\b/i.test(q.pregunta), ref + ': la opción ' + 'ABCDEF'.charAt(i) + ' dice «a esa hora» pero el enunciado no trae ninguna hora'); });
+    });
+    ok(revisadas >= 250, 'preguntas autosuficientes: se revisaron ' + revisadas + ' preguntas (mini-quiz de cada lección y los bancos de test)');
+    // los dos casos concretos que fallaron: «¿Qué se tramita con ese formulario?» sin antecedente y un distractor que contradecía la lección
+    const lec82 = lecciones.find((l) => l.id === 'INT-08-02'), q82 = lec82.componentes.find((c) => c.tipo === 'quiz').datos.preguntas;
+    const form = q82.find((q) => /se tramita con el formulario/.test(q.pregunta));
+    ok(!!form && /Puertas del Sur/.test(form.pregunta) && /invitados/.test(form.pregunta), 'INT-08-02: «¿Qué se tramita con el formulario…?» nombra el formulario (Puertas del Sur, invitados) y se entiende sola');
+    const motor = q82.find((q) => /pararse detrás de un avión con el motor prendido/.test(q.pregunta));
+    ok(!!motor && !motor.opciones.some((o) => /arrancar encima/.test(o)) && motor.opciones.filter((o, i) => i !== motor.correcta).every((o) => !/piloto no te ve/.test(o)), 'INT-08-02: el distractor «el piloto no te ve y puede arrancar encima tuyo» (verosímil y contradictorio con la regla del beacon) ya no está');
+    ok(q82.every((q) => q.opciones.length === 4 && new Set(q.opciones).size === 4 && q.correcta >= 0 && q.correcta < 4 && q.explicacion), 'INT-08-02: cada pregunta del test sigue con 4 opciones distintas, clave y explicación');
+  }
   // preguntas por módulo: la correcta repartida entre A, B, C y D (ninguna letra pasa del 40 %) y que no sea la opción más larga de forma sistemática (≤ 45 %)
   ['INT', 'AER'].forEach((mid) => {
     const qs = lecciones.filter((l) => l.id.startsWith(mid + '-')).flatMap((l) => l.preguntas.map((q) => ({ w: l.id, q })));
@@ -1369,6 +1605,32 @@ seccion('store: repaso espaciado de tarjetas');
   eq([ST.sm2(null, 5, H), ST.sm2(null, 'sabia', H), ST.sm2(null, 'inventada', H), ST.sm2(null, 99, H).ef, ST.sm2(null, -4, H).n], [ST.sm2(null, 'sabia', H), ST.sm2(null, 5, H), ST.sm2(null, 1, H), ST.sm2(null, 5, H).ef, 0], 'sm2: la calidad acepta 0–5 o el nombre; lo desconocido cuenta como "No la sabía"; se acota');
   ok(ST.sm2({ ef: 'x', n: 'y', due: 5, last: 5 }, 5, 10).due === 10 + 1 + 1 && ST.sm2('basura', 3, 10).due === 11 && ST.sm2(undefined, 5, NaN).due >= 0, 'sm2: un registro dañado no tira error (se trata como una carta nueva)');
   { const r0 = { ef: 2.5, n: 1, due: 12, last: 11 }, copia = JSON.stringify(r0); ST.sm2(r0, 5, 12); eq(JSON.stringify(r0), copia, 'sm2: no modifica el registro de entrada'); }
+  // repasar de más (la carta todavía no toca) no adelanta ni infla nada: 4 pasadas el mismo día ya no dan +49 días
+  {
+    let rr = ST.sm2(null, 'sabia', H); const primero = JSON.stringify(rr);
+    for (let i = 0; i < 6; i++) rr = ST.sm2(rr, 'sabia', H);
+    eq([JSON.stringify(rr), rr.due - H, rr.n], [primero, 2, 1], 'sm2: "La sabía" el mismo día, una y otra vez, no cambia nada (n, intervalo ni fecha)');
+    const antes = { ef: 2.6, n: 3, due: H + 20, last: H + 3 };
+    eq(ST.sm2(antes, 'sabia', H + 5), antes, 'sm2: una carta que no toca y se califica bien queda igual (aunque falten días)');
+    eq(ST.sm2(antes, 'medio', H + 5), antes, 'sm2: lo mismo con "Más o menos" antes de tiempo');
+    eq(ST.sm2(antes, 'sabia', H + 20).n, 4, 'sm2: el día que toca sí avanza');
+    eq([ST.sm2(antes, 'nosabia', H + 5).n, ST.sm2(antes, 'nosabia', H + 5).due - (H + 5)], [0, 1], 'sm2: si falla antes de tiempo sí vuelve mañana (el olvido es real)');
+    // tope de un año: ni con cien repasos al día se desborda ni saneTarjeta descarta el registro
+    let rb = null, d = H, mayor = 0;
+    for (let i = 0; i < 100; i++) { rb = ST.sm2(rb, 'sabia', d); mayor = Math.max(mayor, rb.due - d); d = rb.due; }
+    ok(mayor <= ST.DIAS_MAX && ST.DIAS_MAX === 365, 'sm2: el intervalo nunca pasa de ' + ST.DIAS_MAX + ' días (máximo visto: ' + mayor + ')');
+    eq(ST.sanear({ tarjetas: { 'INT-01-01:0': rb } }).tarjetas['INT-01-01:0'], rb, 'sm2: tras 100 repasos el registro sigue siendo válido para saneTarjeta (no se reinicia)');
+    const inflado = ST.sanear({ tarjetas: { 'INT-01-01:0': { ef: 3.5, n: 80, due: 900000, last: H } } }).tarjetas['INT-01-01:0'];
+    eq([inflado && inflado.due - H, inflado && inflado.n], [365, 80], 'saneTarjeta: un intervalo desbordado de una versión anterior se recorta a un año en vez de perder la tarjeta');
+    ok(!ST.sanear({ tarjetas: { 'INT-01-01:1': { ef: 2.5, n: 1, due: 5, last: 900000 } } }).tarjetas['INT-01-01:1'], 'saneTarjeta: un último repaso imposible sí se descarta');
+  }
+  // la instancia: calificar de más el mismo día no infla el registro
+  {
+    const ms0 = Date.parse('2026-10-30T12:00:00'), sx = ST.crear({ storage: memStorage(), now: () => ms0 });
+    const a1 = sx.tarjetaRepasar('INT-03-02', 0, 'sabia');
+    for (let i = 0; i < 4; i++) sx.tarjetaRepasar('INT-03-02', 0, 'sabia');
+    eq(sx.tarjeta('INT-03-02', 0), a1, 'store.tarjetaRepasar: cinco pasadas el mismo día dejan el mismo registro (due +2, n 1)');
+  }
   // pendientes
   const regs = { 'INT-03-02:2': { ef: 2.5, n: 1, due: H - 2, last: H - 3 }, 'INT-03-02:0': { ef: 2, n: 0, due: H, last: H - 1 }, 'AER-01-01:1': { ef: 2.5, n: 3, due: H + 1, last: H - 5 }, 'AER-02-02:0': { ef: 2.5, n: 1, due: H - 2, last: H - 3 }, 'mal': { ef: 2.5, n: 1, due: 1, last: 0 }, 'INT-01-01:3': 'x' };
   eq(ST.tarjetasPendientes(regs, H).map((x) => x.leccion + ':' + x.idx + '+' + x.atraso), ['AER-02-02:0+2', 'INT-03-02:2+2', 'INT-03-02:0+0'], 'tarjetasPendientes: las vencidas, la más atrasada primero (y por clave si empatan); ignora claves y registros dañados');
@@ -1406,6 +1668,56 @@ seccion('store: repaso espaciado de tarjetas');
   ok(sbloq.tarjeta('INT-01-01', 0) !== null && sbloq.persistente === false, 'tarjetas: con el almacenamiento bloqueado siguen en memoria');
 }
 
+seccion('store: huecos libres (la bitácora vive dentro del progreso)');
+{
+  const ms = Date.parse('2026-10-30T12:00:00'), VIEJA = 'c150.escuela.libre.v1', K1 = 'INT-01-01|p2.0|0', K2 = 'INT-01-01|p2.0|1';
+  const mem = memStorage(), sl = ST.crear({ storage: mem, now: () => ms });
+  eq([ST.vacio().libre, sl.libre(K1), sl.libres()], [{}, '', {}], 'libre: arranca vacío');
+  eq([sl.libreGuardar(K1, '  Para volar  '), sl.libre(K1), sl.libreGuardar(K2, 'x'.repeat(300)).length, sl.libreGuardar('', 'no'), sl.libreGuardar('__proto__', 'no')], ['Para volar', 'Para volar', 160, '', ''], 'libre: se guarda recortado (≤ 160); una clave imposible no guarda nada');
+  ok(JSON.parse(mem.getItem('c150.escuela.v1')).libre[K1] === 'Para volar' && mem.getItem(VIEJA) === null, 'libre: va a la clave del progreso (c150.escuela.v1), no a una clave aparte');
+  const sl2 = ST.crear({ storage: mem, now: () => ms });
+  eq(sl2.libre(K1), 'Para volar', 'libre: vuelve al recargar');
+  let avisos = 0; sl2.onChange(() => { avisos++; }); sl2.libreGuardar(K1, 'Cambio'); sl2.libreGuardar(K1, '');
+  eq([sl2.libre(K1), avisos, sl2.libreGuardar(K1, ''), Object.keys(sl2.libres()).length], ['', 0, '', 1], 'libre: escribir vacío borra; no dispara onChange (se llama en cada tecla)');
+  // saneado: sólo texto, claves válidas, tope de cantidad
+  const san = ST.sanear({ libre: { ok: ' hola ', '__proto__': 'x', vacio: '   ', num: 5, obj: {}, [('k'.repeat(121))]: 'larga', largo: 'y'.repeat(500) } });
+  eq([san.libre.ok, Object.keys(san.libre).sort(), san.libre.largo.length, ({}).x === undefined], ['hola', ['largo', 'ok'], 160, true], 'sanear libre: recorta, descarta claves y valores imposibles y no contamina el prototipo');
+  const muchos = {}; for (let i = 0; i < 300; i++) muchos['k' + i] = 't' + i;
+  eq(Object.keys(ST.sanear({ libre: muchos }).libre).length, ST.LIBRE_MAX, 'sanear libre: no pasa de ' + ST.LIBRE_MAX + ' entradas');
+  eq(ST.sanear({ libre: 'texto' }).libre, {}, 'sanear libre: un valor que no es objeto se ignora');
+  // fusión, exportar / importar
+  const fu = ST.fusionar({ libre: { a: 'local', b: 'solo local' } }, { libre: { a: 'otro', c: 'solo otro' } });
+  eq(fu.libre, { a: 'local', b: 'solo local', c: 'solo otro' }, 'fusionar libre: manda lo escrito acá; del otro se suma lo que falta');
+  const sa = ST.crear({ storage: memStorage(), now: () => ms }), sb = ST.crear({ storage: memStorage(), now: () => ms });
+  sa.libreGuardar(K1, 'Me apasiona volar'); sa.libreGuardar(K2, 'Sacar mi licencia');
+  ok(sb.importar(sa.exportar()).ok && sb.libre(K1) === 'Me apasiona volar' && sb.libre(K2) === 'Sacar mi licencia', 'libre: exportar → importar en otro dispositivo trae lo escrito');
+  ok(JSON.parse(sa.exportar()).datos.libre[K1] === 'Me apasiona volar', 'libre: el archivo exportado lo incluye');
+  sa.reset();
+  eq([sa.libre(K1), sa.libres(), JSON.parse(sa.exportar()).datos.libre], ['', {}, {}], 'libre: reset (borrar el avance) también lo borra');
+  // migración única desde la clave vieja, fuera del progreso
+  const vm = memStorage(); vm.setItem(VIEJA, JSON.stringify({ [K1]: 'Lo de antes', [K2]: 'x'.repeat(200), ['k'.repeat(130)]: 'larga', malo: 4 }));
+  vm.setItem('c150.escuela.v1', JSON.stringify({ v: 1, lecciones: { 'INT-01-01': { estado: 'hecha', estrellas: 2, mejor: 1, intentos: 1, paso: 3, h: [] } }, libre: { [K2]: 'Lo nuevo' } }));
+  const sm = ST.crear({ storage: vm, now: () => ms });
+  eq([sm.libre(K1), sm.libre(K2), sm.lec('INT-01-01').estrellas, vm.getItem(VIEJA), Object.keys(sm.libres()).sort().join()], ['Lo de antes', 'Lo nuevo', 2, null, [K1, K2].sort().join()], 'migración: lo de la clave vieja pasa al progreso (lo que ya había en el progreso manda), la clave vieja se borra y nada más se pierde');
+  ok(JSON.parse(vm.getItem('c150.escuela.v1')).libre[K1] === 'Lo de antes', 'migración: queda guardado en la clave del progreso');
+  const vm2 = memStorage(); vm2.setItem(VIEJA, 'no es json{');
+  const smal = ST.crear({ storage: vm2, now: () => ms });
+  ok(Object.keys(smal.libres()).length === 0 && vm2.getItem(VIEJA) === null && smal.persistente, 'migración: una clave vieja ilegible se descarta sin tirar error');
+  const vm3 = memStorage(); vm3.setItem(VIEJA, JSON.stringify({ [K1]: 'No debe volver' }));
+  const sr = ST.crear({ storage: vm3, now: () => ms }); sr.reset();
+  ok(vm3.getItem(VIEJA) === null && ST.crear({ storage: vm3, now: () => ms }).libre(K1) === '', 'migración: reset borra también la clave vieja (no vuelve a la vida en la próxima carga)');
+  // almacenamiento bloqueado: sigue en memoria
+  const sbq = ST.crear({ storage: { getItem() { throw new Error('x'); }, setItem() { throw new Error('x'); }, removeItem() { throw new Error('x'); } }, now: () => ms });
+  sbq.libreGuardar(K1, 'en memoria');
+  ok(sbq.libre(K1) === 'en memoria' && sbq.persistente === false, 'libre: con el almacenamiento bloqueado sigue en memoria');
+  // c-completar ya no toca localStorage por su cuenta
+  const srcCmp = fs.readFileSync(path.join(SRC, 'escuela', 'c-completar.js'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+  ok(!/localStorage/.test(srcCmp) && !/c150\.escuela\.libre/.test(srcCmp) && /libreGuardar/.test(srcCmp), 'c-completar.js: no usa localStorage por su cuenta: lo escrito va por Store.libreGuardar');
+  // una migración sobre un progreso viejo sin `libre`
+  const sv0 = ST.crear({ storage: (() => { const m = memStorage(); m.setItem('c150.escuela.v1', JSON.stringify({ v: 1, lecciones: {}, racha: { dias: 1, ultimo: '2026-10-29', gracia: '', mejor: 1 } })); return m; })(), now: () => ms });
+  ok(JSON.stringify(sv0.libres()) === '{}' && sv0.estado().v === 1, 'libre: un progreso guardado sin `libre` sigue válido (v1)');
+}
+
 /* ------------------------------------------------------------------ datos */
 seccion('datos (páginas, orden, carga perezosa)');
 eq([D.paginas('1–4'), D.paginas('5'), D.paginas('7-8'), D.paginas(''), D.paginas('x'), D.paginas('9–3')], [[1, 4], [5, 5], [7, 8], null, null, [3, 9]], 'paginas()');
@@ -1431,6 +1743,146 @@ ok(D.cargado('INT') === null, 'aún no cargado');
   ok(/AER/.test(msg(err)) && D.cargado('AER') === null, 'cargar(): un 500 rechaza con un mensaje claro y no deja caché');
   S.fetch = () => Promise.resolve({ ok: true, json: () => Promise.resolve({ nada: 1 }) }); err = null; try { await D.cargar('INS'); } catch (e) { err = e; }
   ok(msg(err) !== '' && D.cargado('INS') === null, 'cargar(): un archivo sin la forma esperada rechaza');
+  seccion('F2: etiquetas que caben en su dibujo, foco que no se pierde, pista de «ordenar», banco de «completar»');
+  {
+    const U2 = ES.modelos.util, Bq = ES.bloques, css2 = fs.readFileSync(path.join(SRC, 'styles.css'), 'utf8'), f2src = (f) => fs.readFileSync(path.join(SRC, 'escuela', f), 'utf8');
+
+    // ---- 1) etiquetas: lo puro (dónde va una etiqueta que no cabe) y el ajuste real sobre un <svg> de mentira
+    eq(U2.encajarTexto({ ancla: 'start', ancho: 80, x: 10, min: 0, max: 200, fs: 11 }), { f: 1, dx: 0, parte: false }, 'encajarTexto: lo que cabe no se toca');
+    const sh = U2.encajarTexto({ ancla: 'start', ancho: 108, x: 100, min: 0, max: 200, fs: 11 });
+    ok(sh.parte === false && Math.abs(sh.f - 100 / 108) < 1e-9, 'encajarTexto: si achicando hasta el piso (10 px) entra, sólo se achica');
+    const pa = U2.encajarTexto({ ancla: 'start', ancho: 150, x: 100, min: 0, max: 200, fs: 11 });
+    ok(pa.parte === true && pa.f === 1 && pa.dx === -50, 'encajarTexto: si no entra ni al piso se pide partir en renglones (y, si ni así, correrlo 50 hacia adentro)');
+    ok(U2.encajarTexto({ ancla: 'middle', ancho: 210, x: 100, min: 0, max: 200, fs: 11 }).f < 0.96 && U2.encajarTexto({ ancla: 'end', ancho: 100, x: 40, min: 0, max: 200, fs: 11 }).parte === true, 'encajarTexto: centrada y alineada al final usan el lugar que hay de su lado');
+    const ancha = U2.encajarTexto({ ancla: 'start', ancho: 300, x: 20, min: 0, max: 200, fs: 11 });
+    ok(ancha.parte === true && Math.abs(ancha.f - 200 / 300) < 1e-9 && ancha.dx === -20, 'encajarTexto: más ancha que todo el dibujo → se achica a su ancho y se corre al borde');
+    eq(U2.partirRenglones([30, 40, 50, 20], 5, 100), [[0, 1], [2, 3]], 'partirRenglones: llena cada renglón sin pasarse');
+    eq(U2.partirRenglones([150, 10], 5, 100), [[0], [1]], 'partirRenglones: una palabra más ancha que el renglón va sola');
+    ok(U2.ETIQUETA_PISO >= 9 && U2.ETIQUETA_PISO <= 11, 'el piso de achicado de las etiquetas queda entre 9 y 11 px');
+
+    // un <svg> de mentira: cada letra mide 0,55 × tamaño; el dibujo se ve a escala 0,6; las etiquetas nacen de 17,5 unidades (el piso de 11 px a esa escala)
+    const ESC = 0.6, doc = { activeElement: null, documentElement: {}, createElementNS: (ns, tag) => nodo(tag), createTextNode: (s) => ({ nodeType: 3, data: s }) };
+    doc.body = { contains: (x) => !!x && x._enDoc !== false }; doc.activeElement = doc.body;
+    function nodo(nombre, extra) {
+      return Object.assign({ nodeName: nombre, _attrs: {}, kids: [], disabled: false, isConnected: true,
+        getAttribute(k) { return k in this._attrs ? this._attrs[k] : null; }, setAttribute(k, v) { this._attrs[k] = String(v); }, hasAttribute(k) { return k in this._attrs; },
+        focus() { doc.activeElement = this; } }, extra || {});
+    }
+    function etiqueta(svg, o) {
+      const t = nodo('text', { parentNode: svg, base: o.fs || 17.5, anchor: o.anchor || 'start', x: o.x, y: o.y || 40, txt: o.txt, style: { fontSize: '', transform: '', removeProperty(p) { if (p === 'font-size') this.fontSize = ''; if (p === 'transform') this.transform = ''; } } });
+      t._attrs.x = String(o.x);
+      Object.defineProperty(t, 'children', { get() { return this.kids.filter((k) => k.nodeType !== 3); } });
+      Object.defineProperty(t, 'firstChild', { get() { return this.kids[0] || null; } });
+      Object.defineProperty(t, 'textContent', { get() { return this.kids.length ? this.kids.map((k) => (k.nodeType === 3 ? k.data : k.textContent)).join('') : this.txt; }, set(v) { this.kids = []; this.txt = v; } });
+      t.removeChild = function (k) { this.kids.splice(this.kids.indexOf(k), 1); };
+      t.appendChild = function (k) { this.kids.push(k); return k; };
+      t.fsUser = function () { return parseFloat(this.style.fontSize) || this.base; };
+      t.lineas = function () { const ts = this.kids.filter((k) => k.nodeName === 'tspan'); return ts.length ? ts.map((k) => k.textContent) : [this.txt]; };
+      t.getSubStringLength = function (pos, len) { return len * 0.55 * this.fsUser(); };
+      t.getBoundingClientRect = function () {
+        const ls = this.lineas(), w = Math.max.apply(null, ls.map((s) => s.length)) * 0.55 * this.fsUser() * ESC, h = ls.length * this.fsUser() * 1.2 * ESC;
+        const m = /translate\(([-\d.]+)px,([-\d.]+)px\)/.exec(this.style.transform || ''), tx = m ? +m[1] * ESC : 0, ty = m ? +m[2] * ESC : 0;
+        const x = this.x * ESC + tx, l = this.anchor === 'end' ? x - w : this.anchor === 'middle' ? x - w / 2 : x, top = (this.y - this.fsUser()) * ESC + ty;
+        return { left: l, right: l + w, width: w, top: top, bottom: top + h, height: h };
+      };
+      svg._t.push(t);
+      return t;
+    }
+    function dibujo(W, H) {
+      const svg = nodo('svg', { _t: [], style: {}, viewBox: { baseVal: { width: W, height: H } }, getBoundingClientRect: () => ({ left: 0, top: 0, right: W * ESC, bottom: H * ESC, width: W * ESC, height: H * ESC }), getScreenCTM: () => ({ a: ESC }) });
+      svg.querySelectorAll = (q) => (q === 'text' ? svg._t : []);
+      return svg;
+    }
+    S.document = doc;
+    S.getComputedStyle = (n) => (n.nodeName === 'text' ? { display: 'inline', visibility: 'visible', fontSize: n.fsUser() + 'px', transform: 'none', textAnchor: n.anchor } : { display: 'block', visibility: 'visible' });
+    const dentro = (t, svg) => { const r = t.getBoundingClientRect(), s = svg.getBoundingClientRect(); return r.left >= s.left - 0.6 && r.right <= s.right + 0.6 && r.top >= s.top - 3 && r.bottom <= s.bottom + 3; };
+
+    let sv = dibujo(440, 230);
+    const tA = etiqueta(sv, { x: 282, y: 118, txt: 'Aceptable con mitigación' }), tB = etiqueta(sv, { x: 20, y: 40, txt: 'No tolerable' }), tC = etiqueta(sv, { x: 100, y: 60, txt: 'una etiqueta ancha', fs: 16 });
+    ok(!dentro(tA, sv) && dentro(tB, sv), 'el svg de mentira reproduce el problema: «Aceptable con mitigación» a 11 px se sale por la derecha (ancho de 440 unidades visto a 0,6)');
+    ok(U2.ajustarEtiquetas(sv) >= 1 && dentro(tA, sv) && dentro(tB, sv) && dentro(tC, sv), 'ajustarEtiquetas: después del ajuste ninguna etiqueta se sale del dibujo');
+    eq(tA.lineas(), ['Aceptable con', 'mitigación'], 'ajustarEtiquetas: la que no entra ni achicada hasta el piso se parte en renglones');
+    ok(tB.style.fontSize === '' && tB.kids.length === 0, 'ajustarEtiquetas: la que ya entraba queda como la dibujó el componente');
+    const antes = JSON.stringify([tA.lineas(), tC.style.fontSize]);
+    U2.ajustarEtiquetas(sv); U2.ajustarEtiquetas(sv);
+    eq(JSON.stringify([tA.lineas(), tC.style.fontSize]), antes, 'ajustarEtiquetas: es idempotente (repetirlo no cambia nada)');
+    tA.base = 9; tC.base = 9;            // otra escala: ahora todo entra y las etiquetas vuelven a como las dibujó el componente
+    U2.ajustarEtiquetas(sv);
+    ok(tA.children.length === 0 && tA.textContent === 'Aceptable con mitigación' && tA.style.fontSize === '' && tC.style.fontSize === '', 'ajustarEtiquetas: si el dibujo cambia de escala y ya entra, repone el texto y el tamaño originales');
+    sv = dibujo(440, 230);
+    const tD = etiqueta(sv, { x: 380, y: 40, txt: 'Aceptable', anchor: 'start', fs: 17.5 }), tE = etiqueta(sv, { x: 300, y: 60, txt: 'hipersustentadores', anchor: 'start', fs: 17.5 });
+    U2.ajustarEtiquetas(sv);
+    ok(dentro(tD, sv) && dentro(tE, sv) && tD.style.fontSize !== '' && tE.style.fontSize !== '', 'ajustarEtiquetas: una palabra suelta que no entra se achica hasta caber (sin renglones que armar)');
+    sv = dibujo(440, 230); sv._attrs['data-zoom'] = '1';
+    const tF = etiqueta(sv, { x: 282, y: 118, txt: 'Aceptable con mitigación' });
+    ok(U2.ajustarEtiquetas(sv) === 0 && tF.style.fontSize === '' && tF.kids.length === 0, 'ajustarEtiquetas: con zoom del alumno (data-zoom) no toca nada: el recorte es a propósito');
+
+    // ---- 2) foco: los helpers compartidos (bloques.js) con elementos de mentira
+    ok(typeof Bq.enfocar === 'function' && typeof Bq.focoPerdido === 'function' && typeof Bq.rescatarFoco === 'function' && typeof Bq.vigilarFoco === 'function' && typeof Bq.regionVoz === 'function', 'bloques.js: enfocar, focoPerdido, rescatarFoco, vigilarFoco y regionVoz');
+    eq(Bq.etiquetaPaso('Tarjeta', 2, 7, '  ¿Qué   es el\n flap? '), 'Tarjeta 2 de 7: ¿Qué es el flap?', 'etiquetaPaso: «Tarjeta 2 de 7: <pregunta>» con los espacios normalizados');
+    eq(Bq.etiquetaPaso('Pregunta', 1, 3, ''), 'Pregunta 1 de 3', 'etiquetaPaso: sin texto, sólo el número');
+    ok(Bq.focoPerdido() === true, 'focoPerdido: con el foco en <body> está perdido');
+    const div = nodo('DIV'), bot = nodo('BUTTON');
+    ok(Bq.enfocar(div, 'Tarjeta 1 de 3: ¿Qué?') === true && div._attrs.tabindex === '-1' && div._attrs['aria-label'] === 'Tarjeta 1 de 3: ¿Qué?' && Bq.focoPerdido() === false, 'enfocar: un contenedor recibe tabindex -1 y aria-label, y el foco queda ahí');
+    doc.activeElement = doc.body;
+    ok(Bq.enfocar(bot) === true && !('tabindex' in bot._attrs), 'enfocar: un botón ya es enfocable y no se le toca el tabindex');
+    bot._enDoc = false;
+    ok(Bq.focoPerdido() === true, 'focoPerdido: el foco en un nodo que ya no está en la página también está perdido');
+    const deshab = nodo('BUTTON', { disabled: true }), libre = nodo('BUTTON'), caja = nodo('SECTION');
+    const raiz = nodo('DIV', { querySelector: (sel) => ({ a: deshab, b: libre, c: null })[sel] || null });
+    doc.activeElement = doc.body;
+    ok(Bq.rescatarFoco(raiz, ['a', 'c', 'b']) === libre && doc.activeElement === libre, 'rescatarFoco: salta el deshabilitado y el que no existe y toma el primer candidato válido');
+    ok(Bq.rescatarFoco(raiz, ['a']) === null && doc.activeElement === libre, 'rescatarFoco: si el foco no está perdido no hace nada');
+    doc.activeElement = doc.body; raiz.querySelector = () => null;
+    ok(Bq.rescatarFoco(raiz, ['a']) === raiz && doc.activeElement === raiz && raiz._attrs.tabindex === '-1', 'rescatarFoco: sin candidatos el foco va al propio componente (tabindex -1)');
+    // vigilarFoco: un clic que destruye el control enfocado → el foco no queda en <body>
+    const oyentes = {}, boton1 = nodo('BUTTON'), raiz2 = nodo('DIV', { addEventListener: (ev, fn) => { oyentes[ev] = fn; }, querySelector: () => boton1 });
+    Bq.vigilarFoco(raiz2);
+    doc.activeElement = doc.body; oyentes.click({ target: nodo('BUTTON', { isConnected: false }) });
+    await new Promise((r) => setTimeout(r, 120));
+    ok(doc.activeElement === boton1, 'vigilarFoco: si el control tocado se destruyó y el foco cayó a <body>, vuelve a un control del componente');
+    doc.activeElement = doc.body; oyentes.click({ target: nodo('P') });
+    await new Promise((r) => setTimeout(r, 120));
+    ok(doc.activeElement === doc.body, 'vigilarFoco: un clic en un espacio vacío (el control sigue ahí) no le roba el foco al alumno');
+    const regionEl = nodo('P'); Object.defineProperty(regionEl, 'textContent', { get() { return this._tx || ''; }, set(v) { this._tx = v; } });
+    const reg = Bq.regionVoz({ el: (tag, attrs) => { Object.keys(attrs || {}).forEach((k) => { regionEl._attrs[k] = attrs[k]; }); return regionEl; } }, nodo('DIV', { appendChild: () => {} }));
+    reg.decir('hola'); ok(regionEl.textContent === '', 'regionVoz: vacía la región antes de escribir (así se vuelve a leer)');
+    await new Promise((r) => setTimeout(r, 80));
+    ok(regionEl.textContent === 'hola' && regionEl._attrs['aria-live'] === 'polite', 'regionVoz: la región es aria-live polite y es UNA sola (no se recrea)');
+
+    // ---- 2b) el código de cada componente (mismo criterio que el resto de las pruebas de fuente)
+    const srcMotor = f2src('motor.js'), srcTar2 = f2src('c-tarjetas.js'), srcCmp = f2src('c-completar.js'), srcDia2 = f2src('c-diapositiva.js'), srcMap = f2src('c-mapa.js'), srcDgr = f2src('c-diagrama.js'), srcCaso = f2src('c-caso.js'), srcOrd = f2src('c-ordenar.js');
+    ok(/vigilarFoco\(inner\)/.test(srcMotor), 'motor.js: cada componente queda vigilado (el foco nunca cae a <body> por un control que se destruyó)');
+    ok(/etiquetaPaso\('Tarjeta'/.test(srcTar2) && /role: 'group', tabindex: '-1'/.test(srcTar2) && /foco\(frente\)/.test(srcTar2) && !/es-tar-count'?, ?'aria-live'/.test(srcTar2.replace(/\s+/g, ' ')), 'tarjetas: la carta se rotula «Tarjeta N de M: pregunta» y recibe el foco; el contador ya no es una región viva que se recrea');
+    ok(/empezar\(info\.cola, \{ foco: true \}\)/.test(srcTar2) && /pintarCarta\(true\);\s*if \(r\.reencolada\)/.test(srcTar2), 'tarjetas: «Empezar», «Repasar igual» y cada calificación llevan el foco a la tarjeta siguiente');
+    ok(/foco\(elStage\.querySelector\('\.es-tar-pista-t'\)\)/.test(srcTar2), 'tarjetas: al mostrar la pista el foco va a la pista (se lee)');
+    ok(/bSeguir/.test(srcCmp) && /anunciar\(titulo \+/.test(srcCmp), 'completar: al cerrar una ronda el foco va a «Seguir con la ronda» y el aviso sale por la región persistente');
+    ok(!/bPrev\.disabled|bNext\.disabled/.test(srcDia2) && /bNext\.setAttribute\('aria-disabled'/.test(srcDia2), 'diapositiva: Anterior/Siguiente usan aria-disabled en los extremos (un botón deshabilitado no puede tener el foco)');
+    [['mapa', srcMap], ['diagrama', srcDgr]].forEach(([n, s]) => {
+      ok(!/z(In|Out|Re)\.disabled/.test(s) && /limite\(zIn/.test(s), n + ': los botones de zoom usan aria-disabled en el límite');
+      ok(/aria-describedby', idR/.test(s) && /foco\(bSig\)/.test(s) && /foco\(pRes\)/.test(s) && /pintarPregunta\(true\)/.test(s), n + ': «Encontrá»/prueba lleva el foco a «Siguiente» (que lee el resultado) y a la pregunta o al resultado siguiente');
+      ok(/'aria-live', on \? 'off' : 'polite'/.test(s), n + ': en el modo prueba la ficha no es región viva (el foco ya lee la pregunta)');
+    });
+    ok(/es-caso-bt', tabindex: '-1'/.test(srcCaso), 'caso: el párrafo de cada paso es enfocable (tabindex -1): enfocar(.es-caso-bt) ya mueve el foco');
+    const srcSit = f2src('c-situacion.js'), srcCal = f2src('c-calculadora.js');
+    ok(/ir\(r\.sig, true\)/.test(srcSit) && /ir\(datos\.escenas\[0\]\.id, true\)/.test(srcSit) && /posAct/.test(srcSit) && /role: 'group', tabindex: '-1', 'aria-label': rotuloEsc/.test(srcSit), 'situación: «Seguir» y «Volver a empezar» llevan el foco a la escena nueva (rotulada) y una opción que se redibuja conserva el foco');
+    ok(/nuevoProblema\(true\)/.test(srcCal) && /conFoco/.test(srcCal), 'calculadora: «Otro problema» lleva el foco a la respuesta del problema nuevo');
+    const tool = fs.readFileSync(path.join(ROOT, 'tools', 'escuela-qa-navegador.js'), 'utf8');
+    ok(/EscuelaQA\.etiquetas/.test(tool) && /EscuelaQA\.teclado/.test(tool) && (() => { try { new Function(tool); return true; } catch (e) { return false; } })(), 'tools/escuela-qa-navegador.js: el recorrido de etiquetas recortadas y de foco por teclado existe y es JavaScript válido');
+    ok(Array.from(new Set(f2src('c-diagrama.js').match(/escalarEtiquetas\(svg\)/g))).length === 1 && /sinEscala: true/.test(f2src('c-simulador.js')) && /data-slot/.test(f2src('c-animacion.js')) && /new MutationObserver/.test(f2src('modelos.js')), 'etiquetas: diagrama, animación, plano, diapositiva y tarjetas usan escalarEtiquetas (que encaja), el gráfico del simulador lo usa sin escala y las etiquetas del camino reservan su ancho (data-slot)');
+
+    // ---- 3) «ordenar»: la pista se lee
+    ok(/pistaId/.test(srcOrd) && /'aria-describedby': elKeys\.id \+ \(pistaId/.test(srcOrd), 'ordenar: el botón del paso apunta (aria-describedby) a su pista: el aria-label la deja afuera');
+    ok(/function textoComprobar/.test(srcOrd) && /anunciar\(textoComprobar\(/.test(srcOrd) && /Pista para «/.test(srcOrd), 'ordenar: al comprobar se anuncia el resultado y la pista de cada paso fuera de lugar');
+
+    // ---- 4) «completar»: el banco pegado no tapa el foco
+    ok(/--es-bank-h/.test(css2) && /--es-bank-h/.test(srcCmp) && !/scroll-margin-top: 280px/.test(css2), 'completar: el scroll-margin de los huecos sale del alto real del banco (--es-bank-h), ya no de un 280 px fijo');
+    ok(/\.es-cmp-bank\.is-suelto \{ position: static; \}/.test(css2) && /alto > vh \* 0\.35/.test(srcCmp), 'completar: si el banco cubriría más de ~35 % de la pantalla deja de estar pegado');
+
+    // ---- 5) «ordenar»: ▲▼ de 44 × 44 con cualquier puntero
+    const reglaB = (css2.match(/\.es-ord-b \{[^}]*\}/) || [''])[0];
+    ok(/width: 44px; height: 44px/.test(reglaB) && !/width: 40px/.test(reglaB), 'ordenar: los botones ▲▼ miden 44 × 44 en la regla base (no sólo con puntero grueso)');
+  }
   seccion('integración con el resto (Escuela, Search, Glossary)');
   ok(C.Escuela && C.Escuela.total === D.total() && typeof C.Escuela.mount === 'function' && typeof C.Escuela.navProvider === 'function' && typeof C.Escuela.cargar === 'function', 'C150.Escuela: mount, navProvider, cargar y total');
   const prov = C.Escuela.navProvider();

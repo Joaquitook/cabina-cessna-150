@@ -426,7 +426,7 @@
        "pagina": 5
       },
       {
-       "pregunta": "¿Para qué sirve el certificado que da la escuela, según la diapositiva?",
+       "pregunta": "¿Para qué sirve el certificado que da la escuela, según el curso?",
        "opciones": [
         "Para tener días de estudio en el trabajo",
         "Para entrar a la plataforma sin chaleco",
@@ -601,11 +601,13 @@
          },
          {
           "id": "b",
-          "correcta": "día"
+          "correcta": "día",
+          "grupo": "dn"
          },
          {
           "id": "c",
-          "correcta": "noche"
+          "correcta": "noche",
+          "grupo": "dn"
          },
          {
           "id": "d",
@@ -706,7 +708,7 @@
       {
        "titulo": "El organigrama, nivel por nivel",
        "tipo": "lista",
-       "texto": "La presentación empieza mostrándote al plantel de instructores. Después viene el **organigrama**, de arriba hacia abajo:\nArriba de todo, el Gerente Responsable, junto al Representante Legal.\nDespués, Control de Gestión y Calidad, Asesoría Legal (una empresa externa) y los Auditores.\nLuego, el Jefe de Seguridad Terrestre, el Director de Operaciones / Director Técnico y el Jefe de Seguridad Operacional.\nDel Director de Operaciones / Director Técnico dependen el Jefe de Instrucción de Vuelo y el Jefe de Instrucción Teórica.\nDebajo del Jefe de Instrucción de Vuelo, el Ayudante de Instrucción de Vuelo y los Instructores de Vuelo, que son tus profes.",
+       "texto": "La presentación empieza mostrándote al plantel de instructores. Después viene el **organigrama**, de arriba hacia abajo:\nArriba de todo, el Gerente Responsable, junto al Representante Legal.\nDespués, Control de Gestión y Calidad, Asesoría Legal (una empresa externa) y los Auditores.\nLuego, el Jefe de Seguridad Terrestre, el Director de Operaciones / Director Técnico y el Jefe de Seguridad Operacional.\nDel Director de Operaciones / Director Técnico dependen el Jefe de Instrucción de Vuelo y el Jefe de Instrucción Teórica.\nDebajo del Jefe de Instrucción de Vuelo, el Ayudante de Instrucción de Vuelo y, un escalón más abajo, los Instructores de Vuelo, que son tus profes.",
        "resumen": "El organigrama baja desde el Gerente Responsable hasta los Instructores de Vuelo."
       },
       {
@@ -1023,7 +1025,7 @@
         "al Jefe de Seguridad Terrestre y al de Seguridad Operacional"
        ],
        "correcta": 1,
-       "explicacion": "La rama de vuelo termina en el Ayudante de Instrucción de Vuelo y en los Instructores de Vuelo.",
+       "explicacion": "La rama de vuelo baja del Jefe al Ayudante de Instrucción de Vuelo y, un escalón más abajo, a los Instructores de Vuelo.",
        "pagina": 8
       }
      ],
@@ -1338,7 +1340,7 @@
        "pagina": 9
       },
       {
-       "pregunta": "En la lista del curso, Performance y Peso y Balance aparecen:",
+       "pregunta": "En la lista de las 11 materias del curso, Performance y Peso y Balance aparecen:",
        "opciones": [
         "como sub-viñetas de Instrumentos",
         "dentro de la materia de Meteorología",
@@ -1965,7 +1967,7 @@
        "pagina": 13
       },
       {
-       "pregunta": "¿Cuándo se hace el simulacro?",
+       "pregunta": "¿Cuándo se hace el simulacro del test?",
        "opciones": [
         "La clase anterior al test",
         "El día del test, después de rendir",
@@ -2499,7 +2501,7 @@
        "pagina": 16
       },
       {
-       "pregunta": "Según esta lección, ¿por qué se exige calzado cerrado al volar?",
+       "pregunta": "¿Por qué se exige calzado cerrado al volar?",
        "opciones": [
         "Porque un calzado suelto puede trabar un pedal",
         "Porque se ve más prolijo en la escuela",
@@ -2797,7 +2799,7 @@
        "pagina": 17
       },
       {
-       "pregunta": "¿Cuál de estos es un ejemplo del curso de algo que se anota?",
+       "pregunta": "En el Cervesómetro, ¿cuál de estos es un ejemplo del curso de algo que se anota?",
        "opciones": [
         "Dejar los magnetos conectados",
         "Hacer una pregunta en clase",
@@ -3034,7 +3036,7 @@
        "pagina": 18
       },
       {
-       "pregunta": "¿Cómo se elige el tipo de cerveza, según la regla 2?",
+       "pregunta": "¿Cómo se elige el tipo de cerveza, según la regla 2 del Cervesómetro?",
        "opciones": [
         "Por sorteo entre los alumnos",
         "Por consenso general",
@@ -3317,7 +3319,7 @@
        "pagina": 19
       },
       {
-       "pregunta": "¿Cuál de estas es una falta grave?",
+       "pregunta": "¿Cuál de estas faltas del Cervesómetro es grave?",
        "opciones": [
         "Dejar los cintos colgando hacia afuera",
         "No sacar las calzas",
@@ -4443,7 +4445,7 @@
        "pagina": 24
       },
       {
-       "pregunta": "Sobre los líquidos, la regla dice que están prohibidos:",
+       "pregunta": "Sobre los líquidos, la regla de ingreso a los hangares dice que están prohibidos:",
        "opciones": [
         "siempre, sin excepciones",
         "salvo excepciones",
@@ -4991,7 +4993,7 @@
        "pagina": 26
       },
       {
-       "pregunta": "¿Cuál de los dos carnets habilita las plataformas?",
+       "pregunta": "De los carnets “4” y “3S”, ¿cuál habilita las plataformas?",
        "opciones": [
         "El carnet “3S”",
         "Los dos",
@@ -5003,7 +5005,7 @@
        "pagina": 26
       },
       {
-       "pregunta": "¿Qué zona habilitan los dos tipos de carnet?",
+       "pregunta": "¿Qué zona habilitan tanto el carnet “4” como el “3S”?",
        "opciones": [
         "Las pistas",
         "Los Hangares Sur",
@@ -5274,7 +5276,7 @@
        "pagina": 27
       },
       {
-       "pregunta": "¿Qué se tramita con ese formulario?",
+       "pregunta": "¿Qué se tramita con el formulario de Puertas del Sur para traer invitados?",
        "opciones": [
         "La licencia de alumno piloto del invitado",
         "El pase provisorio del invitado",
@@ -6926,7 +6928,7 @@
        "opciones": [
         "Porque queda más cerca de los hangares",
         "Porque es solo para los invitados",
-        "Porque el portón 6A está cerrado a esa hora",
+        "Porque el portón 6A está cerrado",
         "Porque es la entrada reservada a emergencias"
        ],
        "correcta": 2,
@@ -7558,7 +7560,7 @@
          {
           "id": "nombres",
           "nombre": "Nombres",
-          "svg": "<text class=\"dg-lbl dg-lbl--fg dg-lbl--lg\" x=\"282\" y=\"40\" text-anchor=\"start\">No tolerable</text><text class=\"dg-lbl\" x=\"282\" y=\"56\" text-anchor=\"start\">Inaceptable a</text><text class=\"dg-lbl\" x=\"282\" y=\"70\" text-anchor=\"start\">cualquier nivel</text><text class=\"dg-lbl dg-lbl--fg dg-lbl--lg\" x=\"282\" y=\"102\" text-anchor=\"start\">Tolerable (ALARP)</text><text class=\"dg-lbl\" x=\"282\" y=\"118\" text-anchor=\"start\">Aceptable con mitigación</text><text class=\"dg-lbl\" x=\"282\" y=\"132\" text-anchor=\"start\">y costo-beneficio</text><text class=\"dg-lbl dg-lbl--fg dg-lbl--lg\" x=\"282\" y=\"172\" text-anchor=\"start\">Aceptable</text><text class=\"dg-lbl\" x=\"282\" y=\"188\" text-anchor=\"start\">Aceptable tal como existe</text><path class=\"dg-ln\" d=\"M268 84 V136\"/>",
+          "svg": "<text class=\"dg-lbl dg-lbl--fg dg-lbl--lg\" x=\"282\" y=\"40\" text-anchor=\"start\">No tolerable</text><text class=\"dg-lbl\" x=\"282\" y=\"56\" text-anchor=\"start\">Inaceptable a</text><text class=\"dg-lbl\" x=\"282\" y=\"70\" text-anchor=\"start\">cualquier nivel</text><text class=\"dg-lbl dg-lbl--fg dg-lbl--lg\" x=\"282\" y=\"102\" text-anchor=\"start\">Tolerable (ALARP)</text><text class=\"dg-lbl\" x=\"282\" y=\"118\" text-anchor=\"start\">Aceptable con</text><text class=\"dg-lbl\" x=\"282\" y=\"132\" text-anchor=\"start\">mitigación y</text><text class=\"dg-lbl\" x=\"282\" y=\"146\" text-anchor=\"start\">costo-beneficio</text><text class=\"dg-lbl dg-lbl--fg dg-lbl--lg\" x=\"282\" y=\"178\" text-anchor=\"start\">Aceptable</text><text class=\"dg-lbl\" x=\"282\" y=\"194\" text-anchor=\"start\">Aceptable tal</text><text class=\"dg-lbl\" x=\"282\" y=\"208\" text-anchor=\"start\">como existe</text><path class=\"dg-ln\" d=\"M268 84 V152\"/>",
           "visible": true
          }
         ],
@@ -8675,7 +8677,7 @@
       {
        "pregunta": "El psicofísico es…",
        "opciones": [
-        "el certificado médico que sale de esos estudios",
+        "el certificado médico que sale de los estudios de Medicina Aeronáutica",
         "la licencia de alumno piloto que entrega DINACIA al final",
         "el carnet provisorio que entrega la PAN en el portón",
         "la carta de la escuela que se lleva a DINACIA"
@@ -9458,7 +9460,7 @@
      "enlaces": [],
      "preguntas": [
       {
-       "pregunta": "¿Cuál de estos estudios figura en la lista del curso?",
+       "pregunta": "¿Cuál de estos estudios del psicofísico figura en la lista del curso?",
        "opciones": [
         "El estudio de la audición",
         "La prueba de natación",
@@ -9482,7 +9484,7 @@
        "pagina": 43
       },
       {
-       "pregunta": "¿Cuántos estudios nombra la lista del curso?",
+       "pregunta": "¿Cuántos estudios del psicofísico nombra la lista del curso?",
        "opciones": [
         "Cinco",
         "Diez",
@@ -9506,7 +9508,7 @@
        "pagina": 43
       },
       {
-       "pregunta": "¿Cuál de estos NO figura entre los estudios de la lista?",
+       "pregunta": "¿Cuál de estos NO figura entre los estudios del psicofísico?",
        "opciones": [
         "El electrocardiograma",
         "La prueba de natación",
@@ -9995,65 +9997,41 @@
         "consigna": "Ordená los pasos del trámite, del primero al último.",
         "items": [
          {
-          "id": "recibir-licencia",
-          "texto": "Recibís la licencia de alumno piloto"
-         },
-         {
           "id": "inscripcion",
           "texto": "Te inscribís en la escuela"
-         },
-         {
-          "id": "cita",
-          "texto": "Agendás la cita en Personal Aeronáutico de DINACIA, por lo menos 3 días después"
          },
          {
           "id": "agendar",
           "texto": "Agendás Medicina Aeronáutica por WhatsApp"
          },
          {
-          "id": "carta",
-          "texto": "Pedís la carta de la escuela que acredite que estás en el curso teórico"
-         },
-         {
-          "id": "libro",
-          "texto": "Comprás un libro de vuelo o usás el que prefieras"
-         },
-         {
           "id": "psicofisico",
-          "texto": "Te hacés el psicofísico (a las 8 de la mañana, en ayunas si corresponde)"
+          "texto": "Te hacés el psicofísico (a las 8 de la mañana, en ayunas si corresponde) y te lo mandan por mail"
          },
          {
           "id": "ir-dinacia",
-          "texto": "Vas a DINACIA con la carta de la escuela y una foto carné"
+          "texto": "Vas a DINACIA a tu cita, por lo menos 3 días después del psicofísico, con la carta de la escuela y una foto carné"
          },
          {
-          "id": "recibir-psico",
-          "texto": "Recibís el psicofísico por mail"
+          "id": "recibir-licencia",
+          "texto": "Recibís la licencia de alumno piloto y tu libro de vuelo (nuevo o el que prefieras)"
          }
         ],
         "orden": [
          "inscripcion",
-         "carta",
          "agendar",
          "psicofisico",
-         "recibir-psico",
-         "cita",
          "ir-dinacia",
-         "recibir-licencia",
-         "libro"
+         "recibir-licencia"
         ],
         "explicaciones": {
          "inscripcion": "Todo empieza con tu inscripción en la escuela.",
-         "carta": "La carta acredita que ya estás en el curso teórico: la vas a necesitar en DINACIA.",
-         "agendar": "No se va sin turno: primero agendás por WhatsApp.",
-         "psicofisico": "Los estudios se hacen a las 8 de la mañana, con ayuno si corresponde.",
-         "recibir-psico": "El psicofísico se manda a tu mail.",
-         "cita": "La cita va por lo menos 3 días después del psicofísico.",
-         "ir-dinacia": "En DINACIA llevás la carta de la escuela y una foto carné.",
-         "recibir-licencia": "Ahí te dan la licencia de alumno piloto.",
-         "libro": "Y podés comprar un libro de vuelo o usar el que más te guste."
+         "agendar": "Primero agendás tu turno en Medicina Aeronáutica por WhatsApp.",
+         "psicofisico": "Los estudios se hacen a las 8 de la mañana, con ayuno si corresponde, y el psicofísico se manda a tu mail.",
+         "ir-dinacia": "La cita en DINACIA va por lo menos 3 días después del psicofísico: llevás la carta de la escuela y una foto carné.",
+         "recibir-licencia": "Al final tenés la licencia de alumno piloto y un libro de vuelo, nuevo o el que prefieras."
         },
-        "nota": "Los dos primeros pasos son un orden lógico de la app; el resto es del curso."
+        "nota": "El primer paso es el punto de partida de esta línea de tiempo; el resto sigue lo que dice el curso (pp. 41–44)."
        }
       },
       {
@@ -10601,6 +10579,13 @@
           "frente": "¿Cuándo es la cita en DINACIA y qué se lleva?",
           "dorso": "Por lo menos 3 días después del psicofísico, con la carta de la escuela y una foto carné. Ahí te dan la licencia de alumno piloto (p. 44)."
          }
+        ],
+        "bloques": [
+         "AeroSur y tu curso",
+         "Acceso al aeropuerto",
+         "Hangares y plataforma",
+         "SMS y Calidad",
+         "Trámites"
         ]
        }
       },
@@ -11110,7 +11095,7 @@
            "En menos de 18 meses"
           ],
           "correcta": 3,
-          "explicacion": "La diapositiva lo dice así: el curso teórico y de vuelo debe completarse en menos de 18 meses para poder dar el examen de vuelo en AeroSur.",
+          "explicacion": "Es la regla de la escuela: el curso teórico y de vuelo debe completarse en menos de 18 meses para poder dar el examen de vuelo en AeroSur.",
           "pagina": 9
          },
          {
@@ -11138,7 +11123,7 @@
           "pagina": 11
          },
          {
-          "pregunta": "¿Cuándo se hace el simulacro?",
+          "pregunta": "¿Cuándo se hace el simulacro del test?",
           "opciones": [
            "La clase anterior al test",
            "El día del test, después de rendir",
@@ -11174,7 +11159,7 @@
           "pagina": 16
          },
          {
-          "pregunta": "¿Cuál de estos es un ejemplo del curso de algo que se anota?",
+          "pregunta": "En el Cervesómetro, ¿cuál de estos es un ejemplo del curso de algo que se anota?",
           "opciones": [
            "Dejar los magnetos conectados",
            "Hacer una pregunta en clase",
@@ -11198,7 +11183,7 @@
           "pagina": 18
          },
          {
-          "pregunta": "¿Cuál de estas es una falta grave?",
+          "pregunta": "¿Cuál de estas faltas del Cervesómetro es grave?",
           "opciones": [
            "Dejar los cintos colgando hacia afuera",
            "No sacar las calzas",
@@ -11270,7 +11255,7 @@
           "pagina": 25
          },
          {
-          "pregunta": "¿Cuál de los dos carnets habilita las plataformas?",
+          "pregunta": "De los carnets “4” y “3S”, ¿cuál habilita las plataformas?",
           "opciones": [
            "El carnet “3S”",
            "Los dos",
@@ -11282,7 +11267,7 @@
           "pagina": 26
          },
          {
-          "pregunta": "¿Qué se tramita con ese formulario?",
+          "pregunta": "¿Qué se tramita con el formulario de Puertas del Sur para traer invitados?",
           "opciones": [
            "La licencia de alumno piloto del invitado",
            "El pase provisorio del invitado",
@@ -11310,7 +11295,7 @@
           "opciones": [
            "Porque el escape ensucia la ropa con aceite caliente",
            "Porque hace mucho frío por la corriente de aire",
-           "Porque el piloto no te ve y puede arrancar encima tuyo",
+           "Porque el motor prendido apaga los celulares y las radios de mano",
            "Porque el chorro puede arrojar una piedra y pegarte"
           ],
           "correcta": 3,
@@ -11346,7 +11331,7 @@
           "opciones": [
            "Porque queda más cerca de los hangares",
            "Porque es solo para los invitados",
-           "Porque el portón 6A está cerrado a esa hora",
+           "Porque el portón 6A está cerrado",
            "Porque es la entrada reservada a emergencias"
           ],
           "correcta": 2,
@@ -11378,11 +11363,11 @@
           "pagina": 36
          },
          {
-          "pregunta": "¿Qué canal te lleva al formulario sin escribir ninguna dirección?",
+          "pregunta": "¿Qué canal te lleva al formulario del SMS sin escribir ninguna dirección?",
           "opciones": [
            "La frecuencia de la torre de control",
            "El libro de vuelo del alumno",
-           "El código QR de la diapositiva",
+           "El código QR del formulario",
            "El carnet provisorio de la PAN"
           ],
           "correcta": 2,
@@ -11438,7 +11423,7 @@
           "pagina": 42
          },
          {
-          "pregunta": "¿Cuántos estudios nombra la lista del curso?",
+          "pregunta": "¿Cuántos estudios del psicofísico nombra la lista del curso?",
           "opciones": [
            "Cinco",
            "Diez",

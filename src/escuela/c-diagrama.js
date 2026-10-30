@@ -159,9 +159,16 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     var Fig = ES.figuras, K = ctx.Kit, h = ctx.h, icon = ctx.icon, vb = datos.viewBox.split(/\s+/).map(Number), VW = vb[2], VH = vb[3], VX = vb[0], VY = vb[1];
     var vista = { s: 1, cx: VX + VW / 2, cy: VY + VH / 2 }, visibles = {}, sel = null, prueba = false, abiertos = {}, hecho = !!ctx.hecho, intento = 0;
     var porId = {}, els = {}, n = datos.hotspots.length;
+    var Bq = ES.bloques;
+    function foco(el) { if (Bq && isFn(Bq.enfocar)) return Bq.enfocar(el); if (el && isFn(el.focus)) { if (!el.hasAttribute('tabindex') && !/^(button|a|input)$/i.test(el.nodeName)) el.setAttribute('tabindex', '-1'); el.focus({ preventScroll: true }); } return false; }
+    function limite(b, on) { if (b) b.setAttribute('aria-disabled', on ? 'true' : 'false'); }      // aria-disabled (no disabled): un botón deshabilitado no puede tener el foco y éste caía a <body> (F2)
+    function preguntaEl(rotulo, i, total, texto, meta) {
+      var etiqueta = Bq && isFn(Bq.etiquetaPaso) ? Bq.etiquetaPaso(rotulo, i, total, texto) : rotulo + ' ' + i + ' de ' + total + ': ' + texto;
+      return h('div', { 'class': 'es-dgr-pq', role: 'group', tabindex: '-1', 'aria-label': etiqueta }, h('p', { 'class': 'es-meta', text: meta }), h('p', { 'class': 'es-q es-q--sm', text: texto }));
+    }
     datos.hotspots.forEach(function (x, i) { x._n = i + 1; porId[x.id] = x; });
     datos.capas.forEach(function (c) { visibles[c.id] = c.visible !== false; });
-    var UMBRAL = Math.min(n, Math.min(4, Math.max(2, Math.ceil(n / 2))));
+    var UMBRAL = Math.min(n, Math.min(4, Math.max(2, Math.ceil(n / 2)))), uidR = 0;
 
     var svg = U.svg('svg', { 'class': 'dg-svg', viewBox: datos.viewBox, preserveAspectRatio: 'xMidYMid meet', 'aria-hidden': null });
     var gCapas = U.svg('g'), gCon = U.svg('g', { 'class': 'dg-con' }), gHot = U.svg('g');
@@ -204,8 +211,9 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       vista.cx = Math.max(VX + w / 2, Math.min(VX + VW - w / 2, vista.cx)); vista.cy = Math.max(VY + hgt / 2, Math.min(VY + VH - hgt / 2, vista.cy));
       svg.setAttribute('viewBox', (vista.cx - w / 2) + ' ' + (vista.cy - hgt / 2) + ' ' + w + ' ' + hgt);
       view.classList.toggle('is-zoom', vista.s > 1.001);
+      if (vista.s > 1.001) svg.setAttribute('data-zoom', '1'); else svg.removeAttribute('data-zoom');      // con zoom el recorte de las etiquetas es a propósito
       if (svg._dgMedir) svg._dgMedir();           // el zoom cambia la escala: las etiquetas se miden de nuevo
-      if (zIn) { zIn.disabled = vista.s >= 4; zOut.disabled = vista.s <= 1.001; zRe.disabled = vista.s <= 1.001 && Math.abs(vista.cx - (VX + VW / 2)) < 1; }
+      if (zIn) { limite(zIn, vista.s >= 4); limite(zOut, vista.s <= 1.001); limite(zRe, vista.s <= 1.001 && Math.abs(vista.cx - (VX + VW / 2)) < 1); }
     }
     function zoom(f, px, py) {
       var s2 = Math.max(1, Math.min(4, vista.s * f)); if (s2 === vista.s) return;
@@ -303,44 +311,51 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     function limpiarMarcas() { Object.keys(els).forEach(function (id) { els[id].classList.remove('is-ok', 'is-bad', 'is-pulse', 'is-sel'); }); }
     function entrarModo(on) {
       prueba = on; raiz.classList.toggle('is-prueba', on); limpiarMarcas(); sel = null;
+      ficha.setAttribute('aria-live', on ? 'off' : 'polite');      // en la prueba el foco lee la pregunta (no se lee dos veces)
       if (capasBox) capasBox.hidden = on;
       if (on) { datos.capas.forEach(function (c) { visibles[c.id] = true; }); Array.prototype.forEach.call(capasBox ? capasBox.querySelectorAll('.es-chip') : [], function (b) { b.setAttribute('aria-pressed', 'true'); }); pintarCapas(); empezar(); }
-      else pintarFicha();
+      else { pintarFicha(); foco(modos && modos.querySelector('[aria-pressed="true"]')); }
     }
     function empezar() {
       intento++;
       var rnd = U.rng((ctx.leccion && ctx.leccion.id) + '|dgr|' + intento), ids = datos.hotspots.map(function (x) { return x.id; }), i;
       for (i = ids.length - 1; i > 0; i--) { var j = Math.floor(rnd() * (i + 1)), t = ids[i]; ids[i] = ids[j]; ids[j] = t; }
       P = { orden: ids, i: 0, ok: 0, malas: [], respondida: false };
-      limpiarMarcas(); pintarPregunta();
+      limpiarMarcas(); pintarPregunta(true);
     }
-    function pintarPregunta() {
+    function pintarPregunta(conFoco) {
       while (ficha.firstChild) ficha.removeChild(ficha.firstChild);
       ficha.classList.remove('is-vacia'); limpiarMarcas();
-      var x = porId[P.orden[P.i]];
-      ficha.appendChild(h('p', { 'class': 'es-meta', text: 'Modo prueba · pregunta ' + (P.i + 1) + ' de ' + P.orden.length + ' · ' + P.ok + ' bien' }));
-      ficha.appendChild(h('p', { 'class': 'es-q es-q--sm', text: '¿Dónde está «' + x.titulo + '»? Tocalo en el dibujo.' }));
+      var x = porId[P.orden[P.i]], pq = preguntaEl('Pregunta', P.i + 1, P.orden.length, '¿Dónde está «' + x.titulo + '»? Tocalo en el dibujo.', 'Modo prueba · pregunta ' + (P.i + 1) + ' de ' + P.orden.length + ' · ' + P.ok + ' bien');
+      ficha.appendChild(pq);
+      if (conFoco) foco(pq);      // la pregunta se lee al llegar: el foco no queda en el botón que se destruyó
     }
     function responder(id) {
       if (!P || P.respondida) return;
       P.respondida = true;
       var q = porId[P.orden[P.i]], bien = id === q.id;
       if (bien) { P.ok++; marcar(id, 'is-ok'); } else { P.malas.push(q.id); marcar(id, 'is-bad'); marcar(q.id, 'is-pulse'); }
-      ficha.appendChild(h('p', { 'class': 'es-pill is-' + (bien ? 'ok' : 'bad'), role: 'status' }, h('span', { 'class': 'es-pill-dot', 'aria-hidden': 'true' }),
+      var idR = 'es-dgr-r-' + (++uidR);
+      ficha.appendChild(h('p', { 'class': 'es-pill is-' + (bien ? 'ok' : 'bad'), role: 'status', id: idR }, h('span', { 'class': 'es-pill-dot', 'aria-hidden': 'true' }),
         h('span', { 'class': 'es-pill-t', text: bien ? '¡Ahí está! ' + (q.texto ? q.texto.split('\n')[0] : '') : 'Ese era «' + porId[id].titulo + '». «' + q.titulo + '» es el que parpadea.' })));
       var ult = P.i + 1 >= P.orden.length;
-      ficha.appendChild(K.button({ label: ult ? 'Ver el resultado' : 'Siguiente', variant: 'primary', iconRight: 'arrow-right', onClick: function () { if (ult) terminar(); else { P.i++; P.respondida = false; pintarPregunta(); } } }));
+      var bSig = K.button({ label: ult ? 'Ver el resultado' : 'Siguiente', variant: 'primary', iconRight: 'arrow-right', onClick: function () { if (ult) terminar(); else { P.i++; P.respondida = false; pintarPregunta(true); } } });
+      bSig.setAttribute('aria-describedby', idR);      // al llegar el foco se lee el resultado de la respuesta
+      ficha.appendChild(bSig);
+      foco(bSig);      // el foco no se queda en el punto del dibujo: «Siguiente» está al final del orden de tabulación (F2)
     }
     function terminar() {
       limpiarMarcas();
       while (ficha.firstChild) ficha.removeChild(ficha.firstChild);
       var tot = P.orden.length;
       ficha.appendChild(h('p', { 'class': 'es-meta', text: 'Modo prueba · resultado' }));
-      ficha.appendChild(h('p', { 'class': 'es-q es-q--sm', text: 'Ubicaste ' + P.ok + ' de ' + tot + (P.ok === tot ? '. ¡Perfecto!' : '. Lo que falló entra a tu repaso.') }));
+      var pRes = h('p', { 'class': 'es-q es-q--sm', tabindex: '-1', text: 'Ubicaste ' + P.ok + ' de ' + tot + (P.ok === tot ? '. ¡Perfecto!' : '. Lo que falló entra a tu repaso.') });
+      ficha.appendChild(pRes);
       if (isFn(ctx.score)) ctx.score(P.ok, tot, { retry: intento > 1, fallos: P.malas });
       if (!hecho) { hecho = true; ctx.done(); }
       ficha.appendChild(h('div', { 'class': 'btn-row' }, K.button({ label: 'Repetir la prueba', variant: 'secondary', icon: 'reset', onClick: function () { empezar(); } }),
         K.button({ label: 'Volver a explorar', variant: 'ghost', onClick: function () { if (modos) modos.setValue('explorar', true); } })));
+      foco(pRes);      // el resultado se lee al llegar
     }
 
     var raiz = h('div', { 'class': 'es-dgr' });   // lleva .is-prueba mientras dura el modo prueba (esconde los nombres)

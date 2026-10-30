@@ -15,7 +15,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
  * normalizar entiende los esbozos del plan: la lista puede llamarse items / pasos / elementos / secuencia / etapas / fases / acciones / cargos, con textos sueltos o
  * {id, texto|nombre|paso|titulo|etiqueta, icono, explicacion|porque|motivo}; el orden correcto sale de `orden` (ids, textos, o posiciones 0-based / 1-based), de una
  * `posicion` por paso, o —si no hay ninguna de las dos— del orden en que están escritos (como `pasos`, o un `orden` con los textos y nada más). `explicaciones` puede ser {id: texto} o una lista paralela.
- * Un `orden` que no resuelve (ids que no existen) → null: más vale la reserva que una clave equivocada. Handle: destroy · getState.
+ * Un `orden` que no resuelve (ids que no existen) o que no coloca TODOS los pasos (uno mal escrito, repetido o faltante) → null: más vale la reserva que una clave equivocada o que perder pasos
+ * en silencio. Handle: destroy · getState.
  *
  * Parte pura (ES.ordenar, probada en Node): normalizar · evaluar(actual, correcto) → {enSitio[], correctos, exactos, total, completo} · mover(orden, id, aIndice) · barajar(ids, correcto, semilla)
  */
@@ -147,7 +148,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         var base = nums.length && Math.min.apply(null, nums) >= 1 && Math.max.apply(null, nums) <= crudos.length ? 1 : 0;
         var vistos = {};
         rawOrden.forEach(function (r) { var j = buscar(r, crudos, base); if (j >= 0 && !vistos[j]) { vistos[j] = 1; orden.push(j); } });
-        if (orden.length < 2) return null;
+        // un `orden` que no coloca TODOS los pasos (un id mal escrito, uno repetido, uno que falta) no es una clave confiable: más vale la reserva que perder pasos en silencio
+        if (orden.length < 2 || orden.length !== crudos.length) return null;
       } else if (crudos.every(function (c) { return c.pos !== null; }) && new Set(crudos.map(function (c) { return c.pos; })).size === crudos.length) {
         orden = crudos.map(function (c, n) { return n; }).sort(function (a, b) { return crudos[a].pos - crudos[b].pos; });
       } else orden = crudos.map(function (c, n) { return n; });
@@ -188,6 +190,12 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     host.appendChild(box);
 
     function anunciar(t) { elAnuncio.textContent = ''; setTimeout(function () { elAnuncio.textContent = t; }, 30); }
+    /** Lo que se lee en voz alta al comprobar: el resultado y, desde el segundo intento, la pista de cada paso fuera de lugar (que el aria-label del botón no incluye). */
+    function textoComprobar(c, total, intento, malos) {
+      var fuera = total - c, t = c + ' de ' + total + ' pasos en su lugar; ' + (fuera === 1 ? '1 fuera de lugar' : fuera + ' fuera de lugar') + '.';
+      if (intento >= 2) malos.forEach(function (m) { if (m.explicacion) t += ' Pista para «' + m.texto + '»: ' + m.explicacion; });
+      return t;
+    }
     function decir(tono, titulo, texto) {
       while (elFb.firstChild) elFb.removeChild(elFb.firstChild);
       elFb.className = 'feedback qz-fb es-ord-fb ' + (tono === 'ok' ? 'feedback--ok' : tono === 'bad' ? 'feedback--bad' : '');
@@ -240,20 +248,21 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       var it = porId[id], jug = estado === 'jugando';
       var ok = marcas ? marcas[id] : null;
       var clase = 'es-ord-row' + (grabado === id ? ' is-grab' : '') + (ok === true ? ' is-ok' : ok === false ? ' is-bad' : '') + (!jug ? ' is-done' : '') + (estado === 'revelado' ? ' is-reveal' : '');
-      var pista = jug && ok === false && intentos >= 2 && it.explicacion ? it.explicacion : '';
+      var pista = jug && ok === false && intentos >= 2 && it.explicacion ? it.explicacion : '', pistaId = pista ? elKeys.id.replace('-k-', '-p-') + '-' + it.k : null;
       var cuerpo = [
         it.icono ? h('span', { 'class': 'es-ord-ico', 'aria-hidden': 'true' }, icon(it.icono)) : null,
         h('span', { 'class': 'es-ord-tx' },
           h('span', { 'class': 'es-ord-t', text: it.texto }),
           !jug && it.explicacion ? h('small', { 'class': 'es-ord-ex', text: it.explicacion }) : null,
-          pista ? h('small', { 'class': 'es-ord-ex es-ord-pista' }, h('b', { text: 'Pista: ' }), document.createTextNode(pista)) : null,
+          pista ? h('small', { 'class': 'es-ord-ex es-ord-pista', id: pistaId }, h('b', { text: 'Pista: ' }), document.createTextNode(pista)) : null,
           jug && ok !== null ? h('span', { 'class': 'es-ord-st' }, icon(ok ? 'check' : 'swap'), h('span', { text: ok ? 'Bien ubicado' : 'Fuera de lugar' })) : null)
       ];
       var num = h('span', { 'class': 'es-ord-n', 'aria-hidden': 'true', text: p2(i + 1) });
       if (!jug) return h('li', { 'class': clase, 'data-id': id },
         num, h('div', { 'class': 'es-ord-it es-ord-it--fin' }, cuerpo),
         h('span', { 'class': 'es-ord-ok', 'aria-hidden': 'true' }, icon(estado === 'revelado' ? 'eye' : 'check')));
-      var btn = h('button', { type: 'button', 'class': 'es-ord-it', 'aria-pressed': grabado === id ? 'true' : 'false', 'aria-describedby': elKeys.id,
+      var btn = h('button', { type: 'button', 'class': 'es-ord-it', 'aria-pressed': grabado === id ? 'true' : 'false', 'aria-describedby': elKeys.id + (pistaId ? ' ' + pistaId : ''),      // la pista no está en el aria-label: se lee como descripción (F2)
+
         'aria-roledescription': 'paso ordenable', 'aria-label': it.texto + '. Lugar ' + (i + 1) + ' de ' + n + (ok === true ? '. Bien ubicado.' : ok === false ? '. Fuera de lugar.' : '') + (grabado === id ? '. Agarrado.' : ''),
         onclick: function () { alClic(id); }, onkeydown: function (ev) { teclas(ev, id); } },
         h('span', { 'class': 'es-ord-grip', 'aria-hidden': 'true' }), cuerpo);
@@ -351,6 +360,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         ev.correctos + ' de ' + n + ' pasos ya están en su lugar; ' + (fuera === 1 ? 'hay 1 fuera de lugar' : 'hay ' + fuera + ' fuera de lugar') + '. Movelos y comprobá de nuevo.' + (intentos >= 2 ? ' Los que siguen mal muestran una pista, y si querés podés ver la respuesta.' : ''));
       pintar(false);
       var b = elList.querySelector('.es-ord-row.is-bad .es-ord-it'); if (b) b.focus({ preventScroll: true });
+      anunciar(textoComprobar(ev.correctos, n, intentos, orden.filter(function (id, i) { return !ev.enSitio[i]; }).map(function (id) { return porId[id]; })));
     }
     function resolver() {
       estado = 'resuelto';

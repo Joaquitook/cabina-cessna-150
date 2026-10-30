@@ -234,6 +234,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       svg.addEventListener('pointerup', function () { arrastrando = false; });
       svg.addEventListener('pointercancel', function () { arrastrando = false; });
       return {
+        svg: svg,
         el: h('div', { 'class': 'es-chartbox' }, sel, fig, h('p', { 'class': 'es-meta es-chart-h', text: 'Tocá o arrastrá el gráfico para mover «' + xc.etiqueta + '»' })),
         update: function (out) {
           var ys = ySel || g.y[0], N = 70, pts = [], i, mn = Infinity, mx = -Infinity, copia = {};
@@ -325,6 +326,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
 
     K.add(root_, [consEl, pill, grid, barEl, grafico && grafico.el, cBox, escBox, nota]);
     host.appendChild(root_);
+    var offEt = grafico && grafico.svg ? U.escalarEtiquetas(grafico.svg, { sinEscala: true }) : null;       // los rótulos del gráfico no se recortan en el borde (F2)
 
     /* ---- lógica */
     function ponerValor(id, v, manual, silencioso) {
@@ -366,7 +368,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     if (datos.consigna && ctx.hecho) { consEl.classList.add('is-ok'); consEstado.textContent = ' ¡Lo lograste!'; }
 
     return {
-      destroy: function () { /* sin timers ni listeners globales */ },
+      destroy: function () { if (offEt) offEt(); },
       getState: function () { return { modelo: datos.modelo, valores: JSON.parse(JSON.stringify(vals)), movimientos: movimientos, logrado: logrado }; },
       set: function (id, v) { ponerValor(id, v, true); }
     };

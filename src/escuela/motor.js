@@ -179,6 +179,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       if (datos !== null) {
         try {
           var hd = def.render(inner, datos, ctx) || {};
+          if (C150.ESCUELA && C150.ESCUELA.bloques && isFn(C150.ESCUELA.bloques.vigilarFoco)) C150.ESCUELA.bloques.vigilarFoco(inner);       // el foco nunca cae a <body> por un control que se destruyó (F2)
           if (!isFn(hd.destroy)) hd.destroy = function () {};
           hd.fallback = false;
           return hd;

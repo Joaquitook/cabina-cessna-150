@@ -9,11 +9,12 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
  *     pasos:[{ titulo?, cuando?, texto, decision?:{ pregunta, opciones:[2..4], correcta:índice, explicacion, resultado? }, escena?, figura?, icono?, dato? }],     3 a 8 pasos
  *     aprendizajes:['…'] (1 a 4)      fuente?:'texto'      nota?:'texto' }
  *   Cómo se cuenta: cada paso se muestra al apretar «Seguir»; un paso con `decision` frena el relato y pregunta antes de seguir (las opciones se mezclan con semilla estable);
- *   al contestar se ve si estuvo bien, el porqué y «Lo que pasó de verdad» (`resultado`, o el paso que sigue). `escena`, `figura`, `icono` y `dato` son los de la diapositiva
+ *   al contestar se ve si estuvo bien, el porqué y «Lo que pasó de verdad» (`resultado`, o el paso que sigue; «Lo que pasa en el ejemplo» si es ficticio). `escena`, `figura`, `icono` y `dato` son los de la diapositiva
  *   (ES.diapositiva): sin ninguno se dibuja el ícono del paso con su número. Al terminar: la tarjeta de lección aprendida, el puntaje de las decisiones y «Volver a contarlo».
  *   normalizar entiende los esbozos del plan: { titulo, texto, hechos[], etapas[], preguntas[{pregunta, opciones, correcta, explicacion}], leccion, personas[] }:
  *   el texto es el contexto, cada hecho un paso (con su etapa de título), las preguntas se reparten en los últimos pasos y `leccion` es el aprendizaje.
- * Parte pura (también en Node): ES.caso = { normalizar, decisiones, puntaje }
+ * En un caso `ficticio` lo que se muestra tras decidir se rotula «LO QUE PASA EN EL EJEMPLO» (no pasó de verdad); en uno real, «LO QUE PASÓ DE VERDAD».
+ * Parte pura (también en Node): ES.caso = { normalizar, decisiones, puntaje, rotuloResultado }
  * Puntaje: ctx.score(bien a la primera, decisiones, {fallos:[ref…]}) al terminar (si hay decisiones); ctx.done() al llegar a la tarjeta final. Handle: destroy · getState.
  */
 (function (C150) {
@@ -103,6 +104,9 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     return { ok: ok, total: ds.length, falladas: fall };
   }
 
+  /** El rótulo de lo que se muestra después de decidir: en un caso real «LO QUE PASÓ DE VERDAD»; en un ejemplo inventado (ficticio:true) no pasó de verdad: «LO QUE PASA EN EL EJEMPLO». */
+  function rotuloResultado(ficticio) { return ficticio ? 'LO QUE PASA EN EL EJEMPLO' : 'LO QUE PASÓ DE VERDAD'; }
+
   /* ================================================================== render */
   function render(host, datos, ctx) {
     var h = ctx.h, icon = ctx.icon, K = ctx.Kit, reducido = !!ctx.reducedMotion, D = ES.diapositiva, Q = ES.quiz, St = ES.store, pasos = datos.pasos, n = pasos.length;
@@ -157,7 +161,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
           h('div', { 'class': 'qz-fb-b' }, h('strong', { text: bien ? '¡Bien decidido!' : 'No era esa, pero así se aprende.' }),
             !bien ? h('span', { 'class': 'qz-fb-a' }, 'La mejor: ', h('b', { text: m.opciones[m.correcta] })) : null,
             h('span', { 'class': 'qz-fb-e', text: d.explicacion }),
-            d.resultado ? h('span', { 'class': 'es-caso-real' }, h('b', { text: 'LO QUE PASÓ DE VERDAD' }), h('span', { text: d.resultado })) : null)));
+            d.resultado ? h('span', { 'class': 'es-caso-real' }, h('b', { text: rotuloResultado(datos.ficticio) }), h('span', { text: d.resultado })) : null)));
       }
       return bloque;
     }
@@ -169,7 +173,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
           h('span', { 'class': 'es-caso-node', 'aria-hidden': 'true', text: String(k + 1) }),
           h('div', { 'class': 'es-caso-bb' },
             h('p', { 'class': 'es-caso-bk' }, h('b', { text: 'PASO ' + p2(k + 1) }), p.cuando ? h('span', { text: p.cuando }) : null, p.titulo ? h('span', { text: p.titulo }) : null),
-            h('p', { 'class': 'es-caso-bt' }, D ? D.fraseEl(ctx, p.texto) : document.createTextNode(plano(p.texto))),
+            h('p', { 'class': 'es-caso-bt', tabindex: '-1' }, D ? D.fraseEl(ctx, p.texto) : document.createTextNode(plano(p.texto))),      // tabindex -1: recibe el foco al llegar a este paso (F2)
             abierta ? bloqueDecision(k, foco && now) : null));
         lista.appendChild(li);
       }
@@ -214,7 +218,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       var f = raiz.querySelector('.es-caso-ft'); enfocar(f);
       var t = raiz.querySelector('.es-caso-fin'); if (t && t.scrollIntoView) { try { t.scrollIntoView({ block: 'nearest', behavior: reducido ? 'auto' : 'smooth' }); } catch (e) { /* idem */ } }
     }
-    function reiniciar() { vistos = 1; resp = {}; orden = {}; fin = false; vez++; pintar(false); pintarEscena(); }
+    function reiniciar() { vistos = 1; resp = {}; orden = {}; fin = false; vez++; pintar(false); pintarEscena(); enfocar(lista.querySelector('.es-caso-bt')); }
 
     pintar(false); pintarEscena();
     return {
@@ -224,5 +228,5 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   }
 
   Mot.register('caso', { normalizar: normalizar, render: render });
-  ES.caso = { normalizar: normalizar, decisiones: decisiones, puntaje: puntaje };
+  ES.caso = { normalizar: normalizar, decisiones: decisiones, puntaje: puntaje, rotuloResultado: rotuloResultado };
 })(root.C150);

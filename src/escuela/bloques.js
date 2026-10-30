@@ -97,6 +97,59 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     return root;
   };
   B.prosa = prosa;
+
+  /* ---- foco y avisos (F2). Los componentes vuelven a armar su interior al avanzar: el control que tenía el foco desaparece (o queda deshabilitado) y el foco cae a <body>.
+   * El lector de pantalla se queda mudo y el teclado vuelve al principio de la página. Estos helpers (más aria-disabled en vez de disabled en los controles que pueden tener el foco
+   * en un límite) lo evitan. Todo dentro de try: un foco que no se puede mover nunca rompe un componente. */
+  /** Lleva el foco a `el`: si por sí solo no lo recibe le pone tabindex="-1" y, con `etiqueta`, un aria-label. → true si el foco quedó ahí. */
+  B.enfocar = function (el, etiqueta) {
+    if (!el || !isFn(el.focus)) return false;
+    try {
+      if (etiqueta) el.setAttribute('aria-label', etiqueta);
+      if (!/^(a|button|input|select|textarea|summary)$/i.test(el.nodeName || '') && !el.hasAttribute('tabindex')) el.setAttribute('tabindex', '-1');
+      el.focus({ preventScroll: true });
+    } catch (e) { return false; }
+    return typeof document !== 'undefined' && document.activeElement === el;
+  };
+  /** ¿El foco cayó a <body> (o a un nodo que ya no está en la página)? */
+  B.focoPerdido = function () {
+    if (typeof document === 'undefined') return false;
+    var a = document.activeElement;
+    return !a || a === document.body || a === document.documentElement || !document.body.contains(a);
+  };
+  /** Tras una acción que rearma el componente: si el foco se perdió, lo lleva al primer candidato que exista (selectores dentro de `raiz`, o elementos) y, si no hay ninguno, a `raiz` misma. → el elemento enfocado o null. */
+  B.rescatarFoco = function (raiz, candidatos) {
+    if (!B.focoPerdido()) return null;
+    var lista = candidatos || [], i, el;
+    for (i = 0; i < lista.length; i++) {
+      el = typeof lista[i] === 'string' ? (raiz && raiz.querySelector ? raiz.querySelector(lista[i]) : null) : lista[i];
+      if (el && !el.disabled && B.enfocar(el)) return el;
+    }
+    return raiz && B.enfocar(raiz) ? raiz : null;
+  };
+  /** Red de seguridad para todos los componentes: si un clic o una tecla destruye (o deshabilita) el control que tenía el foco y éste cae a <body>, lo lleva al primer control de `raiz`
+   *  (o a `raiz` misma). Los componentes mueven el foco con intención (a la pregunta, al aviso): esto sólo actúa cuando no lo hicieron. */
+  B.vigilarFoco = function (raiz, candidatos) {
+    if (!raiz || !isFn(raiz.addEventListener)) return;
+    var cand = candidatos || ['button:not([disabled]):not([aria-disabled="true"])', 'input:not([readonly]):not([disabled])', '[tabindex="0"]'];
+    function revisar(ev) {
+      var t = ev && ev.target;
+      setTimeout(function () {
+        if (!B.focoPerdido()) return;
+        if (t && t.isConnected && !t.disabled) return;          // el control sigue ahí: el foco se fue por otra razón (un clic en un espacio vacío)
+        B.rescatarFoco(raiz, cand);
+      }, 60);
+    }
+    raiz.addEventListener('click', revisar); raiz.addEventListener('keydown', revisar);
+  };
+  /** La etiqueta que se lee al llegar a la tarjeta, la pregunta o el paso: "Tarjeta 2 de 7: ¿Qué es…?". */
+  B.etiquetaPaso = function (rotulo, n, total, texto) { return rotulo + ' ' + n + ' de ' + total + (texto ? ': ' + String(texto).replace(/\s+/g, ' ').trim() : ''); };
+  /** Una región aria-live persistente (se crea una sola vez, nunca se vuelve a crear): decir(texto) la vacía y la reescribe un instante después, así se lee aunque el texto se repita. */
+  B.regionVoz = function (K, host) {
+    var el = K.el('p', { 'class': 'sr-only', 'aria-live': 'polite', role: 'status' }), t = 0;
+    if (host) host.appendChild(el);
+    return { el: el, decir: function (txt) { clearTimeout(t); el.textContent = ''; t = setTimeout(function () { el.textContent = txt; }, 30); } };
+  };
   B.resumenLinea = function (K, s, deps) {
     var h = K.el;
     return h('aside', { 'class': 'es-resumen', 'aria-label': 'Resumen en una línea' }, h('p', { 'class': 'es-resumen-k', text: 'RESUMEN EN UNA LÍNEA' }), p(K, s, 'es-resumen-t', deps));

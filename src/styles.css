@@ -3535,6 +3535,9 @@ div.card-h:hover { border-color: var(--line); transform: none; }
 .es-dgr-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; }
 .es-dgr-zoom { display: flex; gap: 6px; margin-left: auto; }
 .es-dgr-z { min-width: 40px; min-height: 40px; }
+.es-dgr-z[aria-disabled="true"] { opacity: .5; cursor: not-allowed; }
+.es-dgr-pq { display: flex; flex-direction: column; gap: 8px; }
+.es-dgr-pq > p { margin: 0; }
 .es-dgr-view { position: relative; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); overflow: hidden; touch-action: pan-y; }
 .es-dgr-view.is-zoom { touch-action: none; cursor: grab; }
 .dg-svg, .es-ani-svg { --dg-s: 1; }
@@ -4477,7 +4480,7 @@ button.es-ord-it:hover { background: var(--surface-2); border-color: var(--fg-so
 .es-ord-st .icon { width: 16px; height: 16px; stroke-width: 2.6; }
 .es-ord-mv { display: flex; gap: 4px; }
 .es-ord-b {
-  display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 1px solid var(--line); border-radius: 50%; background: var(--surface); color: var(--fg); cursor: pointer;
+  display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 1px solid var(--line); border-radius: 50%; background: var(--surface); color: var(--fg); cursor: pointer;          /* 44 × 44 con cualquier puntero (F2) */
   transition: background var(--motion-fast), border-color var(--motion-fast);
 }
 .es-ord-b:hover { background: var(--surface-2); border-color: var(--fg-soft); }
@@ -4606,7 +4609,10 @@ button.es-ord-it:hover { background: var(--surface-2); border-color: var(--fg-so
   .es-cmp-chip { padding-inline: 14px; }
 }
 @media (pointer: coarse) { .es-cmp-gap, .es-cmp-in { min-height: 44px; } }
-@media (min-height: 601px) { .es-cmp-gap, .es-cmp-in { scroll-margin-top: 280px; } }        /* con el banco pegado arriba, el foco con teclado no deja el hueco escondido debajo */
+/* con el banco pegado arriba, el foco con teclado no deja el hueco escondido debajo (WCAG 2.4.11): el margen sale del alto real del banco (--es-bank-h la publica el componente) y,
+ * si el banco taparía más de ~35 % de la pantalla (celular chico, teclado abierto), deja de estar pegado (.is-suelto) */
+.es-cmp-gap, .es-cmp-in, .es-cmp-chip { scroll-margin-top: calc(var(--es-head-h, 0px) + var(--es-bank-h, 0px) + 24px); }
+.es-cmp-bank.is-suelto { position: static; }
 @media (max-height: 600px) { .es-cmp-bank { position: static; } }
 @media (prefers-reduced-motion: reduce) {
   .es-cmp-chip.is-hint, .es-cmp-inw.is-shake { animation: none; }
@@ -4815,7 +4821,7 @@ button.es-ord-it:hover { background: var(--surface-2); border-color: var(--fg-so
 .es-dia-dot:hover::before { border-color: var(--fg); }
 .es-dia-dot:focus-visible { outline: 3px solid var(--focus); outline-offset: -4px; }
 .es-dia-ctl { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
-.es-dia-ctl .btn[disabled] { opacity: .45; }
+.es-dia-ctl .btn[disabled], .es-dia-ctl .btn[aria-disabled="true"] { opacity: .45; cursor: not-allowed; }      /* aria-disabled: el botón de un extremo sigue pudiendo tener el foco (F2) */
 .es-dia-ok { margin: 0; }
 @keyframes es-dia-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 @keyframes dp-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }

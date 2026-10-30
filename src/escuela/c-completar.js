@@ -4,7 +4,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
  * Tocá una ficha y después el hueco (o el hueco y después la ficha), o arrastrá la ficha al hueco; con teclado: Tab, Enter en la ficha y Enter en el hueco.
  * Cada ficha se corrige AL INSTANTE y con suavidad: si va, el hueco se cierra en verde con su porqué; si no, la ficha vuelve al banco (sin castigo) con una pista, y
  * después de dos intentos el banco te marca cuál era. Los huecos que se ESCRIBEN (números con su unidad, o palabras) se verifican con "Comprobar" o con Enter.
- * Hay huecos "libres" (una bitácora: sin respuesta correcta): se guardan solos en este dispositivo. Siempre hay "Ver la respuesta" y "Probar de nuevo".
+ * Hay huecos "libres" (una bitácora: sin respuesta correcta): se guardan solos en este dispositivo, DENTRO del progreso de la Escuela (Store.libre: sale en exportar / importar y se borra con reset).
+ * Siempre hay "Ver la respuesta" y "Probar de nuevo".
  * Más de 6 huecos se reparten en rondas (el banco de cada ronda es corto y sólo trae sus fichas + algunas de relleno).
  * Al terminar: ctx.score(huecos bien a la primera, total, {fallos}) y ctx.done(); los que costaron entran al mazo de repaso. Los huecos libres no califican.
  *
@@ -13,15 +14,18 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
  *     frases:[{ texto:'Todo piloto pide un ___ de sus cervezas.',       cada ___ es un hueco, en orden; **término**, ==clave== y {{75|%}} se muestran con el formato de la lección
  *               huecos:[{ respuesta:'recuento', alternativas?:['recuentos'],       otras respuestas válidas (también para lo que se escribe)
  *                         tipo?:'ficha' | 'escribir' | 'libre',                    ficha (por defecto): se llena con una ficha · escribir: se teclea · libre: se teclea y no tiene respuesta correcta
- *                         unidad?:'%', explicacion?:'texto', pista?:'texto', sugerencias?:['idea', …]  (sugerencias: sólo para huecos libres) }],
+ *                         unidad?:'%', explicacion?:'texto', pista?:'texto', sugerencias?:['idea', …]  (sugerencias: sólo para huecos libres),
+ *                         grupo?:'dn' }],                                          huecos INTERCAMBIABLES: los de la misma frase con el mismo `grupo` aceptan la respuesta de cualquiera del grupo, una vez cada una
+ *                                                                                  («volar de ___ y de ___» → día / noche en cualquier orden); un grupo de un solo hueco se ignora
  *               explicacion?:'texto' }],
  *     distractores?:['aseguradora', …] }                                  fichas de relleno que no son respuesta de ningún hueco
  * normalizar entiende los esbozos del plan:  frases:[[texto, respuesta]] (con `fichas` = los distractores) · frases:[{texto, respuesta|correcta, alternativas, unidad}] ·
  * un párrafo `texto` con [[id]] (o {{id}}) y `huecos:[{id, correcta|respuesta|valor, alternativas, fichas, libre, tipo, unidad, explicacion}]` (+ `distractores`). Una respuesta numérica
- * se compara como NÚMERO ("6" = "6,0"; "75 %" = "75"); la hora "6:00" = "06:00"; el resto sin mayúsculas, tildes ni espacios de más.
+ * se compara como NÚMERO ("6" = "6,0"; "75 %" = "75"); si el hueco declara una unidad (o la respuesta la trae, "2 min") lo escrito pegado a la cifra tiene que ser esa unidad (o sus sinónimos:
+ * "h" = "horas") o nada: "75 kt" no vale por "75 %"; la hora "6:00" = "06:00"; el resto sin mayúsculas, tildes ni espacios de más.
  * Handle: destroy · getState.
  *
- * Parte pura (ES.completar, probada en Node): normalizar · igual(entrada, hueco) · comparable(texto) · numero(texto) · partes(texto) → [{t:'txt'|'hueco'}] · rondas(frases) · banco(frases, ronda, distractores, semilla)
+ * Parte pura (ES.completar, probada en Node): normalizar · igual(entrada, hueco) · aceptaGrupo(entrada, defs, propio, tomadas) · comparable(texto) · numero(texto) · cifra(texto) · mismaUnidad(a, b) · partes(texto) → [{t:'txt'|'hueco'}] · rondas(frases) · banco(frases, ronda, distractores, semilla)
  */
 (function (C150) {
   'use strict';
@@ -42,10 +46,22 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   function sinTildes(s) { s = String(s); return s.normalize ? s.normalize('NFD').replace(/[̀-ͯ]/g, '') : s; }
   /** El texto en su forma comparable: sin tildes, en minúscula, sin puntuación de los bordes ni espacios de más. */
   function comparable(s) { return sinTildes(str(s)).toLowerCase().replace(/[«»"“”'‘’]/g, '').replace(/\s+/g, ' ').replace(/^[\s.,;:!?¡¿()]+|[\s.,;:!?¡¿()]+$/g, ''); }
+  /** El número de un texto con la unidad que trae pegada: "75 %" → {n:75, u:'%'}; "6,5" → {n:6.5, u:''}; "2 horas" → {n:2, u:'horas'}; si no es una cifra, null. */
+  function cifra(s) {
+    var m = /^([-+]?\d+(?:[.,]\d+)?)\s*(%|[a-zA-ZÀ-ÿº°/]{1,12})?$/.exec(str(s).replace(/\s+por\s+ciento$/i, ' %'));
+    return m ? { n: parseFloat(m[1].replace(',', '.')), u: m[2] ? sinTildes(m[2]).toLowerCase() : '' } : null;
+  }
   /** El número de un texto ("75", "6,5", "75 %", "-3 kt") o null. */
-  function numero(s) {
-    var m = /^([-+]?\d+(?:[.,]\d+)?)\s*(?:%|[a-zA-Zºº°/]{1,8})?$/.exec(str(s));
-    return m ? parseFloat(m[1].replace(',', '.')) : null;
+  function numero(s) { var c = cifra(s); return c ? c.n : null; }
+  /** Las unidades que se pueden escribir de más de una manera (cada fila es la misma unidad). */
+  var UNIDADES = [['%', 'pc'], ['h', 'hs', 'hr', 'hrs', 'hora', 'horas'], ['min', 'mins', 'minuto', 'minutos'], ['s', 'seg', 'segs', 'segundo', 'segundos'], ['kt', 'kts', 'nudo', 'nudos'],
+    ['ft', 'pie', 'pies'], ['m', 'mt', 'mts', 'metro', 'metros'], ['km', 'kms', 'kilometro', 'kilometros'], ['nm', 'mn', 'milla', 'millas'], ['kg', 'kgs', 'kilo', 'kilos'],
+    ['l', 'lt', 'lts', 'litro', 'litros'], ['º', '°', 'grado', 'grados'], ['dia', 'dias'], ['mes', 'meses'], ['ano', 'anos']];
+  /** ¿Dos unidades escritas son la misma? ("h" y "horas" sí; "kt" y "%" no). */
+  function mismaUnidad(a, b) {
+    a = sinTildes(str(a)).toLowerCase().replace(/\./g, ''); b = sinTildes(str(b)).toLowerCase().replace(/\./g, '');
+    if (a === b) return true;
+    return UNIDADES.some(function (g) { return g.indexOf(a) >= 0 && g.indexOf(b) >= 0; });
   }
   /** Una hora "6:00" / "06:00" → minutos; si no es una hora, null. */
   function hora(s) { var m = /^(\d{1,2}):(\d{2})$/.exec(str(s)); return m ? (+m[1]) * 60 + (+m[2]) : null; }
@@ -59,17 +75,34 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   function igual(entrada, hueco) {
     var e0 = sinUnidad(entrada, hueco && hueco.unidad), e = comparable(e0);
     if (!e) return false;
-    var resp = [hueco.respuesta].concat(arr(hueco.alternativas)), i;
+    var resp = [hueco.respuesta].concat(arr(hueco.alternativas)), i, declarada = str(hueco && hueco.unidad), ce = cifra(entrada);
     for (i = 0; i < resp.length; i++) {
       var r = str(resp[i]);
       if (!r) continue;
       if (comparable(r) === e) return true;
-      var nr = numero(r), ne = numero(e0);
-      if (nr !== null && ne !== null && Math.abs(nr - ne) < 1e-9) return true;
+      // los números se comparan como números; si el hueco declara una unidad (o la respuesta la trae: "2 min") lo que se escribió pegado a la cifra tiene que ser esa unidad o nada:
+      // "75 kt" no vale por "75 %" ni "2 h" por "2 min". Si la respuesta es una cifra pelada y el hueco no declara unidad, se acepta cualquier unidad.
+      var cr = cifra(r);
+      if (cr !== null && ce !== null && Math.abs(cr.n - ce.n) < 1e-9) {
+        var esperada = declarada || cr.u;
+        if (!esperada || !ce.u || mismaUnidad(ce.u, esperada)) return true;
+      }
       var hr = hora(r), he = hora(e0);
       if (hr !== null && he !== null && hr === he) return true;
     }
     return false;
+  }
+  /**
+   * Huecos INTERCAMBIABLES (`grupo`): los de una misma frase que comparten grupo aceptan cada uno la respuesta de cualquiera del grupo, pero cada respuesta una sola vez
+   * («de ___, de ___» → día / noche en cualquier orden). defs = los huecos del grupo, propio = el índice del hueco que se corrige, tomadas = los índices de defs que ya
+   * ocupa otro hueco. Devuelve el índice de defs al que corresponde `entrada` (primero el propio, después los que siguen libres) o -1.
+   */
+  function aceptaGrupo(entrada, defs, propio, tomadas) {
+    defs = arr(defs);
+    var orden = [propio], i, tom = arr(tomadas);
+    for (i = 0; i < defs.length; i++) if (i !== propio) orden.push(i);
+    for (i = 0; i < orden.length; i++) if (defs[orden[i]] && tom.indexOf(orden[i]) < 0 && igual(entrada, defs[orden[i]])) return orden[i];
+    return -1;
   }
 
   /* ================================================================== partes de una frase, rondas y banco (puro) */
@@ -139,7 +172,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     if (libre) return { respuesta: '', alternativas: [], tipo: 'libre', unidad: str(h.unidad), explicacion: publica(h.explicacion), pista: publica(h.pista), sugerencias: fichas.slice(0, 6) };
     if (!resp) return null;
     alt = alt.filter(function (a, k) { return comparable(a) !== comparable(resp) && alt.indexOf(a) === k; });
-    return { respuesta: resp, alternativas: alt, tipo: escribir ? 'escribir' : 'ficha', unidad: str(h.unidad), explicacion: publica(h.explicacion) || publica(h.porque), pista: publica(h.pista), sugerencias: [], _fichas: libre ? [] : fichas };
+    return { respuesta: resp, alternativas: alt, tipo: escribir ? 'escribir' : 'ficha', unidad: str(h.unidad), explicacion: publica(h.explicacion) || publica(h.porque), pista: publica(h.pista), sugerencias: [], grupo: slug(h.grupo || h.intercambiables), _fichas: libre ? [] : fichas };
   }
   /** Una frase cruda → {texto, huecos[], explicacion} (el texto ya con ___), o null. */
   function fraseDe(raw) {
@@ -207,6 +240,12 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         arr(fuente).forEach(function (r) { var f = fraseDe(r); if (f) frases.push(f); });
       }
       if (!frases.length || frases.length > 14) return null;
+      // un grupo de huecos intercambiables necesita al menos dos huecos en la MISMA frase (y respuestas distintas): si no, el grupo no significa nada
+      frases.forEach(function (f) {
+        var cuenta = {};
+        f.huecos.forEach(function (hu) { if (hu.grupo) cuenta[hu.grupo] = (cuenta[hu.grupo] || 0) + 1; });
+        f.huecos.forEach(function (hu) { if (hu.grupo && cuenta[hu.grupo] < 2) hu.grupo = ''; });
+      });
       var total = frases.reduce(function (s, f) { return s + f.huecos.length; }, 0);
       if (total < 1 || total > 30) return null;
       // fichas de relleno: las de la lista + las de cada hueco, sin repetir y sin ninguna que sea respuesta de un hueco
@@ -223,31 +262,35 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     } catch (e) { return null; }
   }
 
-  /* ================================================================== guardado de lo escrito en los huecos libres (sólo en este dispositivo) */
-  var LS = 'c150.escuela.libre.v1';
-  function leerLibres() { try { var o = JSON.parse(root.localStorage.getItem(LS) || '{}'); return esObj(o) ? o : {}; } catch (e) { return {}; } }
-  function guardarLibre(k, v) {
-    try {
-      var o = leerLibres(), ks = Object.keys(o);
-      if (ks.length > 120 && o[k] === undefined) delete o[ks[0]];
-      if (v) o[k] = String(v).slice(0, 160); else delete o[k];
-      root.localStorage.setItem(LS, JSON.stringify(o));
-    } catch (e) { /* sin almacenamiento: queda en la pantalla */ }
+  /* ================================================================== guardado de lo escrito en los huecos libres (sólo en este dispositivo, dentro del Store: sale en exportar / importar y se borra con reset) */
+  var memoriaLibre = {};      // sin Store (pruebas, vista previa): lo escrito queda en la pantalla, no en localStorage
+  function leerLibre(S, k) { return S ? S.libre(k) : (memoriaLibre[k] || ''); }
+  function guardarLibre(S, k, v) {
+    v = v ? String(v).slice(0, 160) : '';
+    if (S) { try { S.libreGuardar(k, v); } catch (e) { /* sin almacenamiento: queda en la pantalla */ } return; }
+    if (v) memoriaLibre[k] = v; else delete memoriaLibre[k];
   }
 
   /* ================================================================== render */
   function render(host, datos, ctx) {
     var h = ctx.h, icon = ctx.icon, reducido = !!ctx.reducedMotion, Arr = ES.arrastre, K = ctx.Kit, B = ES.bloques;
+    var SL = ctx.store && isFn(ctx.store.libreGuardar) && isFn(ctx.store.libre) ? ctx.store : null;
     var base = (ctx.leccion && ctx.leccion.id || '') + '|' + (ctx.key || '');
     var semilla = base + '|cmp';
     var frases = datos.frases.map(function (f, fi) { return { texto: f.texto, partes: partes(f.texto), explicacion: f.explicacion, huecos: f.huecos, fi: fi }; });
     // huecos globales, en orden de lectura
-    var G = [];
-    frases.forEach(function (f) { f.gaps = f.huecos.map(function (hu, k) { var g = { gi: G.length, f: f, k: k, def: hu, estado: 'vacio', valor: '', intentos: 0, fallo: false, revelado: false }; G.push(g); return g; }); });
+    var G = [], grupos = {};
+    frases.forEach(function (f) {
+      f.gaps = f.huecos.map(function (hu, k) {
+        var g = { gi: G.length, f: f, k: k, def: hu, estado: 'vacio', valor: '', intentos: 0, fallo: false, revelado: false, gr: null, slot: 0, cumple: null };
+        // huecos intercambiables: los de la misma frase con el mismo `grupo` (cada uno acepta la respuesta de cualquiera, una vez cada una)
+        if (hu.grupo && hu.tipo !== 'libre') { var gk = f.fi + '|' + hu.grupo, gg = grupos[gk] || (grupos[gk] = { defs: [], gaps: [] }); g.gr = gg; g.slot = gg.gaps.length; gg.gaps.push(g); gg.defs.push(hu); }
+        G.push(g); return g;
+      });
+    });
     var libres = G.filter(function (g) { return g.def.tipo === 'libre'; }), calificados = G.filter(function (g) { return g.def.tipo !== 'libre'; });
     var soloLibre = !calificados.length;
-    var guardado = leerLibres();
-    libres.forEach(function (g) { var v = guardado[base + '|' + g.gi]; if (typeof v === 'string' && v) { g.valor = v; g.estado = 'escrito'; } });
+    libres.forEach(function (g) { var v = leerLibre(SL, base + '|' + g.gi); if (typeof v === 'string' && v) { g.valor = v; g.estado = 'escrito'; } });
     var tandas = rondas(frases), nRonda = 0, intento = 0, chips = [], sel = null, esRetry = !!ctx.hecho, puntuado = false, terminado = false, arrastres = [];
     var bdeps = { glosario: function (t, d) { if (isFn(ctx.glosario)) ctx.glosario(t, d); }, termino: function () { return null; } };
 
@@ -262,6 +305,16 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     var elAcc = h('div', { 'class': 'btn-row es-cmp-acc' });
     var box = h('div', { 'class': 'es-cmp' + (reducido ? ' is-rm' : '') }, elHint, elCount, elBankBox, elFr, elFb, elAcc, elLive);
     host.appendChild(box);
+    /* el banco pegado arriba no tapa el foco: su alto real va a --es-bank-h (margen de scroll de los huecos) y, si cubriría más de ~35 % de la pantalla, se suelta (F2) */
+    var roBanco = null, tBanco = 0;
+    function medirBanco() {
+      var alto = elBankBox.hidden ? 0 : elBankBox.offsetHeight, vh = (typeof window !== 'undefined' && window.innerHeight) || 0, suelto = !!(alto && vh && alto > vh * 0.35);
+      elBankBox.classList.toggle('is-suelto', suelto);
+      box.style.setProperty('--es-bank-h', (suelto ? 0 : alto) + 'px');
+    }
+    function medirBancoLuego() { clearTimeout(tBanco); tBanco = setTimeout(medirBanco, 30); }
+    if (typeof ResizeObserver === 'function') { try { roBanco = new ResizeObserver(medirBancoLuego); roBanco.observe(elBankBox); } catch (e) { roBanco = null; } }
+    if (typeof window !== 'undefined') window.addEventListener('resize', medirBancoLuego);
 
     function etiq(g) { return enRonda().indexOf(g) + 1; }
     function enRonda() { return tandas[nRonda].reduce(function (a, fi) { return a.concat(frases[fi].gaps); }, []); }
@@ -283,6 +336,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       elFb.hidden = false;
       elFb.appendChild(h('span', { 'class': 'qz-fb-ico', 'aria-hidden': 'true' }, icon(tono === 'ok' ? 'check' : tono === 'bad' ? 'bulb' : 'info')));
       elFb.appendChild(h('div', { 'class': 'qz-fb-b' }, h('strong', { text: titulo }), texto ? h('span', { text: texto }) : null));
+      anunciar(titulo + (texto ? ' ' + texto : ''));      // la región de abajo pasa de oculta a visible en el mismo instante y no se lee: el aviso va por la región persistente (F2)
     }
     function inline(t) {
       var f = document.createDocumentFragment();
@@ -292,6 +346,13 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     function refDe(g) { var S = ES.store; return isFn(S && S.hashTexto) ? S.hashTexto(g.f.texto + '#' + g.k).slice(0, 6) : String(g.gi); }
     function chipEl(chip) { var cs = elBank.querySelectorAll('.es-cmp-chip'); for (var i = 0; i < cs.length; i++) if (cs[i].getAttribute('data-id') === chip.id) return cs[i]; return null; }
     function gapEl(g) { return elFr.querySelector('[data-gi="' + g.gi + '"]'); }
+    function cerrado(g) { return g.estado === 'ok' || g.estado === 'revelado'; }
+    /** Las respuestas del grupo que otros huecos ya ocupan (índices de gr.defs). */
+    function tomadasDe(g) { return g.gr ? g.gr.gaps.filter(function (x) { return x !== g && cerrado(x) && x.cumple !== null; }).map(function (x) { return x.cumple; }) : []; }
+    /** ¿`texto` es una respuesta válida para este hueco? → el índice de la respuesta que cumple (0 si no hay grupo) o -1. */
+    function acepta(g, texto) { return g.gr ? aceptaGrupo(texto, g.gr.defs, g.slot, tomadasDe(g)) : (igual(texto, g.def) ? 0 : -1); }
+    /** La definición cuya respuesta cumple el hueco (la propia, o la de otro hueco de su grupo si las dieron cruzadas). */
+    function defDe(g) { return g.gr && g.cumple !== null && g.gr.defs[g.cumple] ? g.gr.defs[g.cumple] : g.def; }
 
     /* ---------------------------------------------------------- selección */
     function seleccionar(x) {
@@ -323,9 +384,11 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     function colocar(chip, g) {
       if (terminado || g.def.tipo !== 'ficha' || g.estado === 'ok' || chip.uso !== null) return;
       seleccionar(null);
-      if (igual(chip.texto, g.def)) {
-        g.estado = 'ok'; g.valor = chip.texto; chip.uso = g.gi;
-        nota(g, 'ok', '¡Eso es!', '«' + chip.texto + '» va ahí.' + (g.def.explicacion ? ' ' + g.def.explicacion : '') + (g.f.explicacion && g.f.huecos.length === 1 && !g.def.explicacion ? ' ' + g.f.explicacion : ''));
+      var cumple = acepta(g, chip.texto);
+      if (cumple >= 0) {
+        g.estado = 'ok'; g.valor = chip.texto; g.cumple = cumple; chip.uso = g.gi;
+        var dOk = defDe(g);
+        nota(g, 'ok', '¡Eso es!', '«' + chip.texto + '» va ahí.' + (dOk.explicacion ? ' ' + dOk.explicacion : '') + (g.f.explicacion && g.f.huecos.length === 1 && !dOk.explicacion ? ' ' + g.f.explicacion : ''));
         pintar();
         if (!pendientes().length) { cerrarRonda(); return; }
         var c = elBank.querySelector('.es-cmp-chip:not([disabled])'); if (c) c.focus({ preventScroll: true });      // el foco vuelve al banco para elegir la próxima ficha
@@ -335,15 +398,16 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         pintar();
         var ge = gapEl(g); sacudir(ge);
         if (g.intentos >= 2) {            // dos intentos: el banco marca la ficha que era (sin dejar a nadie trabado)
-          var acierto = chips.filter(function (c2) { return c2.uso === null && !c2.relleno && igual(c2.texto, g.def); })[0], ce = acierto && chipEl(acierto);
+          var acierto = chips.filter(function (c2) { return c2.uso === null && !c2.relleno && acepta(g, c2.texto) >= 0; })[0], ce = acierto && chipEl(acierto);
           if (ce) { ce.classList.add('is-hint'); setTimeout(function () { ce.classList.remove('is-hint'); }, 2800); }
         }
         if (ge) ge.focus({ preventScroll: true });
       }
     }
-    function escribirOk(g) {
-      g.estado = 'ok'; g.revelado = false;
-      nota(g, 'ok', '¡Eso es!', '«' + g.valor + '» va ahí.' + (g.def.explicacion ? ' ' + g.def.explicacion : ''));
+    function escribirOk(g, cumple) {
+      g.estado = 'ok'; g.revelado = false; g.cumple = cumple;
+      var dOk = defDe(g);
+      nota(g, 'ok', '¡Eso es!', '«' + g.valor + '» va ahí.' + (dOk.explicacion ? ' ' + dOk.explicacion : ''));
     }
     /** Verifica lo escrito en los huecos "escribir" no vacíos (Enter en uno, o el botón Comprobar en todos). */
     function comprobarEscritos(soloEste) {
@@ -352,7 +416,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       var vacios = lista.filter(function (g) { return !str(g.valor); }), mal = [], bien = 0;
       lista.forEach(function (g) {
         if (!str(g.valor)) return;
-        if (igual(g.valor, g.def)) { escribirOk(g); bien++; }
+        var cumple = acepta(g, g.valor);
+        if (cumple >= 0) { escribirOk(g, cumple); bien++; }
         else { g.intentos++; g.fallo = true; mal.push(g); }
       });
       var hayLibresVacios = enRonda().filter(function (g) { return g.def.tipo === 'libre' && !str(g.valor); });
@@ -386,7 +451,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         'aria-label': 'Hueco ' + n + ' de ' + nTot + (libre ? ' (escribí con tus palabras)' : '') + (ok ? ': ' + g.valor + (rev ? ' (respuesta)' : ', correcto') : ''), readonly: ok ? true : null,
         oninput: function () {
           g.valor = inp.value;
-          if (libre) { g.estado = str(g.valor) ? 'escrito' : 'vacio'; guardarLibre(base + '|' + g.gi, str(g.valor)); }
+          if (libre) { g.estado = str(g.valor) ? 'escrito' : 'vacio'; guardarLibre(SL, base + '|' + g.gi, str(g.valor)); }
           else if (g.fallo && inp.classList.contains('is-miss')) inp.classList.remove('is-miss');
         },
         onkeydown: function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); if (libre) { var nx = G.filter(function (x) { return x.gi > g.gi && x.def.tipo !== 'ficha'; })[0], ne = nx && gapEl(nx); if (ne) ne.focus({ preventScroll: true }); else guardar(); } else comprobarEscritos(g); } } });
@@ -410,7 +475,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
           return h('div', { 'class': 'es-cmp-ideas', role: 'group', 'aria-label': 'Ideas para el hueco ' + etiq(g) }, h('span', { 'class': 'es-meta', text: 'Ideas · hueco ' + etiq(g) }),
             g.def.sugerencias.map(function (t) {
               return h('button', { type: 'button', 'class': 'es-cmp-chip es-cmp-chip--idea', onclick: function () {
-                g.valor = t; g.estado = 'escrito'; guardarLibre(base + '|' + g.gi, t);
+                g.valor = t; g.estado = 'escrito'; guardarLibre(SL, base + '|' + g.gi, t);
                 var e = gapEl(g); if (e) { e.value = t; e.focus({ preventScroll: true }); }
               }, text: t });
             }));
@@ -443,6 +508,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       var enR = enRonda(), hechos = enR.filter(function (g) { return g.estado === 'ok' || g.estado === 'revelado' || (g.def.tipo === 'libre' && str(g.valor)); }).length;
       elCount.textContent = (hechos + ' de ' + enR.length + ' huecos completos' + (tandas.length > 1 ? ' · ronda ' + (nRonda + 1) + ' de ' + tandas.length : '')).toUpperCase();
       pintarAcciones();
+      medirBancoLuego();      // el banco cambió (fichas usadas, otra ronda): se vuelve a medir
       if (enfocado) { var ie = elFr.querySelector('.es-cmp-in[data-gi="' + enfocado.gi + '"]'); if (ie && !ie.readOnly) { ie.focus({ preventScroll: true }); try { ie.setSelectionRange(enfocado.ini, enfocado.fin); } catch (e) { /* idem */ } } }
     }
     function pintarAcciones() {
@@ -464,10 +530,12 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         pintar();
         decir(revelada ? 'info' : 'ok', revelada ? 'Esta es la respuesta de la ronda.' : '¡Ronda completa!', 'Quedan ' + (tandas.length - nRonda - 1) + (tandas.length - nRonda - 1 === 1 ? ' ronda más.' : ' rondas más.'));
         while (elAcc.firstChild) elAcc.removeChild(elAcc.firstChild);
-        elAcc.appendChild(K.button({ label: 'Seguir con la ronda ' + (nRonda + 2), variant: 'primary', iconRight: 'arrow-right', onClick: function () {
+        var bSeguir = K.button({ label: 'Seguir con la ronda ' + (nRonda + 2), variant: 'primary', iconRight: 'arrow-right', onClick: function () {
           nRonda++; elFb.hidden = true; armarRonda(); pintar();
           var c = elBank.querySelector('.es-cmp-chip:not([disabled])') || elFr.querySelector('.es-cmp-in'); if (c) c.focus({ preventScroll: true });
-        } }));
+        } });
+        elAcc.appendChild(bSeguir);
+        if (B && isFn(B.enfocar)) B.enfocar(bSeguir); else bSeguir.focus({ preventScroll: true });      // el chip que tenía el foco ya no existe: el foco va al botón que sigue (F2)
         return;
       }
       terminar();
@@ -499,28 +567,33 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       seleccionar(null);
       enRonda().forEach(function (g) {
         if (g.def.tipo === 'libre' || g.estado === 'ok' || g.estado === 'revelado') return;
-        g.estado = 'revelado'; g.revelado = true; g.fallo = true; g.valor = g.def.respuesta;
-        if (g.def.tipo === 'ficha') { var c = chips.filter(function (x) { return x.uso === null && !x.relleno && igual(x.texto, g.def); })[0]; if (c) c.uso = g.gi; }
+        // con huecos intercambiables cada uno se queda con su respuesta, o con la que siga libre si otro del grupo ya la ocupa
+        var slot = 0, dr = g.def;
+        if (g.gr) { var tom = tomadasDe(g), q; slot = tom.indexOf(g.slot) < 0 ? g.slot : -1; for (q = 0; q < g.gr.defs.length && slot < 0; q++) if (tom.indexOf(q) < 0) slot = q; dr = g.gr.defs[Math.max(0, slot)]; }
+        g.estado = 'revelado'; g.revelado = true; g.fallo = true; g.valor = dr.respuesta; g.cumple = g.gr ? Math.max(0, slot) : 0;
+        if (g.def.tipo === 'ficha') { var c = chips.filter(function (x) { return x.uso === null && !x.relleno && igual(x.texto, dr); })[0]; if (c) c.uso = g.gi; }
       });
       pintar();
       if (!pendientes().length) cerrarRonda(true);
+      else if (B && isFn(B.rescatarFoco)) B.rescatarFoco(box, ['.es-cmp-in:not([readonly])', '.es-cmp-gap:not([disabled])', '.es-cmp-acc .btn']);
     }
     function reiniciar() {
       intento++; esRetry = true; puntuado = false; terminado = false; nRonda = 0;
-      G.forEach(function (g) { if (g.def.tipo === 'libre') return; g.estado = 'vacio'; g.valor = ''; g.intentos = 0; g.fallo = false; g.revelado = false; });
+      G.forEach(function (g) { if (g.def.tipo === 'libre') return; g.estado = 'vacio'; g.valor = ''; g.intentos = 0; g.fallo = false; g.revelado = false; g.cumple = null; });
       ultimo = null; elFb.hidden = true; armarRonda(); pintar();
       var c = elBank.querySelector('.es-cmp-chip:not([disabled])') || elFr.querySelector('.es-cmp-in'); if (c) c.focus({ preventScroll: true });
     }
 
     box.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && sel) { seleccionar(null); ev.stopPropagation(); } });
-    armarRonda(); pintar();
+    armarRonda(); pintar(); medirBanco();
+    setTimeout(medirBanco, 250); setTimeout(medirBanco, 900);      // al armarse la lección el componente todavía no está en la página (el alto sale 0): se mide de nuevo ya montado
     if (soloLibre && libres.length && libres.every(function (g) { return str(g.valor); }) && ctx.hecho) decir('ok', 'Guardado en este dispositivo', 'Podés volver cuando quieras y cambiar lo que escribiste: se guarda solo.');
     return {
-      destroy: function () { arrastres.forEach(function (a) { a.destroy(); }); arrastres = []; },
+      destroy: function () { arrastres.forEach(function (a) { a.destroy(); }); arrastres = []; clearTimeout(tBanco); if (roBanco) { try { roBanco.disconnect(); } catch (e) { /* idem */ } } if (typeof window !== 'undefined') window.removeEventListener('resize', medirBancoLuego); },
       getState: function () { return { total: G.length, completos: G.filter(function (g) { return g.estado === 'ok' || g.estado === 'revelado'; }).length, ronda: nRonda + 1, terminado: terminado }; }
     };
   }
 
   Mot.register('completar', { normalizar: normalizar, render: render });
-  ES.completar = { normalizar: normalizar, igual: igual, comparable: comparable, numero: numero, partes: partes, rondas: rondas, banco: banco };
+  ES.completar = { normalizar: normalizar, igual: igual, aceptaGrupo: aceptaGrupo, comparable: comparable, numero: numero, cifra: cifra, mismaUnidad: mismaUnidad, partes: partes, rondas: rondas, banco: banco };
 })(root.C150);

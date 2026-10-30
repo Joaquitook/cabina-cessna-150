@@ -19,7 +19,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
  *                { tipo:'formula', texto:'L = ½ · ρ · V² · S · CL', nota? }        una fórmula grande
  *              `icono` y `dato:{valor, unidad?, etiqueta?}` sueltos en el paso son atajos de esas escenas. `ilustracion` (esbozos viejos del plan) sólo ayuda a elegir el ícono.
  *   normalizar entiende también `diapositivas` / `slides` / `escenas` o una lista pelada de pasos (textos u objetos). Sin ningún texto devuelve null.
- * Parte pura (también en Node): ES.diapositiva = { normalizar, escenaDe, iconoPara, estadoFigura, duracionPaso, ESCENAS }
+ * Parte pura (también en Node): ES.diapositiva = { normalizar, escenaDe, iconoPara, estadoFigura, duracionPaso, ticAuto(est, ahoraMs, pausada, durSeg), ESCENAS }
  * Para otros componentes (caso): ES.diapositiva.crearEscena({reducido}) → { svg, mostrar(spec, i, n, estado), destroy() } y ES.diapositiva.fraseEl(ctx, texto).
  * Handle: destroy · pause · resume · getState.   Completa la lección (ctx.done()) cuando se vieron todos los pasos.
  */
@@ -64,6 +64,19 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     if (fijo > 0) return fijo;
     var n = String(texto || '').length + String(titulo || '').length / 2;
     return Math.round(clamp(3.6 + n / 16, 4, 11) * 10) / 10;
+  }
+  /**
+   * Un tic de la reproducción automática (puro). `est` = {t0, ult} en MILISEGUNDOS (ctx.ahora()): t0 = cuándo empezó el paso, ult = el tic anterior.
+   * Con la diapositiva fuera de pantalla o la pestaña oculta el reloj del paso se congela (t0 se corre lo que pasó desde el tic anterior: al volver el paso sigue donde estaba);
+   * si el navegador frenó los tics (pestaña en segundo plano: un tic por segundo o ninguno) pasa lo mismo con lo que se salteó. Devuelve la fracción del paso (0 a 1 o más) o null en pausa.
+   */
+  var TIC_MS = 100, TIC_TARDE = 600;
+  function ticAuto(est, ahora, pausada, durSeg) {
+    var d = Math.max(0, ahora - est.ult);
+    est.ult = ahora;
+    if (pausada) { est.t0 += d; return null; }
+    if (d > TIC_TARDE) est.t0 += d - TIC_MS;
+    return (ahora - est.t0) / 1000 / (durSeg > 0 ? durSeg : 1);
   }
 
   function lado(o) {
@@ -370,7 +383,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   /* ================================================================== render */
   function render(host, datos, ctx) {
     var h = ctx.h, icon = ctx.icon, K = ctx.Kit, reducido = !!ctx.reducedMotion, pasos = datos.pasos, n = pasos.length;
-    var Fig = ES.figuras, capasFig = null, idx = 0, vistos = {}, hecho = !!ctx.hecho, jugando = false, timer = null, t0 = 0, dur = 0, enPantalla = true, io = null, iniciada = false, uid = (render._uid = (render._uid || 0) + 1);
+    var Fig = ES.figuras, capasFig = null, idx = 0, vistos = {}, hecho = !!ctx.hecho, jugando = false, timer = null, reloj = { t0: 0, ult: 0 }, dur = 0, enPantalla = true, io = null, iniciada = false, uid = (render._uid = (render._uid || 0) + 1);
     var tieneFig = pasos.some(function (p) { return !!p.figura; });
     if (tieneFig && Fig) { var f0 = pasos.filter(function (p) { return p.figura; })[0]; var ff = Fig.get(f0.figura); capasFig = ff ? ff.capas : null; }
     vistos[0] = true;
@@ -386,8 +399,9 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       var b = h('button', { type: 'button', 'class': 'es-dia-dot', 'aria-label': 'Ir al paso ' + (k + 1) + (p.titulo ? ': ' + plano(p.titulo) : ''), onclick: function () { pararAuto(); ir(k); } });
       dots.appendChild(h('li', null, b)); return b;
     });
-    var bPrev = K.button({ label: 'Anterior', icon: 'chevron-left', variant: 'secondary', onClick: function () { pararAuto(); ir(idx - 1); } });
-    var bNext = K.button({ label: 'Siguiente', iconRight: 'chevron-right', variant: 'primary', onClick: function () { pararAuto(); ir(idx + 1); } });
+    // aria-disabled (no disabled) en los extremos: un botón deshabilitado no puede tener el foco y, al llegar al último paso, el foco caía a <body> (F2)
+    var bPrev = K.button({ label: 'Anterior', icon: 'chevron-left', variant: 'secondary', onClick: function () { if (idx <= 0) return; pararAuto(); ir(idx - 1); } });
+    var bNext = K.button({ label: 'Siguiente', iconRight: 'chevron-right', variant: 'primary', onClick: function () { if (idx >= n - 1) return; pararAuto(); ir(idx + 1); } });
     var bPlay = K.button({ label: 'Reproducir', icon: 'play', variant: 'ghost', onClick: function () { if (jugando) pararAuto(); else reproducir(); } });
     if (reducido || n < 2) bPlay.hidden = true;
     var ctl = h('div', { 'class': 'es-dia-ctl' }, bPrev, bPlay, bNext);
@@ -411,7 +425,6 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       cap.appendChild(fraseEl(ctx, p.texto));
       cap.classList.remove('is-in'); if (!reducido) { void cap.offsetWidth; cap.classList.add('is-in'); }
       dotB.forEach(function (b, k) { b.classList.toggle('is-done', k < idx || !!vistos[k]); if (k === idx) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current'); });
-      bPrev.disabled = idx <= 0; bNext.disabled = idx >= n - 1;
       bPrev.setAttribute('aria-disabled', idx <= 0 ? 'true' : 'false'); bNext.setAttribute('aria-disabled', idx >= n - 1 ? 'true' : 'false');
       marcarPlay();
     }
@@ -424,12 +437,12 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     /* ---- reproducción automática */
     function pararAuto() { if (timer) { clearInterval(timer); timer = null; } jugando = false; barra.style.width = '0%'; if (tm) tm.classList.remove('is-on'); marcarPlay(); }
     function tic() {
-      if (!enPantalla || (typeof document !== 'undefined' && document.hidden)) { t0 += 0.1; return; }
-      var f = (ctx.ahora() - t0) / 1000 / dur;
+      var f = ticAuto(reloj, ctx.ahora(), !enPantalla || (typeof document !== 'undefined' && document.hidden), dur);
+      if (f === null) return;
       barra.style.width = Math.round(clamp(f, 0, 1) * 100) + '%';
       if (f >= 1) { if (idx >= n - 1) { pararAuto(); return; } ir(idx + 1); armar(); }
     }
-    function armar() { t0 = ctx.ahora(); dur = duracionPaso(pasos[idx].texto, pasos[idx].titulo, datos.segundos); barra.style.width = '0%'; }
+    function armar() { var a = ctx.ahora(); reloj.t0 = a; reloj.ult = a; dur = duracionPaso(pasos[idx].texto, pasos[idx].titulo, datos.segundos); barra.style.width = '0%'; }
     function reproducir() {
       if (reducido || n < 2 || jugando) return;
       if (idx >= n - 1) { idx = 0; vistos[0] = true; pintar(); }
@@ -464,5 +477,5 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   }
 
   Mot.register('diapositiva', { normalizar: normalizar, render: render });
-  ES.diapositiva = { normalizar: normalizar, escenaDe: escenaDe, iconoPara: iconoPara, estadoFigura: estadoFigura, duracionPaso: duracionPaso, ESCENAS: ESCENAS, crearEscena: crearEscena, fraseEl: fraseEl, limpiarEscena: limpiarEscena };
+  ES.diapositiva = { normalizar: normalizar, escenaDe: escenaDe, iconoPara: iconoPara, estadoFigura: estadoFigura, duracionPaso: duracionPaso, ticAuto: ticAuto, ESCENAS: ESCENAS, crearEscena: crearEscena, fraseEl: fraseEl, limpiarEscena: limpiarEscena };
 })(root.C150);

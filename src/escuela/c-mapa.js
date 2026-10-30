@@ -17,7 +17,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
  *   Sin ningún punto ni zona devuelve null.
  * Teclado: Tab recorre los números (puntos y zonas), Enter o espacio abre la ficha; en el plano + − 0 y las flechas hacen zoom y desplazamiento. Rueda con Ctrl o ⌘ (o con el plano
  * enfocado), pellizco y arrastre cuando hay zoom. Todo lo que se ve en el plano también está en la lista numerada de abajo (blancos de 44 px).
- * Parte pura (también en Node): ES.mapa = { normalizar, estadoZona, preguntaDe, evaluar }
+ * Parte pura (también en Node): ES.mapa = { normalizar, estadoZona, preguntaDe, evaluar, textoFallo, ubicarEtiquetas(pines, escala, obstaculos), puntoMedioRuta(puntos), insignias(items, visible), radioToque(escala, vecina) }
+ * Áreas de toque: cada pin y cada número de recorrido tiene un área invisible de 44 px de diámetro como mínimo a la escala actual (en «Encontrá» no hay lista de nombres: se toca el pin).
  * Puntaje del modo «Encontrá»: ctx.score(bien, total, {fallos:[id…]}) al terminar; ctx.done() al abrir varias fichas o al terminar el modo. Handle: destroy · getState.
  */
 (function (C150) {
@@ -134,14 +135,42 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     return { fondo: fondo, nota: publico(datos.nota) || publico(datos.aclaracion) || (M.get(fondo) || {}).nota || '', items: items, capas: capas, vistas: vistas,
       vistaTitulo: str(datos.vistaTitulo) || (Array.isArray(datos.carnets) && !Array.isArray(datos.vistas) ? 'Carnet' : 'Caso'), encontra: enc.length >= 2 ? enc : [] };
   }
-  /** Dónde va el nombre de cada punto para que no se pise con otro nombre ni con otro punto: de las cuatro posiciones (derecha, izquierda, abajo, arriba) elige la de menos
-   *  superficie encima de lo ya ubicado y dentro del plano. pines = [{x, y, r, largo}] en unidades de dibujo; escala = píxeles por unidad (las etiquetas nunca miden menos
-   *  de 11 px: si la escala es chica, el texto crece en unidades). Devuelve [{pos:'der'|'izq'|'aba'|'arr', dx, dy, anchor}] (dx, dy desde el centro del punto). */
-  function ubicarEtiquetas(pines, escala) {
+  /** Dónde va el número de un recorrido: el punto medio de su tramo MÁS LARGO (en unidades de plano). Con 2 puntos es la mitad de la línea (nunca encima del pin de llegada);
+   *  con más, no cae sobre un vértice, que es donde suelen estar los pines. */
+  function puntoMedioRuta(puntos) {
+    var ps = arr(puntos), mejor = -1, bi = 0, i;
+    if (ps.length < 2) return ps.length ? [ps[0][0], ps[0][1]] : [0, 0];
+    for (i = 0; i + 1 < ps.length; i++) { var d = Math.hypot(ps[i + 1][0] - ps[i][0], ps[i + 1][1] - ps[i][1]); if (d > mejor) { mejor = d; bi = i; } }
+    return [(ps[bi][0] + ps[bi + 1][0]) / 2, (ps[bi][1] + ps[bi + 1][1]) / 2];
+  }
+  var R_NUM = 13;      // radio (unidades de dibujo) de los números redondos de zonas y recorridos
+  /** El radio (unidades de dibujo) del área de toque de un pin: 44 px de diámetro a la escala actual (px por unidad), sin comerse el pin vecino (`vecina` = distancia al más cercano) y nunca menos de 30. */
+  function radioToque(escala, vecina) {
+    var s = escala > 0 ? escala : 1, quiero = 22 / s, tope = vecina > 0 ? vecina * 0.92 : Infinity;
+    return Math.max(30, Math.min(quiero, tope));
+  }
+  /** Los números redondos de las zonas (en su esquina) y de los recorridos (en su tramo más largo): [{x, y, r, n, id}] en unidades de dibujo. `visible(item)` filtra las capas apagadas. */
+  function insignias(items, visible) {
+    var M = MP(), out = [];
+    arr(items).forEach(function (it) {
+      if (!it || (isFn(visible) && !visible(it))) return;
+      if (it.tipo === 'zona' && arr(it.poligono).length >= 3) { var b = M.caja(it.poligono); out.push({ x: M.px(b.x0) + 14, y: M.px(b.y0) + 14, r: R_NUM, n: it.n, id: it.id }); }
+      else if (it.tipo === 'ruta' && it.n && arr(it.puntos).length >= 2) { var m = puntoMedioRuta(it.puntos); out.push({ x: M.px(m[0]), y: M.px(m[1]), r: R_NUM, n: it.n, id: it.id }); }
+    });
+    return out;
+  }
+  /** Dónde va el nombre de cada punto para que no se pise con otro nombre, con otro punto ni con un número de zona o recorrido: de las cuatro posiciones (derecha, izquierda, abajo, arriba)
+   *  elige la de menos superficie encima de lo ya ubicado y dentro del plano. pines = [{x, y, r, largo}] en unidades de dibujo; escala = píxeles por unidad (las etiquetas nunca miden menos
+   *  de 11 px: si la escala es chica, el texto crece en unidades); obstaculos = [{x, y, r}] (insignias de zonas y recorridos, ver `insignias`).
+   *  Devuelve [{pos:'der'|'izq'|'aba'|'arr', dx, dy, anchor}] (dx, dy desde el centro del punto). */
+  function ubicarEtiquetas(pines, escala, obstaculos) {
     var s = escala > 0 ? escala : 1, fs = Math.max(15, 11 / s), cw = fs * 0.58, alto = fs * 1.15, cajas = [], out = [], VW = 600, VH = 400;
     function inter(a, b) { var w = Math.min(a[2], b[2]) - Math.max(a[0], b[0]), h = Math.min(a[3], b[3]) - Math.max(a[1], b[1]); return w > 0 && h > 0 ? w * h : 0; }
     function fuera(b) { return Math.max(0, -b[0]) * alto + Math.max(0, b[2] - VW) * alto + Math.max(0, -b[1]) * (b[2] - b[0]) + Math.max(0, b[3] - VH) * (b[2] - b[0]); }
     pines.forEach(function (p) { cajas.push([p.x - p.r - 3, p.y - p.r - 3, p.x + p.r + 3, p.y + p.r + 3]); });
+    // los números redondos de las zonas y los recorridos también son obstáculos (van DESPUÉS de los pines: cajas[i] sigue siendo el pin i)
+    var nObs = 0;
+    arr(obstaculos).forEach(function (o) { if (o && num(o.x) && num(o.y)) { cajas.push([o.x - (o.r || 13) - 3, o.y - (o.r || 13) - 3, o.x + (o.r || 13) + 3, o.y + (o.r || 13) + 3]); nObs++; } });
     pines.forEach(function (p, i) {
       var w = p.largo * cw + 8, cand = [
         { pos: 'der', dx: p.r + 8, dy: 5, anchor: 'start' }, { pos: 'izq', dx: -(p.r + 8), dy: 5, anchor: 'end' },
@@ -149,13 +178,15 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       cand.forEach(function (c, ix) {
         var tx = p.x + c.dx, ty = p.y + c.dy, x0 = c.anchor === 'start' ? tx - 2 : c.anchor === 'end' ? tx - w : tx - w / 2, x1 = c.anchor === 'start' ? tx + w : c.anchor === 'end' ? tx + 2 : tx + w / 2;
         var caja = [x0, ty - alto * 0.78, x1, ty + alto * 0.3], sc = ix * 40 + fuera(caja) * 4;
-        for (k = 0; k < cajas.length; k++) if (k !== i) sc += inter(caja, cajas[k]);
+        for (k = 0; k < cajas.length; k++) if (k !== i) sc += inter(caja, cajas[k]) * (k >= pines.length && k < pines.length + nObs ? 4 : 1);      // tapar un número redondo pesa más que rozar otro nombre
         c.caja = caja; c.sc = sc; if (!mejor || sc < mejor.sc) mejor = c;
       });
       cajas.push(mejor.caja); out.push({ pos: mejor.pos, dx: mejor.dx, dy: mejor.dy, anchor: mejor.anchor });
     });
     return out;
   }
+  /** Lo que se dice cuando tocaste otro lugar. No depende de que haya una animación: con «reducir movimiento» nada parpadea, pero el lugar pedido queda marcado (aro fijo). */
+  function textoFallo(elegido, pedido) { return 'Ese era «' + elegido + '». «' + pedido + '» es el que está marcado.'; }
   /** ¿Tocó el lugar pedido? (puro: lo usan el modo «Encontrá» y los tests) */
   function evaluar(d, pedidoId, tocadoId) { return pedidoId === tocadoId && d.items.some(function (it) { return it.id === pedidoId; }); }
 
@@ -167,8 +198,15 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     var porId = {}, els = {}, legBtn = {}, items = datos.items, tocables = items.filter(function (it) { return it.n > 0; }), nTocables = tocables.filter(function (it) { return it.tipo !== 'ruta'; }).length;
     datos.capas.forEach(function (c) { visibles[c.id] = c.visible !== false; });
     items.forEach(function (it) { porId[it.id] = it; });
-    var UMBRAL = Math.min(nTocables, Math.min(4, Math.max(2, Math.ceil(nTocables / 2)))), uid = (render._uid = (render._uid || 0) + 1);
+    var UMBRAL = Math.min(nTocables, Math.min(4, Math.max(2, Math.ceil(nTocables / 2)))), uid = (render._uid = (render._uid || 0) + 1), uidR = 0;
     var T = U.svg, px = M.px;
+    var Bq = ES.bloques;
+    function foco(el) { if (Bq && isFn(Bq.enfocar)) return Bq.enfocar(el); if (el && isFn(el.focus)) { if (!el.hasAttribute('tabindex') && !/^(button|a|input)$/i.test(el.nodeName)) el.setAttribute('tabindex', '-1'); el.focus({ preventScroll: true }); } return false; }
+    function limite(b, on) { if (b) b.setAttribute('aria-disabled', on ? 'true' : 'false'); }      // aria-disabled (no disabled): un botón deshabilitado no puede tener el foco y éste caía a <body> (F2)
+    function preguntaEl(rotulo, i, total, texto, meta) {
+      var etiqueta = Bq && isFn(Bq.etiquetaPaso) ? Bq.etiquetaPaso(rotulo, i, total, texto) : rotulo + ' ' + i + ' de ' + total + ': ' + texto;
+      return h('div', { 'class': 'es-dgr-pq', role: 'group', tabindex: '-1', 'aria-label': etiqueta }, h('p', { 'class': 'es-meta', text: meta }), h('p', { 'class': 'es-q es-q--sm', text: texto }));
+    }
 
     /* ---- el dibujo */
     var svg = T('svg', { 'class': 'dg-svg mp-svg', viewBox: '0 0 ' + VW + ' ' + VH, preserveAspectRatio: 'xMidYMid meet', role: 'group', 'aria-label': (fondoDef.nombre || 'Plano') + '. ' + (datos.nota || '') });
@@ -196,7 +234,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         if (ancho >= 17) etiqueta(it.nombre, Math.max(8, Math.floor(ancho * 0.9)), 2).forEach(function (l, k) { tx.appendChild(T('tspan', { x: px(c[0]), dy: k ? 18 : 0 }, l)); });
         g.appendChild(tx);
         var st = T('text', { 'class': 'mp-lbl mp-zst', x: px(c[0]), y: px(c[1]) + 30, 'text-anchor': 'middle' }); g.appendChild(st); it._st = st; it._tx = ancho >= 17;
-        g.appendChild(T('circle', { 'class': 'mp-num-bg', cx: px(bx.x0) + 14, cy: px(bx.y0) + 14, r: 13 }));
+        g.appendChild(T('circle', { 'class': 'mp-num-bg', cx: px(bx.x0) + 14, cy: px(bx.y0) + 14, r: R_NUM }));
         g.appendChild(T('text', { 'class': 'mp-num', x: px(bx.x0) + 14, y: px(bx.y0) + 14 + 4.5, 'text-anchor': 'middle' }, String(it.n)));
         engancharTocar(g, it); gZ.appendChild(g);
       } else if (it.tipo === 'ruta') {
@@ -207,9 +245,11 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         var bxp = px(b[0]), byp = px(b[1]), cx = Math.cos(ang), cy = Math.sin(ang);
         gr.appendChild(T('polygon', { 'class': 'mp-ruta-h', points: bxp + ',' + byp + ' ' + (bxp - cx * L - cy * W2) + ',' + (byp - cy * L + cx * W2) + ' ' + (bxp - cx * L + cy * W2) + ',' + (byp - cy * L - cx * W2) }));
         if (it.n) {
-          var m = it.puntos[Math.floor(it.puntos.length / 2)];
+          var m = puntoMedioRuta(it.puntos);      // el número va en el medio del tramo más largo: nunca bajo el pin de llegada ni de un vértice
           gr.setAttribute('tabindex', '0'); gr.setAttribute('role', 'button'); gr.setAttribute('aria-label', aria(it));
-          gr.appendChild(T('circle', { 'class': 'mp-num-bg', cx: px(m[0]), cy: px(m[1]), r: 13 }));
+          it._rhit = T('circle', { 'class': 'mp-ruta-hit', cx: px(m[0]), cy: px(m[1]), r: R_NUM + 4, fill: 'transparent' });
+          gr.appendChild(it._rhit);
+          gr.appendChild(T('circle', { 'class': 'mp-num-bg', cx: px(m[0]), cy: px(m[1]), r: R_NUM }));
           gr.appendChild(T('text', { 'class': 'mp-num', x: px(m[0]), y: px(m[1]) + 4.5, 'text-anchor': 'middle' }, String(it.n)));
           engancharTocar(gr, it);
         } else gr.setAttribute('aria-hidden', 'true');
@@ -217,7 +257,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       } else {
         var r = it.grande ? 22 : 17, izq = it.x > 68;
         var gp = T('g', { 'class': 'mp-pin', tabindex: '0', role: 'button', 'data-id': it.id, 'data-tono': it.tono || null, 'aria-label': aria(it), transform: 'translate(' + px(it.x) + ' ' + px(it.y) + ')' });
-        gp.appendChild(T('circle', { 'class': 'mp-pin-hit', r: 30 }));
+        it._hit = T('circle', { 'class': 'mp-pin-hit', r: 30 });      // el área de toque se ajusta a la escala (colocar): siempre ≥ 44 px de diámetro
+        gp.appendChild(it._hit);
         gp.appendChild(T('circle', { 'class': 'mp-pin-halo', r: r + 7 }));
         gp.appendChild(T('circle', { 'class': 'mp-pin-b', r: r }));
         gp.appendChild(T('text', { 'class': 'mp-num mp-num--p', x: 0, y: 5, 'text-anchor': 'middle' }, String(it.n)));
@@ -235,7 +276,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       vista.cx = clamp(vista.cx, w / 2, VW - w / 2); vista.cy = clamp(vista.cy, hg / 2, VH - hg / 2);
       svg.setAttribute('viewBox', (vista.cx - w / 2) + ' ' + (vista.cy - hg / 2) + ' ' + w + ' ' + hg);
       view.classList.toggle('is-zoom', vista.s > 1.001);
-      zIn.disabled = vista.s >= 4; zOut.disabled = vista.s <= 1.001; zRe.disabled = vista.s <= 1.001 && Math.abs(vista.cx - VW / 2) < 1;
+      if (vista.s > 1.001) svg.setAttribute('data-zoom', '1'); else svg.removeAttribute('data-zoom');      // con zoom el recorte de las etiquetas es a propósito
+      limite(zIn, vista.s >= 4); limite(zOut, vista.s <= 1.001); limite(zRe, vista.s <= 1.001 && Math.abs(vista.cx - VW / 2) < 1);
       if (svg._dgMedir) svg._dgMedir();
       colocar();
     }
@@ -310,8 +352,14 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     function colocar() {
       var vis = items.filter(function (it) { return it.tipo === 'punto' && it._lbl && visibleIt(it); });
       var e = parseFloat(svg.style.getPropertyValue('--dg-s')) || 1;
-      var pos = ubicarEtiquetas(vis.map(function (it) { return { x: px(it.x), y: px(it.y), r: it._r, largo: it._largo }; }), e);
+      var pos = ubicarEtiquetas(vis.map(function (it) { return { x: px(it.x), y: px(it.y), r: it._r, largo: it._largo }; }), e, insignias(items, visibleIt));
       vis.forEach(function (it, k) { it._lbl.setAttribute('x', pos[k].dx); it._lbl.setAttribute('y', pos[k].dy); it._lbl.setAttribute('text-anchor', pos[k].anchor); });
+      // áreas de toque de 44 px aunque el plano se vea chico (el celular): en «Encontrá» la lista de nombres no está y hay que acertarle al pin con el dedo
+      vis.forEach(function (it) {
+        var vec = Infinity; vis.forEach(function (o) { if (o !== it) vec = Math.min(vec, Math.hypot(px(o.x) - px(it.x), px(o.y) - px(it.y))); });
+        if (it._hit) it._hit.setAttribute('r', radioToque(e, vec));
+      });
+      items.forEach(function (it) { if (it._rhit) it._rhit.setAttribute('r', Math.max(R_NUM + 4, 22 / (e > 0 ? e : 1))); });
     }
     function pintarCapas() {
       items.forEach(function (it) {
@@ -362,43 +410,51 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     function marcas() { Object.keys(els).forEach(function (id) { els[id].classList.remove('is-ok-r', 'is-bad-r', 'is-pulse', 'is-sel'); }); }
     function entrarModo(on) {
       prueba = on; raiz.classList.toggle('is-prueba', on); marcas(); sel = null;
+      ficha.setAttribute('aria-live', on ? 'off' : 'polite');      // en «Encontrá» el foco lee la pregunta (no se lee dos veces)
       if (capasBox) capasBox.hidden = on; leyenda.hidden = on; if (vistasBox) vistasBox.hidden = on;
       if (on) { datos.capas.forEach(function (c) { visibles[c.id] = true; }); if (capasBox) Array.prototype.forEach.call(capasBox.querySelectorAll('.es-chip'), function (b) { b.setAttribute('aria-pressed', 'true'); }); pintarCapas(); vistaSel = ''; pintarVista(); empezar(); }
-      else { pintarVista(); pintarFicha(); }
+      else { pintarVista(); pintarFicha(); foco(modos && modos.querySelector('[aria-pressed="true"]')); }
       items.forEach(function (it) { if (els[it.id]) els[it.id].setAttribute('aria-label', on ? ariaPrueba(it) : aria(it)); });
     }
     function mezclar(l, sem) { var a = l.slice(), r = U.rng(sem), i; for (i = a.length - 1; i > 0; i--) { var j = Math.floor(r() * (i + 1)), t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
     function empezar() {
       intento++;
       P = { orden: mezclar(datos.encontra, (ctx.leccion && ctx.leccion.id) + '|map|' + intento), i: 0, ok: 0, malas: [], respondida: false };
-      marcas(); pintarPregunta();
+      marcas(); pintarPregunta(true);
     }
-    function pintarPregunta() {
+    function pintarPregunta(conFoco) {
       vaciar(ficha); ficha.classList.remove('is-vacia'); marcas();
-      var q = P.orden[P.i];
-      ficha.appendChild(h('p', { 'class': 'es-meta', text: 'ENCONTRÁ · PREGUNTA ' + (P.i + 1) + ' DE ' + P.orden.length + ' · ' + P.ok + ' BIEN' }));
-      ficha.appendChild(h('p', { 'class': 'es-q es-q--sm es-plano-q', id: 'es-plano-q-' + uid, text: q.pregunta }));
+      var q = P.orden[P.i], pq = preguntaEl('Pregunta', P.i + 1, P.orden.length, q.pregunta, 'ENCONTRÁ · PREGUNTA ' + (P.i + 1) + ' DE ' + P.orden.length + ' · ' + P.ok + ' BIEN');
+      pq.lastChild.classList.add('es-plano-q'); pq.lastChild.id = 'es-plano-q-' + uid;
+      ficha.appendChild(pq);
       ficha.appendChild(h('p', { 'class': 'es-note', text: 'Tocá el lugar en el plano. Con teclado: Tab para recorrer los números y Enter para elegir.' }));
+      if (conFoco) foco(pq);      // la pregunta se lee al llegar: el foco no queda en el botón que se destruyó
     }
     function responder(id) {
       if (!P || P.respondida || !porId[id] || porId[id].n === 0) return;
       P.respondida = true;
       var q = P.orden[P.i], bien = evaluar(datos, q.id, id), pedido = porId[q.id];
       if (bien) { P.ok++; els[id].classList.add('is-ok-r'); } else { P.malas.push(q.id); els[id].classList.add('is-bad-r'); els[q.id].classList.add('is-pulse'); }
-      ficha.appendChild(h('p', { 'class': 'es-pill is-' + (bien ? 'ok' : 'bad'), role: 'status' }, h('span', { 'class': 'es-pill-dot', 'aria-hidden': 'true' }),
-        h('span', { 'class': 'es-pill-t', text: bien ? '¡Ahí está! ' + pedido.nombre + (pedido.texto ? '. ' + primeraOracion(pedido.texto) : '') : 'Ese era «' + porId[id].nombre + '». «' + pedido.nombre + '» es el que parpadea.' })));
+      var idR = 'es-plano-r-' + uid + '-' + (++uidR);
+      ficha.appendChild(h('p', { 'class': 'es-pill is-' + (bien ? 'ok' : 'bad'), role: 'status', id: idR }, h('span', { 'class': 'es-pill-dot', 'aria-hidden': 'true' }),
+        h('span', { 'class': 'es-pill-t', text: bien ? '¡Ahí está! ' + pedido.nombre + (pedido.texto ? '. ' + primeraOracion(pedido.texto) : '') : textoFallo(porId[id].nombre, pedido.nombre) })));
       var ult = P.i + 1 >= P.orden.length;
-      ficha.appendChild(K.button({ label: ult ? 'Ver el resultado' : 'Siguiente', variant: 'primary', iconRight: 'arrow-right', onClick: function () { if (ult) terminar(); else { P.i++; P.respondida = false; pintarPregunta(); } } }));
+      var bSig = K.button({ label: ult ? 'Ver el resultado' : 'Siguiente', variant: 'primary', iconRight: 'arrow-right', onClick: function () { if (ult) terminar(); else { P.i++; P.respondida = false; pintarPregunta(true); } } });
+      bSig.setAttribute('aria-describedby', idR);      // al llegar el foco se lee el resultado de la respuesta
+      ficha.appendChild(bSig);
+      foco(bSig);      // el foco no se queda en el número del plano: «Siguiente» está al final del orden de tabulación (F2)
     }
     function terminar() {
       marcas(); vaciar(ficha);
       var tot = P.orden.length;
       ficha.appendChild(h('p', { 'class': 'es-meta', text: 'ENCONTRÁ · RESULTADO' }));
-      ficha.appendChild(h('p', { 'class': 'es-q es-q--sm', text: 'Ubicaste ' + P.ok + ' de ' + tot + (P.ok === tot ? '. ¡Perfecto!' : '. Lo que falló entra a tu repaso.') }));
+      var pRes = h('p', { 'class': 'es-q es-q--sm', tabindex: '-1', text: 'Ubicaste ' + P.ok + ' de ' + tot + (P.ok === tot ? '. ¡Perfecto!' : '. Lo que falló entra a tu repaso.') });
+      ficha.appendChild(pRes);
       if (isFn(ctx.score)) ctx.score(P.ok, tot, { retry: intento > 1, fallos: P.malas });
       if (!hecho) { hecho = true; ctx.done(); }
       ficha.appendChild(h('div', { 'class': 'btn-row' }, K.button({ label: 'Repetir', variant: 'secondary', icon: 'reset', onClick: function () { empezar(); } }),
         K.button({ label: 'Volver a explorar', variant: 'ghost', onClick: function () { if (modos) modos.setValue('explorar', true); } })));
+      foco(pRes);      // el resultado se lee al llegar
     }
 
     var raiz = h('div', { 'class': 'es-plano' + (reducido ? ' is-rm' : '') });
@@ -416,5 +472,5 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   }
 
   Mot.register('mapa', { normalizar: normalizar, render: render });
-  ES.mapa = { normalizar: normalizar, estadoZona: estadoZona, preguntaDe: preguntaDe, evaluar: evaluar, ubicarEtiquetas: ubicarEtiquetas };
+  ES.mapa = { normalizar: normalizar, estadoZona: estadoZona, preguntaDe: preguntaDe, evaluar: evaluar, ubicarEtiquetas: ubicarEtiquetas, puntoMedioRuta: puntoMedioRuta, insignias: insignias, radioToque: radioToque, textoFallo: textoFallo };
 })(root.C150);

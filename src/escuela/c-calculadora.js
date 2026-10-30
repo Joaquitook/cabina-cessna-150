@@ -605,7 +605,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     /* ---- desafío */
     var desBox = h('div', { 'class': 'es-challenge' });
     desBox.hidden = true;
-    function nuevoProblema() {
+    function nuevoProblema(conFoco) {
       nProb++;
       var rnd = U.rng((ctx.leccion && ctx.leccion.id) + '|' + datos.herramienta + '|' + nProb + '|' + (ctx.ahora ? ctx.ahora() : 0));
       var v = def.desafio.generar ? def.desafio.generar(rnd) : {}, base = {};
@@ -613,6 +613,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       for (var k in v) base[k] = v[k];
       probl = { valores: base, esperado: Herr.calc(datos.herramienta, base, datos.params), resuelto: false };
       dibujarDesafio();
+      if (conFoco) { var ir0 = desBox.querySelector('input.es-num'); if (ir0) ir0.focus({ preventScroll: true }); }      // «Otro problema» se destruye: el foco va a la respuesta del problema nuevo (F2)
     }
     function dibujarDesafio() {
       while (desBox.firstChild) desBox.removeChild(desBox.firstChild);
@@ -645,7 +646,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         fb.appendChild(h('p', { 'class': 'es-pill is-' + (ok ? 'ok' : 'bad'), role: 'status' }, h('span', { 'class': 'es-pill-dot', 'aria-hidden': 'true' }),
           h('span', { 'class': 'es-pill-t', text: ok ? '¡Bien! Da ' + (esHora ? esp : F(esp, sal.dec || 0) + ' ' + (sal.unidad || '')) + '.' : 'Casi: la respuesta es ' + (esHora ? esp : F(esp, sal.dec || 1) + ' ' + (sal.unidad || '')) + '. Mirá los pasos y probá otro.' })));
         var tmp = h('div'); dibujarResultado(probl.esperado, tmp, true); fb.appendChild(tmp);
-        fb.appendChild(K.button({ label: 'Otro problema', variant: 'secondary', iconRight: 'arrow-right', onClick: function () { nuevoProblema(); } }));
+        fb.appendChild(K.button({ label: 'Otro problema', variant: 'secondary', iconRight: 'arrow-right', onClick: function () { nuevoProblema(true); } }));
         desBox.querySelector('.es-meta').textContent = 'Problema ' + nProb + ' · ' + aciertos + ' de ' + total + ' bien';
       }
       inp.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') comprobar(); });

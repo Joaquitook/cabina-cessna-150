@@ -128,23 +128,148 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   };
   /** Tamaño en pantalla (px) de una etiqueta de `base` unidades cuando el dibujo está a escala `s`. */
   U.etiquetaEfectiva = function (base, s, min) { return Math.max(base * (s > 0 ? s : 1), min === undefined ? U.ETIQUETA_MIN : min); };
-  /** Mantiene --dg-s al día en un <svg> (ResizeObserver, zoom incluido). Devuelve una función que corta la observación. */
-  U.escalarEtiquetas = function (svg) {
+  /* ---- encajar las etiquetas (F2): subir las etiquetas a 11 px las hace más anchas de lo que el dibujo previó, y el <svg> recorta lo que se sale. Cada etiqueta que no cabe se
+   * achica hasta U.ETIQUETA_PISO; si aun así no entra se parte en renglones; en última instancia se corre hacia adentro. Las funciones puras (encajarTexto, partirRenglones) se prueban
+   * en Node; ajustarEtiquetas las aplica a un <svg> real (medidas de pantalla) y se rehace sola cuando cambia la escala o el contenido (MutationObserver). */
+  U.ETIQUETA_PISO = 10;
+  /** Puro. o = { ancla:'start'|'middle'|'end', ancho, x (la del ancla), min, max (límites), fs (tamaño actual), piso }, todo en píxeles de pantalla.
+   *  → { f: factor de tamaño (≤ 1), dx: corrimiento, parte: true si conviene partir en renglones antes de achicar más }. Si ya cabe → { f: 1, dx: 0, parte: false }. */
+  U.encajarTexto = function (o) {
+    var ancho = o.ancho, x = o.x, min = o.min, max = o.max, piso = o.piso === undefined ? U.ETIQUETA_PISO : o.piso, fs = o.fs > 0 ? o.fs : 11, ancla = o.ancla || 'start';
+    var izq = ancla === 'end' ? x - ancho : (ancla === 'middle' ? x - ancho / 2 : x), der = izq + ancho;
+    if (!(ancho > 0) || (izq >= min - 0.5 && der <= max + 0.5)) return { f: 1, dx: 0, parte: false };
+    var sitio = ancla === 'end' ? x - min : (ancla === 'middle' ? 2 * Math.min(x - min, max - x) : max - x);
+    if (sitio > 0) {
+      var f = Math.min(1, sitio / ancho);
+      if (fs * f >= piso) return { f: f, dx: 0, parte: false };
+    }
+    var caja = max - min, f2 = (caja > 0 && ancho > caja) ? caja / ancho : 1, w2 = ancho * f2;
+    var izq2 = ancla === 'end' ? x - w2 : (ancla === 'middle' ? x - w2 / 2 : x);
+    return { f: f2, dx: izq2 < min ? min - izq2 : (izq2 + w2 > max ? max - (izq2 + w2) : 0), parte: true };
+  };
+  /** Puro. Parte una lista de anchos de palabras (con un ancho de espacio) en renglones de a lo sumo `max`: → [[índices de palabras]…]. Una palabra más ancha que `max` va sola. */
+  U.partirRenglones = function (anchos, espacio, max) {
+    var out = [], cur = [], w = 0, i;
+    for (i = 0; i < anchos.length; i++) {
+      var nw = cur.length ? w + espacio + anchos[i] : anchos[i];
+      if (cur.length && nw > max) { out.push(cur); cur = [i]; w = anchos[i]; } else { cur.push(i); w = nw; }
+    }
+    if (cur.length) out.push(cur);
+    return out;
+  };
+  /** Rehace el encaje de todas las etiquetas visibles de un <svg>. Idempotente: primero devuelve cada etiqueta a como la dibujó el componente.
+   *  Una etiqueta que está sobre una caja (el rect de su mismo grupo que contiene su centro: caja del diagrama, nodo, tarjeta) se encaja contra esa caja; el resto, contra el <svg>. */
+  U.ajustarEtiquetas = function (svg, memo) {
+    if (!svg || !svg.querySelectorAll || !svg.getBoundingClientRect || typeof getComputedStyle !== 'function') return 0;
+    memo = memo || (svg._dgMemo = svg._dgMemo || (typeof WeakMap === 'function' ? new WeakMap() : null));
+    if (!memo) return 0;
+    var textos = svg.querySelectorAll('text'), i, n = 0, PISO_CAJA = 8.5;
+    function reponer(t) {
+      var m = memo.get(t); if (!m) return;
+      if (m.parte && t.textContent === m.salida) { while (t.firstChild) t.removeChild(t.firstChild); t.appendChild(document.createTextNode(m.t0)); }
+      if (m.fs && t.style.fontSize === m.fs) t.style.removeProperty('font-size');
+      if (m.tf && t.style.transform === m.tf) t.style.removeProperty('transform');
+      memo.delete(t);
+    }
+    for (i = 0; i < textos.length; i++) reponer(textos[i]);
+    if (svg.getAttribute('data-zoom')) return 0;                     // con zoom del alumno el recorte es a propósito
+    var sr = svg.getBoundingClientRect();
+    if (!sr.width || !sr.height || getComputedStyle(svg).display === 'none') return 0;
+    var ctm = svg.getScreenCTM && svg.getScreenCTM(), esc = ctm && ctm.a > 0 ? ctm.a : (U.escalaDibujo(sr.width, sr.height, svg.viewBox.baseVal.width, svg.viewBox.baseVal.height) || 1);
+    var min = sr.left + 1, max = sr.right - 1, top = sr.top + 1, bot = sr.bottom - 1;
+    function cajaDe(t, r) {
+      var cx = (r.left + r.right) / 2, cy = (r.top + r.bottom) / 2, g = t.parentNode, nivel = 0, mejor = null, area = 1e12, k, e, rr;
+      while (g && g !== svg && nivel < 3) {
+        for (k = 0; k < g.children.length; k++) {
+          e = g.children[k]; if (e.nodeName !== 'rect') continue;
+          rr = e.getBoundingClientRect();
+          if (rr.width > 8 && rr.height > 8 && cx >= rr.left && cx <= rr.right && cy >= rr.top && cy <= rr.bottom && rr.width * rr.height < area) { area = rr.width * rr.height; mejor = rr; }
+        }
+        if (mejor) return mejor;
+        g = g.parentNode; nivel++;
+      }
+      return null;
+    }
+    function px(t) { return (parseFloat(getComputedStyle(t).fontSize) || 11) * esc; }
+    function anclaX(r, anc) { return anc === 'end' ? r.right : (anc === 'middle' ? (r.left + r.right) / 2 : r.left); }
+    function partir(t, m, maxU, fsU2) {
+      var texto = t.textContent.trim().replace(/\s+/g, ' '), pal = texto.split(' '), anchos = [], pos = 0, k, esp = 0;
+      for (k = 0; k < pal.length; k++) { try { anchos.push(t.getSubStringLength(pos, pal[k].length)); } catch (e) { return; } pos += pal[k].length + 1; }
+      try { esp = (t.getSubStringLength(0, texto.length) - anchos.reduce(function (s, w) { return s + w; }, 0)) / Math.max(1, pal.length - 1); } catch (e2) { esp = fsU2 * 0.3; }
+      var reng = U.partirRenglones(anchos, Math.max(0, esp), maxU);
+      if (reng.length < 2) return;
+      var x0 = t.getAttribute('x') || '0', lh = fsU2 * 1.18, rn = reng.map(function (ix) { return ix.map(function (j) { return pal[j]; }).join(' '); });
+      while (t.firstChild) t.removeChild(t.firstChild);
+      rn.forEach(function (lin, q) { var ts = document.createElementNS('http://www.w3.org/2000/svg', 'tspan'); ts.setAttribute('x', x0); if (q) ts.setAttribute('dy', String(lh)); ts.textContent = lin; t.appendChild(ts); });
+      m.parte = true; m.salida = t.textContent;
+    }
+    for (i = 0; i < textos.length; i++) {
+      var t = textos[i], r = t.getBoundingClientRect();
+      if (!r.width || !r.height) continue;
+      var cs = getComputedStyle(t);
+      if (cs.display === 'none' || cs.visibility === 'hidden') continue;
+      var oculto = false, a;
+      for (a = t.parentNode; a && a !== svg; a = a.parentNode) { if (getComputedStyle(a).display === 'none') { oculto = true; break; } }
+      if (oculto) continue;
+      var tieneTf = !!cs.transform && cs.transform !== 'none', mt = tieneTf && /matrix\(([^)]+)\)/.exec(cs.transform), pt = mt ? mt[1].split(',').map(Number) : null;
+      if (/rotate|skew/.test(t.getAttribute('transform') || '') || (pt && (Math.abs(pt[1]) > 1e-6 || Math.abs(pt[2]) > 1e-6))) continue;        // rotadas: no se tocan
+      var cj = cajaDe(t, r), rmin = min, rmax = max, anc0 = cs.textAnchor === 'end' ? 'end' : (cs.textAnchor === 'middle' ? 'middle' : 'start'), ranura = parseFloat(t.getAttribute('data-slot')) * esc;      // data-slot = ancho (unidades del dibujo) que el autor le reserva a la etiqueta
+      if (cj) { rmin = Math.max(min, cj.left + 3); rmax = Math.min(max, cj.right - 3); }
+      if (ranura > 0) { var x0r = anclaX(r, anc0), lo = anc0 === 'end' ? x0r - ranura : (anc0 === 'middle' ? x0r - ranura / 2 : x0r); rmin = Math.max(rmin, lo); rmax = Math.min(rmax, lo + ranura); }
+      var fvCaja = cj ? Math.min(1, (cj.height - 3) / (r.height * 0.84)) : 1;                  // el cuadro de línea es ~16 % más alto que las letras
+      if (r.left >= rmin - 0.5 && r.right <= rmax + 0.5 && r.top >= top - 2 && r.bottom <= bot + 2 && fvCaja >= 0.97) continue;
+      var anc = cs.textAnchor === 'end' ? 'end' : (cs.textAnchor === 'middle' ? 'middle' : 'start'), fsU = parseFloat(cs.fontSize) || 11, fsPx = fsU * esc, x = anclaX(r, anc);
+      var enc = U.encajarTexto({ ancla: anc, ancho: r.width, x: x, min: rmin, max: rmax, fs: fsPx, piso: U.ETIQUETA_PISO });
+      var m = { t0: t.textContent, parte: false, salida: '', fs: '', tf: '' };
+      /* 1) achicar hasta el piso (y, dentro de una caja, hasta que entre a lo alto) */
+      if (!enc.parte) {
+        var f1 = enc.f; if (fvCaja < 1 && fsPx * Math.min(f1, fvCaja) >= U.ETIQUETA_PISO) f1 = Math.min(f1, fvCaja);
+        if (f1 < 1) { t.style.fontSize = (fsU * f1) + 'px'; m.fs = t.style.fontSize; }
+      /* 2) partir en renglones (sólo una etiqueta de un único texto) */
+      } else if (t.children.length === 0 && /\s/.test(t.textContent.trim())) {
+        var sitio = anc === 'end' ? x - rmin : (anc === 'middle' ? 2 * Math.min(x - rmin, rmax - x) : rmax - x);
+        if (sitio > fsPx * 3) partir(t, m, sitio / esc, fsU);
+      }
+      /* 3) en última instancia: lo que siga sin entrar se achica hasta caber (dentro de una caja, hasta PISO_CAJA) y se corre hacia adentro del dibujo */
+      r = t.getBoundingClientRect();
+      var fs3 = px(t), e2 = U.encajarTexto({ ancla: anc, ancho: r.width, x: anclaX(r, anc), min: rmin, max: rmax, fs: fs3, piso: 0 }), f3 = e2.f;
+      if ((cj || ranura > 0) && f3 < 1) f3 = Math.max(f3, PISO_CAJA / fs3);
+      if (f3 < 0.995) { t.style.fontSize = (fs3 / esc * f3) + 'px'; m.fs = t.style.fontSize; r = t.getBoundingClientRect(); }
+      var dx = r.left < min ? min - r.left : (r.right > max ? max - r.right : 0), dy = r.top < top ? top - r.top : (r.bottom > bot ? bot - r.bottom : 0);
+      if ((dx || dy) && !tieneTf) { t.style.transform = 'translate(' + (dx / esc) + 'px,' + (dy / esc) + 'px)'; m.tf = t.style.transform; }
+      if (m.fs || m.tf || m.parte) { memo.set(t, m); n++; }
+    }
+    return n;
+  };
+  /** Mantiene --dg-s al día en un <svg> (ResizeObserver, zoom incluido) y encaja las etiquetas que no caben. opc.sinEscala: sólo encaja (gráficos con tamaño de letra fijo). Devuelve una función que corta la observación. */
+  U.escalarEtiquetas = function (svg, opc) {
     if (!svg || !svg.getBoundingClientRect || !svg.style) return function () {};
-    var ro = null, t1 = 0, t2 = 0, ultimo = 0;
+    var ro = null, mo = null, t1 = 0, t2 = 0, t3 = 0, ultimo = 0, vivo = true, tUlt = 0;
+    function encajar() {
+      if (!vivo) return;
+      tUlt = Date.now();
+      if (mo) { mo.takeRecords(); mo.disconnect(); }
+      try { U.ajustarEtiquetas(svg); } catch (e) { if (typeof console !== 'undefined') console.error('[Escuela] encajar etiquetas', e); }
+      if (mo) observar();
+    }
+    function observar() { try { mo.observe(svg, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['class', 'style', 'x', 'y', 'viewBox', 'data-zoom', 'hidden'] }); } catch (e) { /* sin MutationObserver */ } }
+    /* una animación cambia estilos a cada cuadro: se encaja a lo sumo cada ~220 ms (y siempre al final del cambio) */
+    function pronto() { if (t3) return; t3 = setTimeout(function () { t3 = 0; encajar(); }, Math.max(50, 220 - (Date.now() - tUlt))); }
     function medir() {
       var r = svg.getBoundingClientRect(), vb = svg.viewBox && svg.viewBox.baseVal;
       if (!r.width || !vb || !vb.width) return;
       var s = U.escalaDibujo(r.width, r.height, vb.width, vb.height);
       if (Math.abs(s - ultimo) < 0.004) return;
-      ultimo = s; svg.style.setProperty('--dg-s', String(s));
+      ultimo = s; if (!(opc && opc.sinEscala)) svg.style.setProperty('--dg-s', String(s));
+      encajar();
     }
     medir();
     t1 = setTimeout(medir, 60); t2 = setTimeout(medir, 400);
     if (typeof ResizeObserver === 'function') { try { ro = new ResizeObserver(medir); ro.observe(svg); } catch (e) { ro = null; } }
     if (!ro && typeof window !== 'undefined') window.addEventListener('resize', medir);
-    svg._dgMedir = medir;
-    return function () { clearTimeout(t1); clearTimeout(t2); if (ro) { try { ro.disconnect(); } catch (e) { /* idem */ } } else if (typeof window !== 'undefined') window.removeEventListener('resize', medir); };
+    if (typeof MutationObserver === 'function') { try { mo = new MutationObserver(pronto); observar(); } catch (e) { mo = null; } }
+    svg._dgMedir = medir; svg._dgEncajar = encajar;
+    return function () { vivo = false; clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); if (mo) { try { mo.disconnect(); } catch (e) { /* idem */ } } if (ro) { try { ro.disconnect(); } catch (e) { /* idem */ } } else if (typeof window !== 'undefined') window.removeEventListener('resize', medir); };
   };
   /** Colores por tono (los tokens del tema: valen en claro y en oscuro). */
   U.TONO = { ok: 'var(--ok)', info: 'var(--info)', warn: 'var(--warn)', bad: 'var(--bad)' };

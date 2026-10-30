@@ -124,7 +124,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
           var words = e.etiqueta.split(/\s+/), lin = [], cur = '';
           words.forEach(function (w) { if ((cur + ' ' + w).trim().length <= max) cur = (cur + ' ' + w).trim(); else { if (cur) lin.push(cur); cur = w; } }); if (cur) lin.push(cur);
           if (lin.length > 2) { lin = lin.slice(0, 2); lin[1] = corto(lin[1] + '…', max); }
-          var tx = U.svg('text', { 'class': 'an-l', x: pos[j][0], y: pos[j][1] + 32, 'text-anchor': 'middle' });
+          var tx = U.svg('text', { 'class': 'an-l', x: pos[j][0], y: pos[j][1] + 32, 'text-anchor': 'middle', 'data-slot': Math.round(colW - 4) });
           lin.forEach(function (l, m) { tx.appendChild(U.svg('tspan', { x: pos[j][0], dy: m ? 12 : 0 }, l)); });
           g.appendChild(tx);
         }

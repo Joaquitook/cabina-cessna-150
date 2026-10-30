@@ -168,11 +168,11 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     }
     function refDe(e) { var S = ES.store; return isFn(S && S.hashTexto) ? S.hashTexto(e.contexto).slice(0, 6) : e.id; }
 
-    function ir(id) {
+    function ir(id, conFoco) {
       actual = porId[id] || datos.escenas[0];
       if (camino.indexOf(actual.id) < 0) camino.push(actual.id);
       if (!res[actual.id]) res[actual.id] = { primera: null, fallos: 0, elegidas: [], bloqueada: false, sig: '', orden: orden(actual) };
-      pintar(true);
+      pintar(conFoco === true);
     }
     function aviso(tono, titulo, textos) {
       return h('div', { 'class': 'feedback qz-fb ' + (tono === 'ok' ? 'feedback--ok' : tono === 'bad' ? 'feedback--bad' : ''), role: 'status' },
@@ -181,6 +181,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     }
 
     function pintar(foco) {
+      // el botón que tenía el foco se destruye con el cuerpo: se recuerda su lugar para devolverle el foco al nuevo (F2)
+      var act = typeof document !== 'undefined' ? document.activeElement : null, opAct = act && act.closest ? act.closest('.es-sit-opts .opt') : null, posAct = opAct && cuerpo.contains(opAct) ? Array.prototype.indexOf.call(cuerpo.querySelectorAll('.es-sit-opts .opt'), opAct) : -1;
       vaciar(cuerpo);
       var e = actual, r = res[e.id], graded = puntuable(e), n = datos.escenas.length;
       var lista = h('div', { 'class': 'opts es-sit-opts', role: 'group', 'aria-labelledby': 'es-sit-q-' + ctx.key });
@@ -200,7 +202,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
           elegida && !o.correcta && graded ? h('span', { 'class': 'sr-only', text: ' (tu elección: no es la correcta)' }) : null));
       });
       var prog = n > 1 ? h('p', { 'class': 'es-meta es-sit-prog', text: ('Escena ' + (camino.indexOf(e.id) + 1) + (datos.escenas.some(function (x) { return x.opciones.some(function (o) { return o.siguiente; }); }) ? '' : ' de ' + n)).toUpperCase() }) : null;
-      var tarjeta = h('div', { 'class': 'es-sit-card' },
+      var rotuloEsc = (n > 1 ? 'Escena ' + (camino.indexOf(e.id) + 1) : 'Situación') + ': ' + e.contexto + ' ' + (e.pregunta || (e.multiple ? '¿Qué te parece? Marcá todas las que correspondan.' : '¿Qué hacés?'));
+      var tarjeta = h('div', { 'class': 'es-sit-card', role: 'group', tabindex: '-1', 'aria-label': rotuloEsc },
         prog,
         h('p', { 'class': 'es-sit-ctx', text: e.contexto }),
         e.senales.length ? h('ul', { 'class': 'es-sit-sig', 'aria-label': 'Lo que ves' }, e.senales.map(function (t) { return h('li', { text: t }); })) : null,
@@ -213,10 +216,12 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       // consecuencia
       if (r.msg) cuerpo.appendChild(aviso(r.msg.tono, r.msg.titulo, r.msg.textos));
       if (r.bloqueada) {
-        if (r.sig && r.sig !== 'fin' && porId[r.sig]) cuerpo.appendChild(h('div', { 'class': 'btn-row' }, K.button({ label: 'Seguir', variant: 'primary', iconRight: 'arrow-right', onClick: function () { ir(r.sig); } })));
+        if (r.sig && r.sig !== 'fin' && porId[r.sig]) cuerpo.appendChild(h('div', { 'class': 'btn-row' }, K.button({ label: 'Seguir', variant: 'primary', iconRight: 'arrow-right', onClick: function () { ir(r.sig, true); } })));
         else terminar();
       }
-      if (foco === true) { /* sin robo de foco al cambiar de escena: el panel ya baja solo */ }
+      var Bq = ES.bloques;
+      if (foco === true) { if (Bq && isFn(Bq.enfocar)) Bq.enfocar(tarjeta); else tarjeta.focus({ preventScroll: true }); }      // escena nueva (a pedido del alumno): el foco lee el contexto y la pregunta
+      else if (posAct >= 0) { var nb = cuerpo.querySelectorAll('.es-sit-opts .opt')[posAct]; if (nb) nb.focus({ preventScroll: true }); }
     }
 
     function elegir(oi) {
@@ -286,7 +291,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     var resumen = { ok: 0, total: 0 };
     function reiniciar() {
       res = {}; camino = []; fin = false; esRetry = true; reinicios++;
-      ir(datos.escenas[0].id);
+      ir(datos.escenas[0].id, true);
     }
 
     ir(datos.escenas[0].id);

@@ -4,20 +4,22 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
  * Leés el frente, pensás la respuesta, DAS VUELTA la tarjeta (con reducir movimiento: un fundido, sin giro) y contás con honestidad cuánto la sabías:
  * "La sabía" · "Más o menos" · "No la sabía". Al final hay un resumen de la sesión. Cada calificación se guarda en el dispositivo con un repaso espaciado
  * (Store.sm2, una versión simple de SM-2): las que cuestan vuelven mañana, las que sabés vuelven en 1, 6, ~15 días… Es lo que va a leer la pantalla "Repaso del día"
- * (store.tarjetasVencidas). Los botones de calificar dicen cuándo vuelve cada tarjeta. "No la sabía" también vuelve UNA vez al final de la misma sesión.
- * Sesión: primero las vencidas, después las nuevas, hasta 12; si el mazo tiene bloques se puede elegir uno; si todo está al día se puede repasar igual.
+ * (store.tarjetasVencidas). Los botones de calificar dicen cuándo vuelve cada tarjeta (sólo cuando esa calificación la reprograma). "No la sabía" también vuelve UNA vez al final de la misma sesión.
+ * Sesión: primero las vencidas, después las nuevas, hasta 12; si el mazo tiene bloques se puede elegir uno; si todo está al día se puede repasar igual, pero ese repaso extra
+ * (y la segunda vuelta de las que no sabías) NO cambia cuándo vuelven: crearSesion(idxs, {repaso:true}) no guarda nada y no promete fechas.
  * Teclado: Tab hasta "Dar vuelta" y Enter; con la tarjeta dada vuelta, 1 / 2 / 3 califican.
  *
  * ESQUEMA DE `datos` (canónico):
  *   { consigna?:'texto', nota?:'texto',
  *     mazo:[{ idx, frente, dorso, pista?, figura?, bloque? }],     idx = lugar de la tarjeta en el mazo ORIGINAL (es la clave del repaso espaciado: 'INT-03-02:0'); no cambies el orden de un mazo publicado
- *     bloques?:[{ id, nombre, n }] }                                bloques = los grupos que usan las tarjetas (campo `bloque`), en orden de aparición
+ *     bloques?:[{ id, nombre, n }] }                                bloques = los grupos que usan las tarjetas (campo `bloque`), en orden de aparición. Al escribir un mazo con `bloque` numérico (1, 2…)
+ *                                                                   se ponen los NOMBRES: bloques:['AeroSur y tu curso', 'Acceso…'] (el 1.º es el bloque 1); sin nombre el selector dice «Bloque 1»
  *   frente / dorso aceptan el mini-marcado de las lecciones (**término**, ==clave==, {{75|%}}). figura = un nombre de src/icons.js o el id de una figura propia (ES.figuras).
  * normalizar entiende los esbozos del plan: mazo / tarjetas / cartas / items / preguntas con {frente, dorso | pregunta, respuesta | anverso, reverso | termino, definicion | a, b}
  * o [frente, dorso, pista], y dos listas paralelas (terminos / definiciones). Sin ninguna tarjeta con los dos lados → null. Un mazo por lección (la clave usa el índice de la tarjeta).
  * Handle: destroy · getState.
  *
- * Parte pura (ES.tarjetas, probada en Node): normalizar · armarSesion(cartas, registros, hoyDia, {max, bloque}) · crearSesion(idxs, {repaso}) · etiquetaIntervalo(dias) · cartaDe(lec, idx) · cartasDeLeccion(lec)
+ * Parte pura (ES.tarjetas, probada en Node): normalizar · armarSesion(cartas, registros, hoyDia, {max, bloque}) · crearSesion(idxs, {repaso}) (con guardaAhora()) · repasoIgual(cartas, bloque, max) · etiquetaIntervalo(dias) · cartaDe(lec, idx) · cartasDeLeccion(lec)
  */
 (function (C150) {
   'use strict';
@@ -66,14 +68,19 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       var vistos = {};
       crudas.forEach(function (c, n) { if (vistos[c.idx]) c.idx = n + 1000; vistos[c.idx] = 1; });
       // bloques, en orden de aparición
-      var nombres = Array.isArray(datos.bloques) ? datos.bloques.map(str) : [], bl = [], mapa = {};
+      // los nombres de los bloques: una lista de textos (el 1.º es el bloque 1…) o la forma canónica [{id, nombre, n}] (así normalizar es idempotente)
+      var nombres = [], nombrePorId = {}, bl = [], mapa = {};
+      arr(datos.bloques).forEach(function (b0, n0) {
+        if (esObj(b0)) { var nm = str(b0.nombre) || str(b0.titulo); if (nm) { if (str(b0.id)) nombrePorId[str(b0.id)] = nm; else nombres[n0] = nm; } }
+        else nombres[n0] = str(b0);
+      });
       crudas.forEach(function (c) {
         var b = c.bloque;
         if (b === '' || b === undefined) { c.bloque = ''; return; }
         var id = String(b);
         if (!mapa[id]) {
           var num = /^\d+$/.test(id) ? +id : null;
-          mapa[id] = { id: id, nombre: (num !== null && nombres[num - 1]) ? nombres[num - 1] : (num !== null ? 'Bloque ' + num : id), n: 0 };
+          mapa[id] = { id: id, nombre: nombrePorId[id] || ((num !== null && nombres[num - 1]) ? nombres[num - 1] : (num !== null ? 'Bloque ' + num : id)), n: 0 };
           bl.push(mapa[id]);
         }
         mapa[id].n++; c.bloque = id;
@@ -123,6 +130,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       actual: function () { return cola.length ? cola[0] : null; },
       quedan: function () { return cola.length; },
       esRepeticion: function () { return cola.length > 0 && primera[cola[0]] !== undefined; },
+      /** ¿La calificación de la tarjeta de adelante cambia cuándo vuelve? Sólo la primera de cada tarjeta en una sesión normal: en un repaso extra o en la segunda vuelta no. */
+      guardaAhora: function () { return guardar && cola.length > 0 && primera[cola[0]] === undefined; },
       vistas: function () { return Object.keys(primera).length; },
       calificar: function (calidad) {
         if (!cola.length) return null;
@@ -135,6 +144,11 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       cuenta: function () { var c = { sabia: 0, medio: 0, nosabia: 0 }; for (var k in primera) c[primera[k]]++; return c; },
       terminada: function () { return cola.length === 0; }
     };
+  }
+  /** Las tarjetas de un "Repasar igual" (el mazo está al día): hasta `max` del mazo (o del bloque elegido), en su orden. Esa sesión se arma con {repaso:true}: no guarda nada. */
+  function repasoIgual(cartas, bloque, max) {
+    var tope = max > 0 ? max : MAX_SESION;
+    return arr(cartas).filter(function (c) { return !bloque || c.bloque === bloque; }).slice(0, tope).map(function (c) { return c.idx; });
   }
   /** "mañana" · "en 6 días" · "en 2 semanas" · "en 3 meses" para los botones de calificar. */
   function etiquetaIntervalo(d) {
@@ -174,6 +188,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     function inline(t) { var f = document.createDocumentFragment(); if (B && isFn(B.inline)) f.appendChild(B.inline(K, t, bdeps)); else f.appendChild(document.createTextNode(plano(t))); return f; }
     function vaciar(e) { while (e.firstChild) e.removeChild(e.firstChild); }
     function anunciar(t) { elLive.textContent = ''; setTimeout(function () { elLive.textContent = t; }, 30); }
+    function foco(el, etiqueta) { if (B && isFn(B.enfocar)) return B.enfocar(el, etiqueta); if (el && isFn(el.focus)) { if (!el.hasAttribute('tabindex') && !/^(button|a|input)$/i.test(el.nodeName)) el.setAttribute('tabindex', '-1'); el.focus({ preventScroll: true }); } return false; }
 
     /* ---------------------------------------------------------- figura de una carta */
     function figuraEl(id) {
@@ -206,7 +221,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       if (info.futuras) partes.push(info.futuras + ' para más adelante');
       if (partes.length) panel.appendChild(h('p', { 'class': 'es-tar-desg', text: partes.join(' · ') }));
       if (info.resto) panel.appendChild(h('p', { 'class': 'es-note', text: 'Hoy vemos ' + nSes + ' y quedan ' + info.resto + ' para la próxima sesión: así se aprende mejor que de un tirón.' }));
-      if (info.alDia && info.proxima !== null) panel.appendChild(h('p', { 'class': 'es-note', text: 'Estás al día. La próxima tarjeta vuelve ' + etiquetaIntervalo(info.proxima - hoy()) + '. Si querés, podés repasar igual.' }));
+      if (info.alDia && info.proxima !== null) panel.appendChild(h('p', { 'class': 'es-note', text: 'Estás al día. La próxima tarjeta vuelve ' + etiquetaIntervalo(info.proxima - hoy()) + '. Si querés, podés repasar igual: ese repaso extra no cambia cuándo vuelven.' }));
       if (datos.bloques.length > 1) {
         var grp = h('div', { 'class': 'es-tar-bloques', role: 'group', 'aria-label': 'Elegí qué repasar' });
         [{ id: '', nombre: 'Todo el mazo', n: cartas.length }].concat(datos.bloques).forEach(function (b) {
@@ -216,12 +231,12 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         panel.appendChild(grp);
       }
       elStage.appendChild(panel);
-      if (nSes) elAcc.appendChild(K.button({ label: 'Empezar', variant: 'primary', iconRight: 'arrow-right', onClick: function () { empezar(info.cola); } }));
-      else elAcc.appendChild(K.button({ label: 'Repasar igual', variant: 'primary', iconRight: 'arrow-right', onClick: function () { empezar(cartas.filter(function (c) { return !bloque || c.bloque === bloque; }).slice(0, MAX_SESION).map(function (c) { return c.idx; })); } }));
+      if (nSes) elAcc.appendChild(K.button({ label: 'Empezar', variant: 'primary', iconRight: 'arrow-right', onClick: function () { empezar(info.cola, { foco: true }); } }));
+      else elAcc.appendChild(K.button({ label: 'Repasar igual', variant: 'primary', iconRight: 'arrow-right', onClick: function () { empezar(repasoIgual(cartas, bloque, MAX_SESION), { repaso: true, foco: true }); } }));      // el mazo está al día: nada de esto cambia cuándo vuelven
     }
-    function empezar(idxs) {
-      sesion = crearSesion(idxs); sesiones++; volteada = false; pistaVista = false;
-      pintarCarta();
+    function empezar(idxs, opts) {
+      sesion = crearSesion(idxs, opts); sesiones++; volteada = false; pistaVista = false;
+      pintarCarta(!!(opts && opts.foco));      // sólo con foco cuando lo pidió el alumno: al armarse la lección no se le roba el foco
     }
 
     /* ---------------------------------------------------------- la carta */
@@ -229,7 +244,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       vaciar(elTop);
       var n = sesion.total, vistas = sesion.vistas(), res = sesion.resultados(), cur = sesion.actual();
       var num = Math.min(n, vistas + (sesion.esRepeticion() ? 0 : 1));
-      elTop.appendChild(h('p', { 'class': 'es-meta es-tar-count', 'aria-live': 'polite' }, document.createTextNode(('Tarjeta ' + num + ' de ' + n).toUpperCase()), sesion.esRepeticion() ? h('span', { 'class': 'es-tar-rep', text: 'otra vuelta' }) : null, sesion.repaso ? h('span', { 'class': 'es-tar-rep es-tar-rep--info', text: 'repaso: no cambia cuándo vuelven' }) : null));
+      elTop.appendChild(h('p', { 'class': 'es-meta es-tar-count' }, document.createTextNode(('Tarjeta ' + num + ' de ' + n).toUpperCase()), sesion.esRepeticion() ? h('span', { 'class': 'es-tar-rep', text: sesion.repaso ? 'otra vuelta' : 'otra vuelta: no cambia cuándo vuelve' }) : null, sesion.repaso ? h('span', { 'class': 'es-tar-rep es-tar-rep--info', text: 'repaso: no cambia cuándo vuelven' }) : null));
       var bar = h('div', { 'class': 'es-tar-bar', role: 'img', 'aria-label': vistas + ' de ' + n + ' tarjetas calificadas' });
       sesion.orden().forEach(function (idx) {
         var r = res[idx];
@@ -237,16 +252,16 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       });
       elTop.appendChild(bar);
     }
-    function pintarCarta() {
+    function pintarCarta(conFoco) {
       var idx = sesion.actual();
       if (idx === null) { pintarResumen(); return; }
-      var c = porIdx[idx];
+      var c = porIdx[idx], nCarta = Math.min(sesion.total, sesion.vistas() + (sesion.esRepeticion() ? 0 : 1));
       marcador();
       vaciar(elStage); vaciar(elAcc);
       var fig = c.figura ? figuraEl(c.figura) : null;
       var corto = plano(c.dorso).length <= 38;
-      var pistaBtn = c.pista ? h('button', { type: 'button', 'class': 'es-tar-pista', 'aria-expanded': pistaVista ? 'true' : 'false', onclick: function (ev) { ev.stopPropagation(); pistaVista = true; pintarCarta(); var b = elAcc.querySelector('.btn'); if (b) b.focus({ preventScroll: true }); } }, icon('bulb'), h('span', { text: 'Pista' })) : null;
-      var frente = h('div', { 'class': 'es-tar-face es-tar-face--f', 'aria-hidden': volteada ? 'true' : null },
+      var pistaBtn = c.pista ? h('button', { type: 'button', 'class': 'es-tar-pista', 'aria-expanded': pistaVista ? 'true' : 'false', onclick: function (ev) { ev.stopPropagation(); pistaVista = true; pintarCarta(false); foco(elStage.querySelector('.es-tar-pista-t')); } }, icon('bulb'), h('span', { text: 'Pista' })) : null;
+      var frente = h('div', { 'class': 'es-tar-face es-tar-face--f', 'aria-hidden': volteada ? 'true' : null, role: 'group', tabindex: '-1', 'aria-label': (B && isFn(B.etiquetaPaso) ? B.etiquetaPaso('Tarjeta', nCarta, sesion.total, plano(c.frente)) : 'Tarjeta ' + nCarta + ' de ' + sesion.total + ': ' + plano(c.frente)) },
         h('p', { 'class': 'es-tar-k' }, h('span', { text: 'Pregunta' }), c.bloque && datos.bloques.length ? h('span', { 'class': 'es-tar-tag', text: nombreBloque(c.bloque) }) : null),
         fig,
         h('p', { 'class': 'es-tar-t' }, inline(c.frente)),
@@ -260,6 +275,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         h('div', { 'class': 'es-tar-in' }, frente, dorso));
       elStage.appendChild(card);
       pintarAcciones(c);
+      if (conFoco) foco(frente);      // la pregunta se lee al llegar: el foco no queda en el botón que se destruyó
     }
     function nombreBloque(id) { for (var i = 0; i < datos.bloques.length; i++) if (datos.bloques[i].id === id) return datos.bloques[i].nombre; return id; }
     function pintarAcciones(c) {
@@ -269,9 +285,10 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         return;
       }
       var rec = S ? S.tarjeta(lecId, c.idx) : null, h0 = hoy();
+      var cuenta = !!S && sesion.guardaAhora();      // sólo la primera calificación de una sesión normal cambia cuándo vuelve la tarjeta; en un repaso extra o en la segunda vuelta no se promete ninguna fecha
       var grp = h('div', { 'class': 'es-tar-rates', role: 'group', 'aria-label': '¿Cuánto la sabías?' });
       CAL.forEach(function (q) {
-        var cuando = St && isFn(St.sm2) ? etiquetaIntervalo(St.sm2(rec, q.id, h0).due - h0) : '';
+        var cuando = cuenta && St && isFn(St.sm2) ? etiquetaIntervalo(St.sm2(rec, q.id, h0).due - h0) : '';
         if (cuando && q.id === 'nosabia' && !sesion.esRepeticion()) cuando = 'hoy y ' + cuando;      // vuelve una vez al final de esta misma sesión
         grp.appendChild(h('button', { type: 'button', 'class': 'es-tar-r es-tar-r--' + q.clase, 'data-q': q.id, 'aria-keyshortcuts': q.tecla, onclick: function () { calificar(q.id); } },
           h('span', { 'class': 'es-tar-r-i', 'aria-hidden': 'true' }, icon(q.icono)),
@@ -302,9 +319,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       if (r.persistir && S) S.tarjetaRepasar(lecId, r.idx, q);
       volteada = false; pistaVista = false;
       if (sesion.terminada()) { pintarResumen(); return; }
-      pintarCarta();
-      var b = elAcc.querySelector('.btn'); if (b) b.focus({ preventScroll: true });
-      anunciar(r.reencolada ? 'Esa tarjeta vuelve al final de la sesión.' : 'Siguiente tarjeta.');
+      pintarCarta(true);
+      if (r.reencolada) anunciar('Esa tarjeta vuelve al final de la sesión.');
     }
 
     /* ---------------------------------------------------------- resumen */
@@ -323,12 +339,13 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       var stats = h('ul', { 'class': 'es-tar-stats' });
       CAL.forEach(function (q) { stats.appendChild(h('li', { 'class': 'es-tar-st es-tar-st--' + q.clase }, h('b', { text: String(cu[q.id]) }), h('span', null, icon(q.icono), document.createTextNode(q.label)))); });
       panel.appendChild(stats);
-      if (S && dueMin !== null) panel.appendChild(h('p', { 'class': 'es-tar-desg', text: 'La primera vuelve ' + etiquetaIntervalo(dueMin - hoy()) + '. Las que costaron aparecen antes.' }));
+      if (sesion.repaso && S) panel.appendChild(h('p', { 'class': 'es-note', text: 'Fue un repaso extra: no cambia cuándo vuelven tus tarjetas.' }));
+      else if (S && dueMin !== null) panel.appendChild(h('p', { 'class': 'es-tar-desg', text: 'La primera vuelve ' + etiquetaIntervalo(dueMin - hoy()) + '. Las que costaron aparecen antes.' }));
       else if (!S) panel.appendChild(h('p', { 'class': 'es-note', text: 'Esto es una prueba: acá no se guarda tu repaso.' }));
       elStage.appendChild(panel);
       var malas = Object.keys(res).filter(function (k) { return res[k] === 'nosabia'; }).map(Number);
-      if (malas.length) elAcc.appendChild(K.button({ label: malas.length === 1 ? 'Repasar la que no sabía' : 'Repasar las ' + malas.length + ' que no sabía', variant: 'primary', icon: 'reset', onClick: function () { volteada = false; sesion = crearSesion(malas, { repaso: true }); sesiones++; pintarCarta(); var b = elAcc.querySelector('.btn'); if (b) b.focus({ preventScroll: true }); } }));
-      if (otras.cola.length) elAcc.appendChild(K.button({ label: 'Seguir con ' + otras.cola.length + (otras.cola.length === 1 ? ' tarjeta más' : ' tarjetas más'), variant: malas.length ? 'ghost' : 'primary', iconRight: 'arrow-right', onClick: function () { info = otras; empezar(otras.cola); var b = elAcc.querySelector('.btn'); if (b) b.focus({ preventScroll: true }); } }));
+      if (malas.length) elAcc.appendChild(K.button({ label: malas.length === 1 ? 'Repasar la que no sabía' : 'Repasar las ' + malas.length + ' que no sabía', variant: 'primary', icon: 'reset', onClick: function () { volteada = false; sesion = crearSesion(malas, { repaso: true }); sesiones++; pintarCarta(true); } }));
+      if (otras.cola.length) elAcc.appendChild(K.button({ label: 'Seguir con ' + otras.cola.length + (otras.cola.length === 1 ? ' tarjeta más' : ' tarjetas más'), variant: malas.length ? 'ghost' : 'primary', iconRight: 'arrow-right', onClick: function () { info = otras; empezar(otras.cola, { foco: true }); } }));
       elAcc.appendChild(K.button({ label: 'Volver al mazo', variant: 'ghost', icon: 'list', onClick: function () { pintarLobby(); var b = elAcc.querySelector('.btn'); if (b) b.focus({ preventScroll: true }); } }));
       panel.setAttribute('tabindex', '-1'); panel.focus({ preventScroll: true });
     }
@@ -344,7 +361,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
 
     if (datos.nota) box.appendChild(h('p', { 'class': 'es-note', text: datos.nota }));
     if (conLobby) pintarLobby();
-    else { info = armarSesion(cartas, registros(), hoy(), { max: MAX_SESION }); empezar(info.cola.length ? info.cola : cartas.map(function (c) { return c.idx; })); }
+    else { info = armarSesion(cartas, registros(), hoy(), { max: MAX_SESION }); empezar(info.cola.length ? info.cola : cartas.map(function (c) { return c.idx; }), { repaso: !info.cola.length }); }
     return {
       destroy: function () { if (offFig) { offFig(); offFig = null; } },
       getState: function () { return { total: cartas.length, sesion: sesion ? { total: sesion.total, quedan: sesion.quedan(), resultados: sesion.resultados() } : null, volteada: volteada }; }
@@ -352,5 +369,5 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   }
 
   Mot.register('tarjetas', { normalizar: normalizar, render: render });
-  ES.tarjetas = { normalizar: normalizar, armarSesion: armarSesion, crearSesion: crearSesion, etiquetaIntervalo: etiquetaIntervalo, cartaDe: cartaDe, cartasDeLeccion: cartasDeLeccion, MAX_SESION: MAX_SESION };
+  ES.tarjetas = { normalizar: normalizar, armarSesion: armarSesion, crearSesion: crearSesion, repasoIgual: repasoIgual, etiquetaIntervalo: etiquetaIntervalo, cartaDe: cartaDe, cartasDeLeccion: cartasDeLeccion, MAX_SESION: MAX_SESION };
 })(root.C150);
