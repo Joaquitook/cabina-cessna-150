@@ -73,7 +73,7 @@ const SCRIPT_ORDER = ['data/controls-a.js', 'data/controls-b.js', 'data/learning
   'airfoil.js', 'world.js', 'cockpit.js', 'exterior.js', 'airflow.js', 'core.js', 'lab.js', 'situations.js', 'icons.js', 'kit.js', 'progress.js', 'ui.js'];
 // contrato UI/UX v4 §4: módulos de las próximas olas (opcionales hasta que existan); si están, van antes de ui.js y después de progress.js
 // contrato v7 (Escuela): mismo orden, justo antes de ui.js. Entre motor.js y leccion.js van modelos.js, figuras.js (si existe) y los componentes c-*.js (cada pasada suma los suyos).
-const ESCUELA_EXTRAS = fs.existsSync(path.join(SRC, 'escuela')) ? fs.readdirSync(path.join(SRC, 'escuela')).filter((f) => /^(c-.*|modelos|figuras|texto|bloques)\.js$/.test(f)).map((f) => 'escuela/' + f) : [];
+const ESCUELA_EXTRAS = fs.existsSync(path.join(SRC, 'escuela')) ? fs.readdirSync(path.join(SRC, 'escuela')).filter((f) => /^(c-.*|modelos|figuras|mapas|texto|bloques)\.js$/.test(f)).map((f) => 'escuela/' + f) : [];
 const ESCUELA_SCRIPTS = ['escuela/datos.js', 'escuela/store.js', 'escuela/motor.js'].concat(ESCUELA_EXTRAS.slice().sort((a, b) => (a === 'escuela/modelos.js' ? -1 : b === 'escuela/modelos.js' ? 1 : a === 'escuela/figuras.js' ? -1 : b === 'escuela/figuras.js' ? 1 : a.localeCompare(b))), ['escuela/leccion.js', 'escuela/pantallas.js', 'escuela/visor.js', 'escuela/escuela.js']);
 const SCRIPT_OPTIONAL = ['nav.js', 'glossary.js', 'search.js', 'home.js', 'onboarding.js'].concat(ESCUELA_SCRIPTS);   // nav.js (contrato v6): después de progress.js, antes de ui.js
 
@@ -322,6 +322,11 @@ order.filter((f) => SCRIPT_OPTIONAL.includes(f)).forEach((f) => ok(order.indexOf
   ESCUELA_EXTRAS.filter((f) => /\/c-/.test(f)).forEach((f) => ok(order.indexOf(f) > order.indexOf('escuela/modelos.js') && (!ESCUELA_EXTRAS.includes('escuela/figuras.js') || order.indexOf(f) > order.indexOf('escuela/figuras.js')), 'index.html: ' + f + ' después de modelos.js y figuras.js'));
   ['nav.js', 'glossary.js', 'search.js'].forEach((f) => ok(order.indexOf(f) < pos[0], 'index.html: ' + f + ' antes de escuela/datos.js'));
   ok(html.indexOf('<!--ESCUELA-JSON-->') > 0 && html.indexOf('<!--ESCUELA-JSON-->') < html.indexOf('data-inline="escuela/datos.js"'), 'index.html: marcador <!--ESCUELA-JSON--> antes de escuela/datos.js (build.js inyecta ahí el índice y los módulos)');
+  // las páginas de prueba cargan los mismos scripts: ui-harness.html todos los de escuela/, styleguide.html el motor, el store y todos los componentes (c-*.js)
+  const paginaDePrueba = (f) => matchAll(/<script\s+src="\.\.\/src\/([^"]+)"/g, fs.readFileSync(path.join(ROOT, 'tests', f), 'utf8'));
+  const harness = paginaDePrueba('ui-harness.html'), guia = paginaDePrueba('styleguide.html');
+  ESCUELA_SCRIPTS.forEach((f) => ok(harness.includes(f), 'tests/ui-harness.html: carga ' + f));
+  ['escuela/store.js', 'escuela/motor.js'].concat(ESCUELA_EXTRAS).forEach((f) => ok(guia.includes(f), 'tests/styleguide.html: carga ' + f));
   const ED = path.join(SRC, 'data', 'escuela');
   const ix = JSON.parse(fs.readFileSync(path.join(ED, 'indice.json'), 'utf8'));
   const idsIx = [], estado = {};

@@ -76,6 +76,40 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       return { pregunta: p.pregunta, opciones: m.opciones, correcta: m.correcta, explicacion: p.explicacion || '', pagina: p.pagina || null, qid: String(lec.id) + ':' + St().hashTexto(p.pregunta) };
     });
   };
+  /** Una pregunta de opción múltiple con la cara del mini-quiz de la lección (la comparten el mini-quiz y el componente `quiz`):
+   *  puntos de avance, enunciado grande, opciones con letra, y —ya contestada— la explicación con «Ver en el curso: p. N».
+   *  o = { K, hid (id del enunciado), q:{pregunta, opciones, correcta, explicacion?, pagina?}, i, n, resp (índice elegido | null), estados:[null|'ok'|'bad' por pregunta], onPick(k), titulo? }
+   *  → { h2, dots, opts, fb (null si no contestó) }. Sin estado propio: quien llama guarda las respuestas y vuelve a dibujar. */
+  Leccion.vistaPregunta = function (o) {
+    var K = o.K, h = K.el, icon = K.icon, q = o.q, i = o.i, n = o.n, resp = o.resp, contesto = resp !== undefined && resp !== null;
+    var h2 = h('h2', { 'class': 'es-quest', id: o.hid, tabindex: '-1', text: q.pregunta });
+    var dots = h('ol', { 'class': 'es-qdots' + (n > 8 ? ' es-qdots--many' : ''), 'aria-label': 'Pregunta ' + (i + 1) + ' de ' + n });
+    for (var d = 0; d < n; d++) {
+      var e = arr(o.estados)[d];
+      dots.appendChild(h('li', { 'class': (d === i ? 'is-cur ' : '') + (e === 'ok' ? 'is-ok' : e === 'bad' ? 'is-bad' : ''), 'aria-current': d === i ? 'step' : null }));
+    }
+    var opts = h('div', { 'class': 'opts es-opts', role: 'group', 'aria-labelledby': o.hid });
+    q.opciones.forEach(function (op, k) {
+      var c = 'opt';
+      if (contesto && k === q.correcta) c += ' is-correct'; else if (contesto && k === resp) c += ' is-wrong';
+      opts.appendChild(h('button', { type: 'button', 'class': c, disabled: contesto ? true : null, onclick: function () { if (isFn(o.onPick)) o.onPick(k); } },
+        h('span', { 'class': 'opt-letter', 'aria-hidden': 'true', text: 'ABCDEFGH'.charAt(k) }), h('span', { 'class': 'opt-t', text: op }),
+        contesto && k === q.correcta ? h('span', { 'class': 'opt-flag', 'aria-hidden': 'true' }, icon('check')) : null,
+        contesto && k === q.correcta ? h('span', { 'class': 'sr-only', text: ' (correcta)' }) : null,
+        contesto && k === resp && k !== q.correcta ? h('span', { 'class': 'sr-only', text: ' (tu respuesta)' }) : null));
+    });
+    var fb = null;
+    if (contesto) {
+      var bien = resp === q.correcta;
+      fb = h('div', { 'class': 'feedback qz-fb ' + (bien ? 'feedback--ok' : 'feedback--bad'), role: 'status' },
+        h('span', { 'class': 'qz-fb-ico', 'aria-hidden': 'true' }, icon(bien ? 'check' : 'bulb')),
+        h('div', { 'class': 'qz-fb-b' }, h('strong', { text: bien ? '¡Bien!' : 'No es esa, pero así se aprende.' }),
+          !bien ? h('span', { 'class': 'qz-fb-a' }, 'La correcta: ', h('b', { text: q.opciones[q.correcta] })) : null,
+          q.explicacion ? h('span', { 'class': 'qz-fb-e', text: q.explicacion }) : null,
+          q.pagina ? h('span', { 'class': 'es-pg', text: 'Ver en el curso: p. ' + q.pagina }) : null));
+    }
+    return { h2: h2, dots: dots, opts: opts, fb: fb };
+  };
   Leccion.armar = function (lec) {
     lec = lec || {};
     var Tx = ES.texto, expl = [], prac = [];
@@ -167,12 +201,13 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     };
 
     /* ---- ciclo de vida */
-    var ro = null, teclas = false, fuera = false;
+    var ro = null, teclas = false, fuera = false, visorEv = false;
     function destruirHandles() { R.handles.forEach(function (hd) { try { if (hd && isFn(hd.destroy)) hd.destroy(); } catch (e) { if (root.console) console.error('[Escuela] destroy', e); } }); R.handles = []; }
     R.destruir = function () {
       destruirHandles();
       if (teclas) { root.removeEventListener('keydown', onKey, true); teclas = false; }
       if (fuera) { document.removeEventListener('click', alFuera, true); fuera = false; }
+      if (visorEv) { document.removeEventListener('c150-visor-abierto', alVisor); visorEv = false; }
       if (ro) { try { ro.disconnect(); } catch (e) { /* idem */ } ro = null; }
     };
     R.pausar = function () { R.pausada = true; R.handles.forEach(function (hd) { try { if (hd && isFn(hd.pause)) hd.pause(); } catch (e) { /* un componente no rompe a los demás */ } }); };
@@ -293,6 +328,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       if (fuera) { document.removeEventListener('click', alFuera, true); fuera = false; }
     }
     function toggleIndice() { if (ui.rail.classList.contains('is-open')) cerrarIndice(); else abrirIndice(); }
+    /** El visor 3D se abrió en una pantalla angosta: el cajón del índice (si estaba abierto) se cierra para que se vea el visor. */
+    function alVisor() { if (ui.rail.classList.contains('is-open')) cerrarIndice(); }
     function alFuera(ev) { if (!ui.rail.contains(ev.target) && !ui.idxBtn.contains(ev.target)) cerrarIndice(); }
     /** La barra pegajosa baja lo que mida la barra de Nav (si hay una "← Volver a …" a la vista). */
     function medirCabecera() {
@@ -453,31 +490,12 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         return articulo(p, 'quiz', h2f, cabeza(['Mini-quiz', 'Resultado'], h2f), fin, pie(R.idx, { sinSiguiente: true }));
       }
       var i = R.q.i, q = p.preguntas[i], resp = R.q.resp[i], contesto = resp !== undefined && resp !== null;
-      var h2 = h('h2', { 'class': 'es-quest', id: hid, tabindex: '-1', text: q.pregunta });
-      var dots = h('ol', { 'class': 'es-qdots', 'aria-label': 'Pregunta ' + (i + 1) + ' de ' + n });
-      for (var d = 0; d < n; d++) {
-        var r_ = R.q.resp[d], hecho = r_ !== undefined && r_ !== null;
-        dots.appendChild(h('li', { 'class': (d === i ? 'is-cur ' : '') + (hecho ? (r_ === p.preguntas[d].correcta ? 'is-ok' : 'is-bad') : ''), 'aria-current': d === i ? 'step' : null }));
-      }
-      var opts = h('div', { 'class': 'opts es-opts', role: 'group', 'aria-labelledby': hid });
-      q.opciones.forEach(function (o, k) {
-        var c = 'opt';
-        if (contesto && k === q.correcta) c += ' is-correct'; else if (contesto && k === resp) c += ' is-wrong';
-        opts.appendChild(h('button', { type: 'button', 'class': c, disabled: contesto ? true : null, onclick: function () { responder(p, k); } },
-          h('span', { 'class': 'opt-letter', 'aria-hidden': 'true', text: 'ABCDEFGH'.charAt(k) }), h('span', { 'class': 'opt-t', text: o }),
-          contesto && k === q.correcta ? h('span', { 'class': 'opt-flag', 'aria-hidden': 'true' }, icon('check')) : null,
-          contesto && k === q.correcta ? h('span', { 'class': 'sr-only', text: ' (correcta)' }) : null,
-          contesto && k === resp && k !== q.correcta ? h('span', { 'class': 'sr-only', text: ' (tu respuesta)' }) : null));
-      });
-      var cuerpo = h('div', { 'class': 'es-step-body' }, opts);
+      var vp = Leccion.vistaPregunta({ K: K, hid: hid, q: q, i: i, n: n, resp: resp, onPick: function (k) { responder(p, k); },
+        estados: p.preguntas.map(function (qq, d) { var r_ = R.q.resp[d]; return r_ === undefined || r_ === null ? null : (r_ === qq.correcta ? 'ok' : 'bad'); }) });
+      var h2 = vp.h2, dots = vp.dots;
+      var cuerpo = h('div', { 'class': 'es-step-body' }, vp.opts);
       if (contesto) {
-        var bien = resp === q.correcta;
-        cuerpo.appendChild(h('div', { 'class': 'feedback qz-fb ' + (bien ? 'feedback--ok' : 'feedback--bad'), role: 'status' },
-          h('span', { 'class': 'qz-fb-ico', 'aria-hidden': 'true' }, icon(bien ? 'check' : 'bulb')),
-          h('div', { 'class': 'qz-fb-b' }, h('strong', { text: bien ? '¡Bien!' : 'No es esa, pero así se aprende.' }),
-            !bien ? h('span', { 'class': 'qz-fb-a' }, 'La correcta: ', h('b', { text: q.opciones[q.correcta] })) : null,
-            q.explicacion ? h('span', { 'class': 'qz-fb-e', text: q.explicacion }) : null,
-            q.pagina ? h('span', { 'class': 'es-pg', text: 'Ver en el curso: p. ' + q.pagina }) : null)));
+        cuerpo.appendChild(vp.fb);
         cuerpo.appendChild(h('div', { 'class': 'btn-row es-qnext' },
           K.button({ label: i + 1 >= n ? 'Ver el resumen' : 'Siguiente pregunta', variant: 'primary', iconRight: 'arrow-right', onClick: function () { siguientePregunta(p); } })));
       }
@@ -575,6 +593,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       R.el.setAttribute('data-etapa', p.k);
       pintarBarra(); pintarRail();
       if (!teclas) { root.addEventListener('keydown', onKey, true); teclas = true; }
+      if (!visorEv) { document.addEventListener('c150-visor-abierto', alVisor); visorEv = true; }
       if (!ro && typeof root.ResizeObserver === 'function') { var hd_ = document.getElementById('panel-head'); if (hd_) { try { ro = new root.ResizeObserver(medirCabecera); ro.observe(hd_); } catch (e) { ro = null; } } }
       medirCabecera();
       if (isFn(deps.annotate)) deps.annotate(v.el.querySelectorAll('.es-blocks'));

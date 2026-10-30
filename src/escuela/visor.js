@@ -33,7 +33,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   var SKEY = 'c150.es.visor';
 
   var A = null, K = null, h = null, appEl = null, vpEl = null;
-  var st = { open: false, target: null, fn: null, label: '', caption: '', returnLabel: '', opener: null, prev: null, tok: null, onClose: null, forced: null, anim: 0, aimT: 0 };
+  var st = { sheetPrev: null, open: false, target: null, fn: null, label: '', caption: '', returnLabel: '', opener: null, prev: null, tok: null, onClose: null, forced: null, anim: 0, aimT: 0 };
   var els = null, listeners = [], routeFn = null, retry = 0;
 
   function isFn(f) { return typeof f === 'function'; }
@@ -132,6 +132,15 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   function soltarPose() { if (st.target && st.target.pose && A && isFn(A.has) && A.has('clearPose')) { try { cc('clearPose'); } catch (e) { /* el avión ya no está */ } } }
 
   /* ------------------------------------------------------------------ abrir / cerrar */
+  /** En pantallas angostas (teléfono, tablet: < 1000 px) el visor ocupa la parte de arriba y la lección queda debajo: lo que siga abierto tapando (el cajón del índice
+   *  de la lección, la hoja de abajo de la app) se repliega para que se vea el visor. Avisa por un evento del documento (la lección cierra su índice sin acoplarse al visor)
+   *  y le pide a ui.js que baje la hoja; al cerrar el visor la hoja vuelve a donde estaba. */
+  function colapsarEnTelefono() {
+    var angosto = root.matchMedia ? root.matchMedia('(max-width: 999px)').matches : (root.innerWidth || 1200) < 1000;
+    if (!angosto) return;
+    try { document.dispatchEvent(new CustomEvent('c150-visor-abierto', { detail: { open: true } })); } catch (e) { /* sin CustomEvent: el cajón se cierra solo al tocar afuera */ }
+    if (A && isFn(A.sheetCollapse)) { try { st.sheetPrev = A.sheetCollapse(); } catch (e2) { st.sheetPrev = null; } }
+  }
   function avisar() { var ev = { open: st.open, target: st.target }; listeners.slice().forEach(function (f) { try { f(ev); } catch (e) { /* un oyente roto no frena al visor */ } }); }
   function guardar() {
     if (!st.open || !st.target) { ss('del', SKEY); return; }
@@ -193,6 +202,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       if (N && isFn(N.overlayOpen)) st.tok = N.overlayOpen(function () { V.close({ fromNav: true }); });
       document.addEventListener('keydown', onKey);
       if (isFn(A.hidePeek)) A.hidePeek();
+      colapsarEnTelefono();
     }
     pintar();
     guardar();
@@ -210,6 +220,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     var tok = st.tok, opener = st.opener, prev = st.prev, cb = st.onClose, target = st.target, cap = st.caption, label = st.label;
     if (o.fromNav) st.forced = { target: target, caption: cap, label: label, returnLabel: st.returnLabel, t: now() };
     soltarPose();
+    if (st.sheetPrev && A && isFn(A.sheetRestore)) { try { A.sheetRestore(st.sheetPrev); } catch (e0) { /* idem */ } }
+    st.sheetPrev = null;
     st.open = false; st.tok = null; st.opener = null; st.prev = null; st.onClose = null; st.target = null; st.fn = null;
     document.removeEventListener('keydown', onKey);
     if (appEl) appEl.removeAttribute('data-visor');

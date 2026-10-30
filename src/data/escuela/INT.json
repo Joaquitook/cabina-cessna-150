@@ -49,22 +49,51 @@
          {
           "titulo": "La portada",
           "texto": "Donde un sueño se vuelve meta.",
-          "ilustracion": "portada-aerosur"
+          "escena": {
+           "tipo": "icono",
+           "icono": "cap"
+          }
          },
          {
           "titulo": "¿Qué vamos a ver?",
           "texto": "Cinco puntos: la escuela, el acceso, las reglas de plataforma, seguridad y calidad, y tus trámites.",
-          "ilustracion": "agenda-5-puntos"
+          "escena": {
+           "tipo": "lista",
+           "items": [
+            "La escuela y tu curso",
+            "El acceso al aeropuerto",
+            "Las reglas en hangares y plataforma",
+            "Seguridad operacional y calidad",
+            "Tus trámites para la licencia"
+           ]
+          }
          },
          {
           "titulo": "Se tacha lo que ya viste",
           "texto": "La agenda se repite al empezar cada bloque con lo ya visto tachado.",
-          "ilustracion": "agenda-tachada"
+          "escena": {
+           "tipo": "lista",
+           "items": [
+            "La escuela y tu curso",
+            "El acceso al aeropuerto",
+            "Las reglas en hangares y plataforma",
+            "Seguridad operacional y calidad",
+            "Tus trámites para la licencia"
+           ],
+           "hecho": [
+            0,
+            1
+           ],
+           "actual": 2
+          }
          },
          {
           "titulo": "Rompamos el hielo",
           "texto": "Cuatro preguntas para conocerte: nombre y edad, estudios, por qué querés ser piloto y qué esperás del curso.",
-          "ilustracion": "hielo"
+          "escena": {
+           "tipo": "icono",
+           "icono": "help"
+          }
          }
         ]
        }
@@ -471,7 +500,18 @@
         "fondo": "costa-sur-uruguay",
         "puntos": [
          {
+          "id": "melilla",
+          "x": 16,
+          "y": 37,
+          "nombre": "Aeropuerto de Melilla",
+          "rol": "satélite",
+          "texto": "Base satélite.",
+          "posicionAprox": "Montevideo"
+         },
+         {
           "id": "carrasco",
+          "x": 34,
+          "y": 36,
           "nombre": "Aeropuerto de Carrasco",
           "rol": "principal",
           "texto": "Base principal. El aeropuerto más profesional del país: se vuela de día, de noche y por instrumentos.",
@@ -479,6 +519,8 @@
          },
          {
           "id": "green",
+          "x": 62,
+          "y": 30,
           "nombre": "“Green” (Guazuvirá)",
           "rol": "satélite",
           "texto": "Base satélite ubicada en Guazuvirá.",
@@ -486,20 +528,15 @@
          },
          {
           "id": "jaguel",
+          "x": 86,
+          "y": 36,
           "nombre": "Aeropuerto del Jagüel",
           "rol": "satélite",
           "texto": "Base satélite en Punta del Este.",
           "posicionAprox": "Maldonado"
-         },
-         {
-          "id": "melilla",
-          "nombre": "Aeropuerto de Melilla",
-          "rol": "satélite",
-          "texto": "Base satélite.",
-          "posicionAprox": "Montevideo"
          }
         ],
-        "aclaracion": "El curso no dice qué tipo de vuelos se hacen en cada base satélite; solo que dan más versatilidad."
+        "nota": "Esquema de la costa sur: las posiciones son ilustrativas y sólo muestran el orden de oeste a este. El curso no dice qué tipo de vuelos se hacen en cada base satélite; solo que dan más versatilidad."
        }
       },
       {
@@ -898,13 +935,44 @@
        "descripcion": "Se ordenan de arriba abajo los cinco cargos de la rama de instrucción de vuelo.",
        "datos": {
         "consigna": "Ordená la rama de instrucción de vuelo, de arriba hacia abajo.",
-        "pasos": [
-         "Gerente Responsable",
-         "Director de Operaciones / Director Técnico",
-         "Jefe de Instrucción de Vuelo",
-         "Ayudante de Instrucción de Vuelo",
-         "Instructores de Vuelo"
-        ]
+        "items": [
+         {
+          "id": "jefe",
+          "texto": "Jefe de Instrucción de Vuelo"
+         },
+         {
+          "id": "gerente",
+          "texto": "Gerente Responsable"
+         },
+         {
+          "id": "instructores",
+          "texto": "Instructores de Vuelo"
+         },
+         {
+          "id": "director",
+          "texto": "Director de Operaciones / Director Técnico"
+         },
+         {
+          "id": "ayudante",
+          "texto": "Ayudante de Instrucción de Vuelo"
+         }
+        ],
+        "orden": [
+         "gerente",
+         "director",
+         "jefe",
+         "ayudante",
+         "instructores"
+        ],
+        "explicaciones": {
+         "gerente": "Arriba de todo del organigrama: de él depende toda la escuela.",
+         "director": "De acá cuelgan las dos ramas de instrucción, la de vuelo y la teórica.",
+         "jefe": "Está a cargo de toda la instrucción de vuelo y responde al Director de Operaciones / Director Técnico.",
+         "ayudante": "Trabaja debajo del Jefe de Instrucción de Vuelo y antes de los instructores.",
+         "instructores": "Son tus profes: el último escalón de la cadena, el que más tratás todos los días."
+        },
+        "inicio": "Arriba de todo",
+        "fin": "Abajo de todo"
        }
       }
      ],
@@ -2338,13 +2406,34 @@
        "datos": {
         "pasos": [
          {
-          "texto": "Tus pies mandan: los pedales mueven el timón de dirección y, en tierra, también la rueda de nariz."
+          "titulo": "Tus pies mandan",
+          "texto": "Tus pies mandan: los pedales mueven el timón de dirección y, en tierra, también la rueda de nariz.",
+          "escena": {
+           "tipo": "flujo",
+           "nodos": [
+            "Tus pies",
+            "Los pedales",
+            "Timón de dirección",
+            "Rueda de nariz"
+           ],
+           "actual": 1
+          }
          },
          {
-          "texto": "Los frenos están arriba de cada pedal: se frena apretando la punta del pedal con la punta del pie."
+          "titulo": "Los frenos",
+          "texto": "Los frenos están arriba de cada pedal: se frena apretando la punta del pedal con la punta del pie.",
+          "escena": {
+           "tipo": "icono",
+           "icono": "hand"
+          }
          },
          {
-          "texto": "Un calzado que se suelta, se traba o resbala puede dejarte sin control de un pedal. Por eso, calzado cerrado."
+          "titulo": "Por eso, calzado cerrado",
+          "texto": "Un calzado que se suelta, se traba o resbala puede dejarte sin control de un pedal. Por eso, calzado cerrado.",
+          "escena": {
+           "tipo": "icono",
+           "icono": "warning"
+          }
          }
         ]
        }
@@ -2475,16 +2564,60 @@
        "datos": {
         "pasos": [
          {
-          "texto": "Un error: equivocarse durante el curso es normal."
+          "titulo": "Un error",
+          "texto": "Un error: equivocarse durante el curso es normal.",
+          "escena": {
+           "tipo": "flujo",
+           "nodos": [
+            "Un error",
+            "El profe corrige",
+            "Formulario A1",
+            "Cervezas"
+           ],
+           "actual": 0
+          }
          },
          {
-          "texto": "El profe corrige: la primera vez te lo explica y te corrige."
+          "titulo": "El profe corrige",
+          "texto": "El profe corrige: la primera vez te lo explica y te corrige.",
+          "escena": {
+           "tipo": "flujo",
+           "nodos": [
+            "Un error",
+            "El profe corrige",
+            "Formulario A1",
+            "Cervezas"
+           ],
+           "actual": 1
+          }
          },
          {
-          "texto": "Si no hacés caso: si te corrigen varias veces lo mismo y seguís igual, se anota en el formulario A1."
+          "titulo": "Si no hacés caso",
+          "texto": "Si no hacés caso: si te corrigen varias veces lo mismo y seguís igual, se anota en el formulario A1.",
+          "escena": {
+           "tipo": "flujo",
+           "nodos": [
+            "Un error",
+            "El profe corrige",
+            "Formulario A1",
+            "Cervezas"
+           ],
+           "actual": 2
+          }
          },
          {
-          "texto": "Se anotan cervezas: cuantas más, más grave es lo que afecta la seguridad propia o la de otros."
+          "titulo": "Se anotan cervezas",
+          "texto": "Se anotan cervezas: cuantas más, más grave es lo que afecta la seguridad propia o la de otros.",
+          "escena": {
+           "tipo": "flujo",
+           "nodos": [
+            "Un error",
+            "El profe corrige",
+            "Formulario A1",
+            "Cervezas"
+           ],
+           "actual": 3
+          }
          }
         ]
        }
@@ -2696,10 +2829,6 @@
       {
        "termino": "Cartilla",
        "definicion": "Lista de pasos escritos (checklist) que se siguen en el avión."
-      },
-      {
-       "termino": "Magnetos",
-       "definicion": "Generadores que producen la chispa del motor; la llave de encendido los conecta o los desconecta."
       }
      ],
      "resumen": "El Cervesómetro es el formulario A1 de seguridad: equivocarse es normal, pero repetir lo que el profe ya te corrigió suma cervezas."
@@ -5943,15 +6072,29 @@
         "pasos": [
          {
           "titulo": "Qué son",
-          "texto": "Las calzas son cuñas que se ponen contra las ruedas para que el avión estacionado no se mueva."
+          "texto": "Las calzas son cuñas que se ponen contra las ruedas para que el avión estacionado no se mueva.",
+          "escena": {
+           "tipo": "icono",
+           "icono": "plane"
+          }
          },
          {
           "titulo": "El chiste del curso",
-          "texto": "La diapositiva se burla del alumno que cree que no necesita calzas: es un recordatorio de que se usan siempre."
+          "texto": "La diapositiva se burla del alumno que cree que no necesita calzas: es un recordatorio de que se usan siempre.",
+          "escena": {
+           "tipo": "icono",
+           "icono": "help"
+          }
          },
          {
           "titulo": "En el Cervesómetro",
-          "texto": "No sacar las calzas es una falta leve."
+          "texto": "No sacar las calzas es una falta leve.",
+          "escena": {
+           "tipo": "dato",
+           "valor": "Leve",
+           "etiqueta": "No sacar las calzas es una falta leve",
+           "icono": "warning"
+          }
          }
         ]
        }
@@ -6310,7 +6453,34 @@
          }
         ],
         "consulta": "tocar",
-        "nota": "Plano esquemático, no está a escala."
+        "nota": "Plano esquemático, no está a escala.",
+        "rutas": [
+         {
+          "id": "camino-a-pie",
+          "nombre": "Camino a pie",
+          "texto": "Del portón 6A al cartel PARE, cruzando la calle de rodaje sólo cuando no vienen aviones, y después pegado a los hangares.",
+          "capa": "ruta a pie",
+          "tono": "info",
+          "puntos": [
+           [
+            30,
+            24
+           ],
+           [
+            38,
+            34
+           ],
+           [
+            43,
+            38
+           ],
+           [
+            52,
+            41
+           ]
+          ]
+         }
+        ]
        }
       },
       {
@@ -6342,7 +6512,9 @@
          "avion": "Primero siempre el avión: por eso mirás antes de cruzar la calle de rodaje.",
          "persona": "Segundo, la persona: sea piloto o peatón.",
          "vehiculo": "Tercero, el vehículo."
-        }
+        },
+        "inicio": "Pasa primero",
+        "fin": "Pasa último"
        }
       },
       {
@@ -6637,7 +6809,59 @@
          }
         ],
         "consulta": "tocar",
-        "nota": "Plano esquemático, no está a escala."
+        "nota": "Plano esquemático, no está a escala.",
+        "rutas": [
+         {
+          "id": "a-pie-prohibido",
+          "nombre": "A pie por la plataforma (prohibido)",
+          "texto": "Si entrás por Bomberos, no se camina por la plataforma: sólo se va con un instructor.",
+          "capa": "recorrido prohibido",
+          "tono": "bad",
+          "puntos": [
+           [
+            88,
+            12
+           ],
+           [
+            88,
+            30
+           ],
+           [
+            80,
+            44
+           ],
+           [
+            66,
+            50
+           ]
+          ]
+         },
+         {
+          "id": "con-el-profe",
+          "nombre": "Con el profe, en camioneta",
+          "texto": "El profe te busca con un auto o una camioneta del aeropuerto y te lleva hasta el hangar.",
+          "capa": "recorrido correcto",
+          "tono": "ok",
+          "puntos": [
+           [
+            88,
+            12
+           ],
+           [
+            84,
+            24
+           ],
+           [
+            80,
+            36
+           ],
+           [
+            62,
+            31
+           ]
+          ]
+         }
+        ]
        }
       },
       {
@@ -7040,45 +7264,76 @@
        "datos": {
         "ficticio": true,
         "titulo": "Un charco de aceite bajo el avión",
-        "texto": "Antes de un vuelo, un alumno ve un charco de aceite bajo el avión estacionado. Deja un reporte sin su nombre en el buzón SMS del hangar. La escuela revisa el motor y encuentra una pérdida de aceite, que se arregla antes de volar. El alumno no recibe ninguna sanción.",
-        "hechos": [
-         "Se identifica un charco de aceite bajo el avión.",
-         "El alumno reporta por el buzón SMS del hangar, de forma anónima.",
-         "La escuela revisa el motor y encuentra una pérdida de aceite.",
-         "La pérdida se arregla antes del vuelo."
-        ],
-        "etapas": [
-         "Identificación del charco",
-         "Reporte anónimo por el buzón SMS",
-         "Revisión del avión",
-         "Pérdida de aceite reparada",
-         "Vuelo seguro"
-        ],
-        "preguntas": [
+        "contexto": "Un ejemplo inventado, armado para practicar: un alumno llega a volar y mira el avión antes de subirse.",
+        "pasos": [
          {
-          "pregunta": "¿Qué permitió el reporte del alumno?",
-          "opciones": [
-           "Identificar el peligro antes de que ocurriera un accidente",
-           "Que el alumno volara más horas esa semana",
-           "Que se sancionara al responsable de la pérdida",
-           "Que el avión no se revisara nunca más"
-          ],
-          "correcta": 0,
-          "explicacion": "El reporte permitió identificar el peligro a tiempo, antes de volar."
+          "titulo": "Un charco",
+          "texto": "Antes de un vuelo, el alumno ve un charco de aceite bajo el avión estacionado.",
+          "escena": {
+           "tipo": "icono",
+           "icono": "warning"
+          },
+          "decision": {
+           "pregunta": "Ves un charco de aceite bajo el avión. ¿Qué hacés?",
+           "opciones": [
+            "Lo ignoro: seguro que es agua",
+            "Dejo un reporte en el buzón SMS del hangar, aunque sea sin mi nombre",
+            "Despego igual y aviso al volver",
+            "Lo limpio con un trapo y no digo nada"
+           ],
+           "correcta": 1,
+           "explicacion": "El SMS sirve para identificar peligros antes de que haya un accidente, y el reporte puede ser anónimo.",
+           "resultado": "El alumno deja un reporte sin su nombre en el buzón SMS del hangar."
+          }
          },
          {
-          "pregunta": "¿Qué le pasó al alumno por reportar?",
-          "opciones": [
-           "Lo sancionaron por meterse en lo que no le tocaba",
-           "Nada: a quien reporta no se lo sanciona",
-           "Tuvo que identificarse y dar explicaciones",
-           "Perdió su turno de vuelo del día"
-          ],
-          "correcta": 1,
-          "explicacion": "En el SMS no se sanciona a quienes reportan, y el reporte puede ser anónimo."
+          "titulo": "El reporte",
+          "texto": "El alumno deja el reporte, sin su nombre, en el buzón SMS del hangar.",
+          "escena": {
+           "tipo": "icono",
+           "icono": "checklist"
+          }
+         },
+         {
+          "titulo": "La revisión",
+          "texto": "La escuela revisa el motor y encuentra una pérdida de aceite.",
+          "escena": {
+           "tipo": "icono",
+           "icono": "engine"
+          }
+         },
+         {
+          "titulo": "La reparación",
+          "texto": "La pérdida se arregla antes del vuelo.",
+          "escena": {
+           "tipo": "icono",
+           "icono": "check"
+          },
+          "decision": {
+           "pregunta": "¿Qué permitió el reporte del alumno?",
+           "opciones": [
+            "Identificar el peligro antes de que ocurriera un accidente",
+            "Que el alumno volara más horas esa semana",
+            "Que se sancionara al responsable de la pérdida",
+            "Que el avión no se revisara nunca más"
+           ],
+           "correcta": 0,
+           "explicacion": "El reporte permitió identificar el peligro a tiempo, antes de volar. Y al alumno no le pasó nada: en el SMS no se sanciona a quienes reportan."
+          }
+         },
+         {
+          "titulo": "Vuelo seguro",
+          "texto": "Con la pérdida reparada, el vuelo sigue adelante sin el peligro.",
+          "escena": {
+           "tipo": "icono",
+           "icono": "plane"
+          }
          }
         ],
-        "leccion": "Reportar a tiempo evita accidentes, y reportar no tiene castigo."
+        "aprendizajes": [
+         "Reportar a tiempo evita accidentes.",
+         "Reportar no tiene castigo: en el SMS no se sanciona a quien reporta, y el reporte puede ser anónimo."
+        ]
        }
       }
      ],
@@ -7924,15 +8179,48 @@
         "pasos": [
          {
           "titulo": "SMS: seguridad",
-          "texto": "Sirve para identificar peligros antes de un accidente. Lo usás cuando ves algo peligroso; puede ser anónimo y nunca se sanciona a quien reporta."
+          "texto": "Sirve para identificar peligros antes de un accidente. Lo usás cuando ves algo peligroso; puede ser anónimo y nunca se sanciona a quien reporta.",
+          "escena": {
+           "tipo": "comparar",
+           "a": {
+            "titulo": "SMS: seguridad",
+            "icono": "warning"
+           },
+           "b": {
+            "titulo": "Calidad: tu opinión",
+            "icono": "help"
+           },
+           "foco": "a"
+          }
          },
          {
           "titulo": "Calidad: tu opinión",
-          "texto": "Sirve para mejorar tu experiencia en el curso. Lo completás cada tanto, en unos 5 minutos: materias cursadas, qué te gustó o no, tu experiencia de vuelo y qué cambiarías."
+          "texto": "Sirve para mejorar tu experiencia en el curso. Lo completás cada tanto, en unos 5 minutos: materias cursadas, qué te gustó o no, tu experiencia de vuelo y qué cambiarías.",
+          "escena": {
+           "tipo": "comparar",
+           "a": {
+            "titulo": "SMS: seguridad",
+            "icono": "warning"
+           },
+           "b": {
+            "titulo": "Calidad: tu opinión",
+            "icono": "help"
+           },
+           "foco": "b"
+          }
          },
          {
           "titulo": "Dónde está el de Calidad",
-          "texto": "En la página web, en el sistema aerosursg y en los links de Google Classroom; también por código QR."
+          "texto": "En la página web, en el sistema aerosursg y en los links de Google Classroom; también por código QR.",
+          "escena": {
+           "tipo": "lista",
+           "items": [
+            "La página web",
+            "El sistema aerosursg",
+            "Los links de Google Classroom",
+            "El código QR"
+           ]
+          }
          }
         ]
        }
@@ -8151,19 +8439,48 @@
         "pasos": [
          {
           "titulo": "Quinto punto de la agenda",
-          "texto": "Los cuatro primeros ya están tachados. Falta el último: qué trámites y documentos tenés que hacer y llevar para sacar tu licencia de alumno piloto."
+          "texto": "Los cuatro primeros ya están tachados. Falta el último: qué trámites y documentos tenés que hacer y llevar para sacar tu licencia de alumno piloto.",
+          "escena": {
+           "tipo": "lista",
+           "items": [
+            "La escuela y tu curso",
+            "El acceso al aeropuerto",
+            "Las reglas en hangares y plataforma",
+            "Seguridad operacional y calidad",
+            "Tus trámites para la licencia"
+           ],
+           "hecho": [
+            0,
+            1,
+            2,
+            3
+           ],
+           "actual": 4
+          }
          },
          {
           "titulo": "¿Qué es el psicofísico?",
-          "texto": "Es el certificado que sale de los estudios médicos de Medicina Aeronáutica."
+          "texto": "Es el certificado que sale de los estudios médicos de Medicina Aeronáutica.",
+          "escena": {
+           "tipo": "icono",
+           "icono": "checklist"
+          }
          },
          {
           "titulo": "Se agenda por WhatsApp",
-          "texto": "No se va sin turno. El número que figura en el curso es 092 292 403: confirmá que siga vigente antes de escribir."
+          "texto": "No se va sin turno. El número que figura en el curso es 092 292 403: confirmá que siga vigente antes de escribir.",
+          "escena": {
+           "tipo": "icono",
+           "icono": "clock"
+          }
          },
          {
           "titulo": "Queda en la Base Aérea Capitán Boiso Lanza",
-          "texto": "Av. Don Pedro de Mendoza 5553, en el Servicio de Sanidad de la Fuerza Aérea Uruguaya."
+          "texto": "Av. Don Pedro de Mendoza 5553, en el Servicio de Sanidad de la Fuerza Aérea Uruguaya.",
+          "escena": {
+           "tipo": "icono",
+           "icono": "map"
+          }
          }
         ]
        }
@@ -9264,19 +9581,59 @@
         "pasos": [
          {
           "titulo": "Agendá fecha y hora",
-          "texto": "En Personal Aeronáutico de DINACIA. El teléfono del curso es 2604 0408: verificá que siga vigente."
+          "texto": "En Personal Aeronáutico de DINACIA. El teléfono del curso es 2604 0408: verificá que siga vigente.",
+          "escena": {
+           "tipo": "flujo",
+           "nodos": [
+            "Agendar",
+            "Esperar 3 días",
+            "Llevar carta y foto",
+            "Licencia"
+           ],
+           "actual": 0
+          }
          },
          {
           "titulo": "Por lo menos 3 días después",
-          "texto": "La cita va por lo menos 3 días después de la fecha de tu psicofísico."
+          "texto": "La cita va por lo menos 3 días después de la fecha de tu psicofísico.",
+          "escena": {
+           "tipo": "flujo",
+           "nodos": [
+            "Agendar",
+            "Esperar 3 días",
+            "Llevar carta y foto",
+            "Licencia"
+           ],
+           "actual": 1
+          }
          },
          {
           "titulo": "Llevá la carta de la escuela y una foto carné",
-          "texto": "La carta acredita que ya estás en el curso teórico."
+          "texto": "La carta acredita que ya estás en el curso teórico.",
+          "escena": {
+           "tipo": "flujo",
+           "nodos": [
+            "Agendar",
+            "Esperar 3 días",
+            "Llevar carta y foto",
+            "Licencia"
+           ],
+           "actual": 2
+          }
          },
          {
           "titulo": "Te dan la licencia de alumno piloto",
-          "texto": "Para el libro de vuelo, podés comprar uno o usar el que prefieras."
+          "texto": "Para el libro de vuelo, podés comprar uno o usar el que prefieras.",
+          "escena": {
+           "tipo": "flujo",
+           "nodos": [
+            "Agendar",
+            "Esperar 3 días",
+            "Llevar carta y foto",
+            "Licencia"
+           ],
+           "actual": 3
+          }
          }
         ]
        }
@@ -9790,80 +10147,75 @@
        "datos": {
         "ficticio": true,
         "titulo": "Valentina y Tomás: dos caminos al mismo trámite",
-        "texto": "Valentina tiene 23 años y hace los análisis y el electrocardiograma en su mutualista. Tomás tiene 52 años y hace todos los estudios de sangre y orina en Medicina Aeronáutica. Los dos hacen el mismo trámite, pero no llevan lo mismo ni pagan lo mismo.",
-        "personas": [
+        "contexto": "Dos personas inventadas para practicar. Hacen el mismo trámite del psicofísico, pero llegan con listas distintas.",
+        "pasos": [
          {
-          "nombre": "Valentina",
-          "edad": 23,
-          "lugar": "mutualista",
-          "lleva": [
-           "resultados de sangre y orina",
-           "tira del electrocardiograma informado por cardiólogo",
-           "electroencefalograma con privación de sueño de 24 horas",
-           "vacuna antitetánica vigente",
-           "una foto carné"
-          ],
-          "ayuno": false,
-          "UR": 2,
-          "ergometria": false
+          "titulo": "Valentina, 23 años",
+          "texto": "Valentina hace los análisis y el electrocardiograma en su mutualista. Lleva los resultados de sangre y orina, la tira del electrocardiograma informada por un cardiólogo, el electroencefalograma con privación de sueño de 24 horas, la vacuna antitetánica vigente y una foto carné. No va en ayunas.",
+          "escena": {
+           "tipo": "icono",
+           "icono": "checklist"
+          }
          },
          {
-          "nombre": "Tomás",
-          "edad": 52,
-          "lugar": "Medicina Aeronáutica",
-          "lleva": [
-           "ayuno de 12 horas",
-           "primera orina de la mañana",
-           "electroencefalograma con privación de sueño de 24 horas",
-           "vacuna antitetánica vigente",
-           "una foto carné",
-           "ergometría"
-          ],
-          "ayuno": true,
-          "UR": 4,
-          "ergometria": true
+          "titulo": "Tomás, 52 años",
+          "texto": "Tomás hace todos los estudios de sangre y orina en Medicina Aeronáutica. Va en ayunas de 12 horas, con la primera orina de la mañana, y lleva el electroencefalograma con privación de sueño de 24 horas, la vacuna antitetánica vigente y una foto carné.",
+          "escena": {
+           "tipo": "icono",
+           "icono": "clock"
+          }
+         },
+         {
+          "titulo": "Mismo trámite, listas distintas",
+          "texto": "Los dos hacen el mismo trámite, pero no llevan lo mismo.",
+          "escena": {
+           "tipo": "comparar",
+           "a": {
+            "titulo": "Valentina, 23 años",
+            "icono": "checklist"
+           },
+           "b": {
+            "titulo": "Tomás, 52 años",
+            "icono": "clock"
+           }
+          },
+          "decision": {
+           "pregunta": "¿Quién necesita llevar, además, una ergometría?",
+           "opciones": [
+            "Valentina",
+            "Tomás",
+            "Los dos",
+            "Ninguno de los dos"
+           ],
+           "correcta": 1,
+           "explicacion": "La ergometría se pide a partir de los 50 años: Tomás tiene 52.",
+           "resultado": "Tomás lleva la ergometría; Valentina, no."
+          }
+         },
+         {
+          "titulo": "Llega la hora de pagar",
+          "texto": "Los estudios tienen un costo, y no es igual para todos.",
+          "escena": {
+           "tipo": "icono",
+           "icono": "gauge"
+          },
+          "decision": {
+           "pregunta": "¿Quién paga 4 UR?",
+           "opciones": [
+            "Valentina",
+            "Tomás",
+            "Los dos",
+            "Ninguno de los dos"
+           ],
+           "correcta": 1,
+           "explicacion": "Se pagan 4 UR cuando los estudios se hacen en el gabinete de Medicina Aeronáutica, como Tomás. Valentina, que los hace en su mutualista, paga 2 UR.",
+           "resultado": "Tomás paga 4 UR y Valentina paga 2 UR."
+          }
          }
         ],
-        "hechos": [
-         "Valentina (23 años) lleva los resultados de la mutualista, la tira del electrocardiograma y no va en ayunas: paga 2 UR.",
-         "Tomás (52 años) va en ayunas, con la primera orina de la mañana, y además lleva la ergometría: paga 4 UR."
-        ],
-        "preguntas": [
-         {
-          "pregunta": "¿Quién necesita llevar la ergometría?",
-          "opciones": [
-           "Valentina",
-           "Tomás",
-           "Los dos",
-           "Ninguno de los dos"
-          ],
-          "correcta": 1,
-          "explicacion": "La ergometría se pide a partir de los 50 años: Tomás tiene 52."
-         },
-         {
-          "pregunta": "¿Quién paga 4 UR?",
-          "opciones": [
-           "Valentina",
-           "Tomás",
-           "Los dos",
-           "Ninguno de los dos"
-          ],
-          "correcta": 1,
-          "explicacion": "Se pagan 4 UR cuando los estudios se hacen en el gabinete de Medicina Aeronáutica, como Tomás."
-         },
-         {
-          "pregunta": "¿Quién lleva la tira del electrocardiograma informado por cardiólogo?",
-          "opciones": [
-           "Valentina",
-           "Tomás",
-           "Los dos",
-           "Ninguno de los dos"
-          ],
-          "correcta": 0,
-          "explicacion": "Valentina hace el electrocardiograma y los análisis en su mutualista, así que lleva la tira y los resultados."
-         }
-        ],
-        "leccion": "Lo que llevás depende de dónde hacés los análisis y de cuántos años tenés."
+        "aprendizajes": [
+         "Lo que llevás depende de dónde hacés los análisis y de cuántos años tenés."
+        ]
        }
       }
      ],
@@ -10655,19 +11007,37 @@
         "pasos": [
          {
           "titulo": "Es hora de estudiar para el test",
-          "texto": "La Introducción termina con el aviso del test."
+          "texto": "La Introducción termina con el aviso del test.",
+          "escena": {
+           "tipo": "icono",
+           "icono": "bulb"
+          }
          },
          {
           "titulo": "Simulacro",
-          "texto": "La clase anterior se hace un simulacro, que se puede repetir en casa todas las veces que quieras."
+          "texto": "La clase anterior se hace un simulacro, que se puede repetir en casa todas las veces que quieras.",
+          "escena": {
+           "tipo": "icono",
+           "icono": "eye"
+          }
          },
          {
           "titulo": "El test",
-          "texto": "De múltiple opción, por Google Classroom, unos días después de terminar la materia."
+          "texto": "De múltiple opción, por Google Classroom, unos días después de terminar la materia.",
+          "escena": {
+           "tipo": "icono",
+           "icono": "quiz"
+          }
          },
          {
           "titulo": "75 % o re-take",
-          "texto": "Si no llegás al 75 %, repasás las erradas y hacés el re-take; si lo perdés, volvés a cursar toda la materia."
+          "texto": "Si no llegás al 75 %, repasás las erradas y hacés el re-take; si lo perdés, volvés a cursar toda la materia.",
+          "escena": {
+           "tipo": "dato",
+           "valor": "75",
+           "unidad": "%",
+           "etiqueta": "Lo mínimo para aprobar el test"
+          }
          }
         ]
        }
@@ -11103,7 +11473,8 @@
           "explicacion": "El carnet provisorio no es parte de los trámites de la licencia: es para entrar a los hangares y se devuelve al irte de la escuela.",
           "pagina": 25
          }
-        ]
+        ],
+        "titulo": "Simulacro del test de la Introducción"
        }
       },
       {

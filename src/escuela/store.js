@@ -13,6 +13,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
  *     mazo:      { 'INT-01-01:clasificar:3': { tipo, ref, caja:1..5, prox:'YYYY-MM-DD', t:ms } },   // repaso espaciado (cajas de Leitner)
  *     racha:     { dias:n, ultimo:'YYYY-MM-DD'|'' , gracia:'YYYY-Www'|'' , mejor:n },
  *     minutos:   { 'YYYY-MM-DD': n },                                        // minutos estudiados por día (para "esta semana")
+ *     tarjetas:  { 'INT-03-02:0': { ef:2.5, n:0, due:20000, last:19999 } },   // repaso espaciado de las TARJETAS (SM-2 simple): clave 'lección:índice de la carta';
+ *                                                                              //   ef facilidad (1.3–3.5) · n repasos seguidos bien · due y last = NÚMERO DE DÍA (Store.diaDe) del próximo repaso y del último
  *     insignias: { primera: ms, … },
  *     ultima:    { leccion:'INT-01-01', paso:n, t:ms } | null,                // "Continuar donde dejaste"
  *     prefs:     { mapa:'tarjetas'|'camino' } }
@@ -25,6 +27,13 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
  *   s.marcarLista(id, {minutos}) → {estrellas, nueva, insignias:[ids nuevos]}      estado 'hecha'; suma racha, minutos e insignias
  *   s.respuesta(qid, ok)   s.ultima()   s.tocar(id, paso)   (mueve "ultima" y pasa la lección a 'en-curso' si estaba sin ver)
  *   s.mazoAgregar({id, tipo, ref}) · s.mazo() · s.vencidas(hoy?) · s.repasar(id, ok)
+ *   TARJETAS (repaso espaciado de cartas con frente y dorso; Store.sm2 es la parte pura, probada en Node con números de día):
+ *     Store.diaDe(ms) → número de día local (entero) · Store.diaDeFecha('YYYY-MM-DD') · Store.fechaDeDia(n) · Store.tarjetaId(leccion, idx) → 'INT-03-02:0'
+ *     Store.CALIDAD = {sabia:5, medio:3, nosabia:1} · Store.sm2(registro|null, calidad 0..5 | 'sabia'|'medio'|'nosabia', hoyDia) → {ef, n, due, last}
+ *     Store.tarjetasPendientes(registros, hoyDia) → [{leccion, idx, …, atraso}] (la parte pura de s.tarjetasVencidas)
+ *     s.tarjeta(leccion, idx) → registro|null · s.tarjetaRepasar(leccion, idx, calidad) → registro nuevo · s.tarjetas() → copia de todos
+ *     s.tarjetasDeLeccion(leccion) → {idx: registro} · s.tarjetasVencidas(hoyDia?) → [{leccion, idx, ef, n, due, last, atraso}] (la más atrasada primero;
+ *       es lo que va a usar la pantalla "Repaso del día") · s.hoyDia()
  *   s.racha(hoy?) → días de racha vigente    s.minutosSemana(hoy?)      s.insignias() · s.otorgar(id) → bool
  *   s.exportar() → texto JSON    s.importar(texto) → {ok, error?, lecciones}      s.reset()      s.onChange(fn) → desuscribir
  *   s.pref(k, v?)  s.persistente
@@ -102,8 +111,56 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     return ('00000000' + (h >>> 0).toString(16)).slice(-8);
   };
 
+  /* ------------------------------------------------------------------ tarjetas: repaso espaciado (SM-2 simplificado, puro)
+   * Un registro por carta: { ef, n, due, last }. ef = facilidad (empieza en 2.5, nunca baja de 1.3); n = veces seguidas que la supiste; due = día en que toca
+   * volver a verla; last = día del último repaso. Los días son NÚMEROS DE DÍA enteros (no fechas ni milisegundos): así las pruebas no dependen del reloj
+   * ni de la zona horaria. El intervalo previo es due − last.
+   *   calidad 5 (La sabía) · 3 (Más o menos) · 1 (No la sabía)  →  <3 reinicia: vuelve mañana; 1.er acierto 2 días (1 si fue "más o menos"), 2.º 6 días (3 si fue "más o menos"),
+   *   después el intervalo anterior × ef (× 1.2 si fue "más o menos"). Siempre avanza al menos un día. */
+  var EF0 = 2.5, EF_MIN = 1.3, EF_MAX = 3.5;
+  Store.CALIDAD = { sabia: 5, medio: 3, nosabia: 1 };
+  var ID_TARJETA = /^[A-Z]{3}-\d{2}-\d{2}:\d{1,3}$/;
+  Store.tarjetaId = function (leccion, idx) { return String(leccion) + ':' + Math.max(0, Math.floor(num(idx, 0))); };
+  /** Número de día (entero) de la fecha LOCAL de `ms`: 2026-10-30 → 20756. Es la unidad de `due` y `last`. */
+  Store.diaDe = function (ms) { var d = new Date(ms); return Math.round(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000); };
+  Store.diaDeFecha = function (f) { var t = aUTC(f); return isNaN(t) ? NaN : Math.round(t / 86400000); };
+  Store.fechaDeDia = function (n) { var d = new Date(Math.round(num(n, 0)) * 86400000); return d.getUTCFullYear() + '-' + p2(d.getUTCMonth() + 1) + '-' + p2(d.getUTCDate()); };
+  function saneTarjeta(r) {
+    if (!isObj(r)) return null;
+    var due = Math.round(num(r.due, NaN)), last = Math.round(num(r.last, NaN));
+    if (isNaN(due) || isNaN(last) || due < 0 || last < 0 || due > 400000 || last > 400000) return null;
+    return { ef: Math.round(clamp(num(r.ef, EF0), EF_MIN, EF_MAX) * 100) / 100, n: clamp(Math.round(num(r.n, 0)), 0, 999), due: due, last: last };
+  }
+  Store.sm2 = function (rec, calidad, hoy) {
+    hoy = Math.round(num(hoy, 0));
+    var r = saneTarjeta(rec) || { ef: EF0, n: 0, due: hoy, last: hoy };
+    var q = typeof calidad === 'string' ? (Store.CALIDAD[calidad] !== undefined ? Store.CALIDAD[calidad] : 1) : clamp(Math.round(num(calidad, 0)), 0, 5);
+    var ef = Math.round(clamp(r.ef + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02)), EF_MIN, EF_MAX) * 100) / 100;
+    var prev = Math.max(1, r.due - r.last), n, dias;
+    if (q < 3) { n = 0; dias = 1; }
+    else {
+      n = Math.min(999, r.n + 1);
+      if (n === 1) dias = q === 3 ? 1 : 2;
+      else if (n === 2) dias = q === 3 ? 3 : 6;
+      else dias = q === 3 ? Math.max(prev + 1, Math.round(prev * 1.2)) : Math.max(prev + 1, Math.round(prev * ef));
+    }
+    return { ef: ef, n: n, due: hoy + dias, last: hoy };
+  };
+  /** Los registros que ya vencieron el día `hoy`, de mayor a menor atraso (y por clave si empatan). La pantalla "Repaso del día" arranca de acá. */
+  Store.tarjetasPendientes = function (registros, hoy) {
+    var out = [];
+    if (!isObj(registros)) return out;
+    Object.keys(registros).forEach(function (k) {
+      var r = saneTarjeta(registros[k]);
+      if (!ID_TARJETA.test(k) || !r || r.due > hoy) return;
+      out.push({ leccion: k.slice(0, k.indexOf(':')), idx: +k.slice(k.indexOf(':') + 1), ef: r.ef, n: r.n, due: r.due, last: r.last, atraso: hoy - r.due });
+    });
+    out.sort(function (a, b) { return (b.atraso - a.atraso) || (a.leccion < b.leccion ? -1 : a.leccion > b.leccion ? 1 : a.idx - b.idx); });
+    return out;
+  };
+
   Store.vacio = function () {
-    return { v: 1, lecciones: {}, respuestas: {}, mazo: {}, racha: { dias: 0, ultimo: '', gracia: '', mejor: 0 }, minutos: {}, insignias: {}, ultima: null, prefs: {} };
+    return { v: 1, lecciones: {}, respuestas: {}, mazo: {}, tarjetas: {}, racha: { dias: 0, ultimo: '', gracia: '', mejor: 0 }, minutos: {}, insignias: {}, ultima: null, prefs: {} };
   };
 
   function saneLec(r) {
@@ -124,6 +181,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       var e = o.mazo[m];
       if (okKey(m) && isObj(e) && typeof e.tipo === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(e.prox || '')) s.mazo[m] = { tipo: e.tipo.slice(0, 30), ref: String(e.ref === undefined ? '' : e.ref).slice(0, 60), caja: clamp(Math.round(num(e.caja, 1)), 1, 5), prox: e.prox, t: Math.max(0, num(e.t, 0)) };
     }
+    if (isObj(o.tarjetas)) for (var tk in o.tarjetas) { if (ID_TARJETA.test(tk)) { var tr = saneTarjeta(o.tarjetas[tk]); if (tr) s.tarjetas[tk] = tr; } }
     if (isObj(o.racha)) s.racha = { dias: Math.max(0, Math.round(num(o.racha.dias, 0))), ultimo: /^\d{4}-\d{2}-\d{2}$/.test(o.racha.ultimo || '') ? o.racha.ultimo : '', gracia: /^\d{4}-W\d{2}$/.test(o.racha.gracia || '') ? o.racha.gracia : '', mejor: Math.max(0, Math.round(num(o.racha.mejor, 0))) };
     if (isObj(o.minutos)) for (var d in o.minutos) { if (/^\d{4}-\d{2}-\d{2}$/.test(d)) s.minutos[d] = Math.max(0, Math.round(num(o.minutos[d], 0))); }
     if (isObj(o.insignias)) for (var n in o.insignias) { if (okKey(n)) s.insignias[n] = Math.max(0, num(o.insignias[n], 0)); }
@@ -145,6 +203,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     }
     for (k in b.respuestas) { var r1 = s.respuestas[k], r2 = b.respuestas[k]; s.respuestas[k] = r1 ? { ok: Math.max(r1.ok, r2.ok), mal: Math.max(r1.mal, r2.mal), t: Math.max(r1.t, r2.t) } : r2; }
     for (k in b.mazo) { if (!s.mazo[k] || b.mazo[k].t > s.mazo[k].t) s.mazo[k] = b.mazo[k]; }
+    for (k in b.tarjetas) { if (!s.tarjetas[k] || b.tarjetas[k].last > s.tarjetas[k].last || (b.tarjetas[k].last === s.tarjetas[k].last && b.tarjetas[k].n > s.tarjetas[k].n)) s.tarjetas[k] = b.tarjetas[k]; }
     if (b.racha.ultimo > s.racha.ultimo) s.racha = b.racha; else s.racha.mejor = Math.max(s.racha.mejor, b.racha.mejor);
     for (k in b.minutos) s.minutos[k] = Math.max(s.minutos[k] || 0, b.minutos[k]);
     for (k in b.insignias) if (!s.insignias[k] || b.insignias[k] < s.insignias[k]) s.insignias[k] = b.insignias[k];
@@ -260,6 +319,28 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         cambio('repaso');
         return { caja: e.caja, prox: e.prox };
       },
+
+      /* tarjetas (repaso espaciado de cartas; la lógica está en Store.sm2) */
+      hoyDia: function () { return Store.diaDe(nowFn()); },
+      tarjeta: function (leccion, idx) { var r = S().tarjetas[Store.tarjetaId(leccion, idx)]; return r ? { ef: r.ef, n: r.n, due: r.due, last: r.last } : null; },
+      tarjetas: function () { return JSON.parse(JSON.stringify(S().tarjetas)); },
+      tarjetasDeLeccion: function (leccion) {
+        var out = {}, pre = String(leccion) + ':';
+        for (var k in S().tarjetas) if (k.indexOf(pre) === 0) out[+k.slice(pre.length)] = { ef: S().tarjetas[k].ef, n: S().tarjetas[k].n, due: S().tarjetas[k].due, last: S().tarjetas[k].last };
+        return out;
+      },
+      /** Califica una carta (calidad 5 / 3 / 1 o 'sabia' / 'medio' / 'nosabia'): reprograma su próximo repaso y cuenta como actividad del día. Devuelve el registro nuevo o null. */
+      tarjetaRepasar: function (leccion, idx, calidad) {
+        var k = Store.tarjetaId(leccion, idx);
+        if (!ID_TARJETA.test(k)) return null;
+        var hoyN = Store.diaDe(nowFn()), r = Store.sm2(S().tarjetas[k] || null, calidad, hoyN);
+        S().tarjetas[k] = r;
+        S().racha = Store.rachaActualizar(S().racha, hoy());
+        cambio('tarjeta');
+        return { ef: r.ef, n: r.n, due: r.due, last: r.last };
+      },
+      /** Cartas que ya tocan repasar (el día `hoyDia`, por defecto hoy), la más atrasada primero. */
+      tarjetasVencidas: function (hoyN) { return Store.tarjetasPendientes(S().tarjetas, typeof hoyN === 'number' ? hoyN : Store.diaDe(nowFn())); },
 
       /* racha, minutos e insignias */
       racha: function (f) { return Store.rachaVigente(S().racha, f || hoy()); },

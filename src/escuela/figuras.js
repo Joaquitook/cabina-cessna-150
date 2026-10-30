@@ -497,7 +497,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       { id: 'suelo', nombre: 'Pista', visible: true, svg: '<rect class="dg-ground" x="0" y="206" width="480" height="44"/>' + lin(0, 206, 480, 206) + '<g class="dg-fillfg"><rect x="40" y="226" width="34" height="5"/><rect x="110" y="226" width="34" height="5"/><rect x="180" y="226" width="34" height="5"/><rect x="250" y="226" width="34" height="5"/><rect x="320" y="226" width="34" height="5"/><rect x="390" y="226" width="34" height="5"/></g>' + txt(466, 244, 'pista', 'dg-lbl--sm', 'end') },
       { id: 'trayectoria', nombre: 'Trayectoria', visible: true, svg: '<path class="dg-ln dg-ln--dash" d="M90 94 L170 128 C215 148 260 166 300 174 C325 179 345 180 375 180"/>' },
       { id: 'avion', nombre: 'Avión', visible: true, svg: aviEn(90, 94, 0.5, false) },
-      { id: 'sustentacion', nombre: 'Sustentación', visible: true, svg: flecha(90, 68, 90, 40, 'l') + txt(90, 32, 'sustentación', 'dg-lbl--sm dg-lbl--l') },
+      { id: 'sustentacion', nombre: 'Sustentación', visible: true, svg: flecha(90, 68, 90, 40, 'l') },
+      { id: 'sustentacion-t', nombre: 'Rótulo de la sustentación', visible: true, svg: txt(90, 32, 'sustentación', 'dg-lbl--sm dg-lbl--l') },      // el rótulo va aparte: al achicar la flecha (escala 0.3 en la animación) no se achica el texto
       { id: 'peso', nombre: 'Peso', visible: true, svg: flecha(90, 98, 90, 126, 'w') + txt(90, 138, 'peso', 'dg-lbl--sm dg-lbl--w') },
       { id: 'lectura', nombre: 'Ángulo de ataque', visible: true, svg: txt(470, 40, 'α moderado', 'dg-lbl--lg dg-lbl--a', 'end') }
     ],
@@ -521,7 +522,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       { id: 'pesos', nombre: 'Pesos', visible: true, svg: flecha(80, 120, 80, 142, 'w') + flecha(240, 120, 240, 156, 'w') + flecha(400, 120, 400, 142, 'w') +
         txt(80, 204, '1 100 lb', 'dg-lbl--sm') + txt(240, 204, '1 600 lb', 'dg-lbl--sm') + txt(400, 204, '1 100 lb', 'dg-lbl--sm') },
       { id: 'alfa', nombre: 'Ángulo crítico', visible: false, svg: '<rect class="dg-tag--d" x="30" y="34" width="100" height="22" rx="11"/><rect class="dg-tag--d" x="190" y="34" width="100" height="22" rx="11"/><rect class="dg-tag--d" x="350" y="34" width="100" height="22" rx="11"/>' +
-        '<text class="dg-lbl dg-lbl--fg" x="80" y="49" text-anchor="middle">α crítico</text><text class="dg-lbl dg-lbl--fg" x="240" y="49" text-anchor="middle">α crítico</text><text class="dg-lbl dg-lbl--fg" x="400" y="49" text-anchor="middle">α crítico</text>' +
+        '<text class="dg-lbl dg-lbl--ink" x="80" y="49" text-anchor="middle">α crítico</text><text class="dg-lbl dg-lbl--ink" x="240" y="49" text-anchor="middle">α crítico</text><text class="dg-lbl dg-lbl--ink" x="400" y="49" text-anchor="middle">α crítico</text>' +
         '<text class="dg-sym" x="160" y="52" text-anchor="middle">=</text><text class="dg-sym" x="320" y="52" text-anchor="middle">=</text>' },
       { id: 'ias', nombre: 'Velocidad indicada de pérdida (IAS)', visible: false, svg: '<text class="dg-lbl dg-lbl--lg dg-lbl--l" x="80" y="228" text-anchor="middle">IAS 39 kt</text><text class="dg-lbl dg-lbl--lg dg-lbl--l" x="240" y="228" text-anchor="middle">IAS 47 kt</text><text class="dg-lbl dg-lbl--lg dg-lbl--l" x="400" y="228" text-anchor="middle">IAS 39 kt</text>' },
       { id: 'tas', nombre: 'Velocidad verdadera de pérdida (TAS)', visible: false, svg: '<text class="dg-lbl dg-lbl--lg dg-lbl--a" x="80" y="248" text-anchor="middle">TAS 39 kt</text><text class="dg-lbl dg-lbl--lg dg-lbl--a" x="240" y="248" text-anchor="middle">TAS 47 kt</text><text class="dg-lbl dg-lbl--lg dg-lbl--a" x="400" y="248" text-anchor="middle">TAS 44 kt</text>' }

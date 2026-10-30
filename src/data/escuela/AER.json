@@ -465,14 +465,6 @@
       {
        "termino": "Resistencia parásita",
        "definicion": "La parte de la resistencia que producen las partes del avión que no generan sustentación."
-      },
-      {
-       "termino": "Tracción",
-       "definicion": "Fuerza hacia adelante que produce la hélice y vence a la resistencia."
-      },
-      {
-       "termino": "Empuje",
-       "definicion": "Nombre que recibe la tracción en los aviones a turbina."
       }
      ],
      "resumen": "Cuatro fuerzas actúan sobre el avión: el peso baja, la sustentación sube, la tracción empuja y la resistencia frena."
@@ -1541,7 +1533,8 @@
         "mazo": [
          {
           "frente": "Estrechamiento",
-          "dorso": "Aumenta la velocidad del fluido."
+          "dorso": "Aumenta la velocidad del fluido.",
+          "figura": "venturi-tubo"
          },
          {
           "frente": "Aumenta la velocidad",
@@ -1554,7 +1547,8 @@
          {
           "frente": "¿Dónde hay un Venturi en el C150?",
           "dorso": "En el carburador.",
-          "pista": "Ahí se mezcla el aire con la nafta."
+          "pista": "Ahí se mezcla el aire con la nafta.",
+          "figura": "carburador-venturi"
          }
         ]
        }
@@ -2355,16 +2349,32 @@
        "datos": {
         "pasos": [
          {
-          "texto": "La fórmula del curso: L = ρ · V² · S · Cf · cos α / 2."
+          "titulo": "La fórmula del curso",
+          "texto": "La fórmula del curso: L = ρ · V² · S · Cf · cos α / 2.",
+          "escena": {
+           "tipo": "formula",
+           "texto": "L = ρ · V² · S · Cf · cos α / 2"
+          }
          },
          {
-          "texto": "La fórmula que se usa en la mayoría de los libros: L = ½ · ρ · V² · S · CL."
+          "titulo": "La fórmula estándar",
+          "texto": "La fórmula que se usa en la mayoría de los libros: L = ½ · ρ · V² · S · CL.",
+          "escena": {
+           "tipo": "formula",
+           "texto": "L = ½ · ρ · V² · S · CL"
+          }
          },
          {
+          "titulo": "Dónde vive el ángulo de ataque",
           "texto": "En la fórmula estándar, el efecto del ángulo de ataque está dentro de CL. En los dos casos, hasta el ángulo crítico, más ángulo da más sustentación.",
           "termino": [
            "Coeficiente aerodinámico"
-          ]
+          ],
+          "escena": {
+           "tipo": "formula",
+           "texto": "CL depende del ángulo de ataque",
+           "nota": "Hasta el ángulo crítico, más ángulo da más sustentación."
+          }
          }
         ],
         "autoplay": false
@@ -3204,7 +3214,9 @@
          "a12": "Al subir el ángulo la capa turbulenta se extiende, pero el ala todavía produce más sustentación.",
          "a17": "Es el ángulo crítico: la sustentación llega a su máximo y desde ahí empieza a decaer.",
          "a19": "Con casi todo el ala despegada la sustentación disminuye y el ala entra en pérdida."
-        }
+        },
+        "inicio": "Menos ángulo",
+        "fin": "Más ángulo"
        }
       }
      ],
@@ -3418,6 +3430,10 @@
             "peso": [
              140,
              58
+            ],
+            "sustentacion-t": [
+             140,
+             58
             ]
            },
            "rotar": {
@@ -3449,6 +3465,10 @@
              84
             ],
             "peso": [
+             260,
+             84
+            ],
+            "sustentacion-t": [
              260,
              84
             ]

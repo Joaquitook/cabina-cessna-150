@@ -23,6 +23,9 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   function arr(x) { return Array.isArray(x) ? x : []; }
   function p2(n) { return (n < 10 ? '0' : '') + n; }
   function isFn(f) { return typeof f === 'function'; }
+  /** El número que se ve en pantalla es el del propio id (unidad 'MET-04' → '04', lección 'MET-04-02' → '02'), no la posición en la lista: así lo que se lee
+   *  coincide con el código de la lección. nivel 1 = unidad, 2 = lección; si el id no trae número se usa la posición. */
+  P.numId = function (id, pos, nivel) { var v = parseInt(String(id || '').split('-')[nivel], 10); return p2(v > 0 ? v : pos); };
   P.fmtMin = function (n) { n = Math.max(0, Math.round(n || 0)); return n < 60 ? n + ' min' : Math.floor(n / 60) + ' h ' + p2(n % 60) + ' min'; };
   P.saludo = function (hora) { hora = typeof hora === 'number' ? hora : new Date().getHours(); return hora < 6 ? 'Buenas noches' : hora < 13 ? 'Buen día' : hora < 20 ? 'Buenas tardes' : 'Buenas noches'; };
   P.estadoLec = function (store, id) {
@@ -243,6 +246,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
 
   /* ------------------------------------------------------------------ módulo */
   function tarjetaLeccion(E, l, n) {
+    var num = P.numId(l.id, n, 2);
     var h = E.h, disp = l.detalle === 'completo', es = P.estadoLec(E.store, l.id);
     var estadoTxt = es.estado === 'hecha' ? 'hecha' : es.estado === 'en-curso' ? 'en curso' : (disp ? 'sin ver' : 'próximamente');
     var pie;
@@ -251,7 +255,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     else if (es.estado === 'en-curso') pie = h('span', { 'class': 'es-lcard-st is-en-curso' }, h('span', { 'class': 'es-dot is-en-curso', 'aria-hidden': 'true' }), h('span', { text: 'En curso · paso ' + es.paso }));
     else pie = h('span', { 'class': 'es-lcard-st' }, h('span', { 'class': 'es-dot is-nueva', 'aria-hidden': 'true' }), h('span', { text: 'Sin ver' }));
     var kids = [
-      h('span', { 'class': 'es-lcard-top' }, h('span', { 'class': 'es-lcard-n', 'aria-hidden': 'true', text: p2(n) }), h('span', { 'class': 'es-lcard-id', text: l.id })),
+      h('span', { 'class': 'es-lcard-top' }, h('span', { 'class': 'es-lcard-n', 'aria-hidden': 'true', text: num }), h('span', { 'class': 'es-lcard-id', text: l.id })),
       h('span', { 'class': 'es-lcard-t', text: l.titulo }),
       h('span', { 'class': 'es-lcard-m' }, (l.paginas ? 'pp. ' + l.paginas + ' · ' : '') + (l.minutos || 0) + ' min'),
       chipsComp(E, l, 4), h('span', { 'class': 'es-lcard-pie' }, pie)];
@@ -325,7 +329,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       var disp = arr(u.lecciones).filter(function (l) { return l.detalle === 'completo'; });
       var hechas = disp.filter(function (l) { return P.estadoLec(E.store, l.id).estado === 'hecha'; }).length;
       var plegada = disp.length === 0, abierta = E.secOpen[u.id] !== undefined ? !!E.secOpen[u.id] : !plegada;
-      var meta = (u.paginas ? 'pp. ' + u.paginas + ' · ' : '') + (disp.length ? hechas + ' de ' + disp.length + ' hechas' : arr(u.lecciones).length + ' lecciones · próximamente');
+      var nUni = P.numId(u.id, k + 1, 1), parte = nUni !== p2(k + 1) ? 'Parte ' + (k + 1) + ' de ' + unidades.length + ' · ' : '';
+      var meta = parte + (u.paginas ? 'pp. ' + u.paginas + ' · ' : '') + (disp.length ? hechas + ' de ' + disp.length + ' hechas' : arr(u.lecciones).length + ' lecciones · próximamente');
       var grid = h('ul', { 'class': 'es-lgrid' });
       arr(u.lecciones).forEach(function (l, j) { grid.appendChild(h('li', null, tarjetaLeccion(E, l, j + 1))); });
       var bodyId = 'es-ub-' + u.id;
@@ -338,7 +343,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       }
       var sec = h('section', { 'class': 'es-unit' + (plegada ? ' is-soon' : ''), 'data-sec': 'es-u-' + u.id, 'aria-labelledby': 'es-uh-' + u.id },
         h('header', { 'class': 'es-unit-h' },
-          h('span', { 'class': 'es-unit-n', 'aria-hidden': 'true', text: p2(k + 1) }),
+          h('span', { 'class': 'es-unit-n', 'aria-hidden': 'true', text: nUni }),
           h('div', { 'class': 'es-unit-b' }, h('h3', { 'class': 'es-unit-t', id: 'es-uh-' + u.id, text: u.titulo }), h('p', { 'class': 'es-unit-m', text: meta })), tog),
         grid);
       function abre(v) {
@@ -348,7 +353,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       sec.abre = abre;
       secs.push(sec);
       var b = h('button', { type: 'button', 'class': 'es-uidx-b' + (plegada ? ' is-soon' : ''), 'data-u': u.id },
-        h('span', { 'class': 'es-uidx-n', text: p2(k + 1) }), h('span', { 'class': 'es-uidx-t', text: u.titulo }), h('span', { 'class': 'es-uidx-c', text: disp.length ? hechas + '/' + disp.length : '–' }));
+        h('span', { 'class': 'es-uidx-n', text: nUni }), h('span', { 'class': 'es-uidx-t', text: u.titulo }), h('span', { 'class': 'es-uidx-c', text: disp.length ? hechas + '/' + disp.length : '–' }));
       b.addEventListener('click', function () {
         if (plegada && grid.hidden) abre(true);
         var rm = K.reducedMotion && K.reducedMotion();

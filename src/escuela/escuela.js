@@ -146,6 +146,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   function montarLeccion(e, mod, claveOIdx) {
     var datos = mod && mod.lecs[e.id];
     if (!datos) { body.appendChild(Pan.error(E, 'La lección ' + e.id + ' no está en el archivo del módulo.', function () { mostrar(V, { forzar: true }); })); return; }
+    registrarGlosario(mod);                  // los términos del módulo (y los de esta lección) ya están en el glosario ANTES de armar y marcar el texto
     var r = runners[e.id];
     var idx = 0;
     if (!r) r = runners[e.id] = Leccion.crear(depsLeccion(e), e, datos, 0);
@@ -325,17 +326,25 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   };
 
   /* ------------------------------------------------------------------ glosario y buscador */
+  var glosRegistrado = {};
+  /** Suma al glosario de la app los términos de TODAS las lecciones del módulo (una sola vez por módulo: es idempotente). Devuelve cuántos términos sumó.
+   *  Se llama al cargarse el módulo y, otra vez por las dudas, justo antes de armar la lección (así el texto se marca con el glosario completo). */
   function registrarGlosario(m) {
     var G = C150.Glossary;
-    if (!G || !isFn(G.register) || !m) return;
+    if (!G || !isFn(G.register) || !m || !m.lecs || glosRegistrado[m.id]) return 0;
     var vistos = {}, lista = [];
     Object.keys(m.lecs).forEach(function (id) {
       arr(m.lecs[id].glosario).forEach(function (g) {
         if (g && g.termino && g.definicion && !vistos[g.termino.toLowerCase()]) { vistos[g.termino.toLowerCase()] = 1; lista.push({ termino: g.termino, definicion: g.definicion }); }
       });
     });
-    if (lista.length) { try { G.register(lista); } catch (e) { if (root.console) console.error('[Escuela] Glossary.register', e); } }
+    if (lista.length) { try { G.register(lista); glosRegistrado[m.id] = true; } catch (e) { if (root.console) console.error('[Escuela] Glossary.register', e); return 0; } }
+    else glosRegistrado[m.id] = true;
+    return lista.length;
   }
+  /** Para pantallas y pruebas: ¿ya se registraron los términos de ese módulo? · y registrarlos ahora si el módulo está a mano (inline o ya cargado). */
+  Escuela.glosarioRegistrado = function (id) { return !!glosRegistrado[id]; };
+  Escuela.asegurarGlosario = function (id) { var m = D.cargarSync(id); return m ? registrarGlosario(m) : 0; };
   D.onCargado(registrarGlosario);
   D.modulos().forEach(function (m) { var c = D.cargado(m.id); if (c) registrarGlosario(c); });
 

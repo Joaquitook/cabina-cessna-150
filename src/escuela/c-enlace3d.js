@@ -188,6 +188,17 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   function tituloDe(lista, id, campo) { var l = arr(lista); for (var i = 0; i < l.length; i++) if (l[i].id === id) return l[i][campo || 'titulo'] || l[i].nombre || id; return id; }
   function etiquetaPose(id) { var l = arr(C150.Exterior && C150.Exterior.POSES); for (var i = 0; i < l.length; i++) if (l[i].id === id) return l[i].etiqueta || id; return id; }
 
+  /** La frase de arriba depende de QUÉ se puede mirar o abrir (no sólo del destino): mandos → cabina; poses o vista exterior → el avión desde afuera; AIRE → el laboratorio; el resto → otra pantalla. */
+  function leadDe(d) {
+    var cab = d.controles.length > 0, pose = d.poses.length > 0, otra = !!(d.aire || d.checklist || d.situacion || d.leccionApp);
+    if (d.aire && cab) return 'Mirá el mando en la cabina (el visor 3D se abre al lado de la lección) o probalo en el laboratorio del aire, que se abre en otra pantalla y te devuelve a este mismo paso.';
+    if (d.destino === 'aire' || (d.aire && !cab && !pose)) return 'Esto se ve mejor en el laboratorio del aire. Se abre en otra pantalla y, cuando termines, volvés a este mismo paso de la lección.';
+    if (d.destino === 'vuelo') return 'Esto se practica volando. Se abre en otra pantalla y, cuando termines, volvés a este mismo paso.';
+    if (cab && pose) return 'Mirá el mando en la cabina o el avión desde afuera: se abre el visor 3D al lado de la lección, sin sacarte de acá, y lo cerrás cuando quieras.';
+    if (pose || (d.destino === 'exterior' && !cab)) return 'Mirá el avión desde afuera: se abre el visor 3D al lado de la lección, sin sacarte de acá. Arrastrá para girar alrededor y cerralo cuando quieras.';
+    if (!cab && otra) return 'Esto se abre en otra pantalla de la app y, cuando termines, volvés a este mismo paso de la lección.';
+    return 'Mirarlo abre el visor 3D al lado de la lección: no te saca de acá y lo cerrás cuando quieras. La ficha completa te lleva a otra pantalla, pero volvés con un toque.';
+  }
   function render(host, datos, ctx) {
     var h = ctx.h, K = ctx.Kit, A = ctx.api || null, UI = C150.UI || null;
     var armado = !!ctx.hecho, logrado = !!ctx.hecho, usado = !!ctx.hecho, racha = 0, poseActiva = false, pausado = false, vistoFalso = false, elYa = null, offLook = null, vistaAntes = null;
@@ -320,10 +331,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     var primero = true;
     function variante() { if (primero) { primero = false; return 'primary'; } return 'secondary'; }
     var partes = [];
-    var lead = datos.destino === 'aire' ? 'Esto se ve mejor en el laboratorio del aire. Se abre en otra pantalla y, cuando termines, volvés a este mismo paso de la lección.'
-      : datos.destino === 'exterior' ? 'Mirá el avión desde afuera: la cámara se mueve, pero seguís en la lección.'
-      : datos.destino === 'vuelo' ? 'Esto se practica volando. Se abre en otra pantalla y, cuando termines, volvés a este mismo paso.'
-      : 'Mirarlo abre el visor 3D al lado de la lección: no te saca de acá y lo cerrás cuando quieras. La ficha completa te lleva a otra pantalla, pero volvés con un toque.';
+    var lead = leadDe(datos);
     partes.push(h('p', { 'class': 'es-note es-3d-lead', text: lead }));
 
     if (datos.controles.length) {
@@ -380,5 +388,5 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   }
 
   Mot.register('enlace3d', { normalizar: normalizar, render: render });
-  ES.enlace3d = { normalizar: normalizar, referencias: referencias, cumple: cumple, VISTAS: VISTAS, FOCOS: FOCOS, CAPAS: CAPAS, rutaOk: rutaOk };
+  ES.enlace3d = { leadDe: leadDe, normalizar: normalizar, referencias: referencias, cumple: cumple, VISTAS: VISTAS, FOCOS: FOCOS, CAPAS: CAPAS, rutaOk: rutaOk };
 })(root.C150);

@@ -593,7 +593,9 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     var g = groupDef(groupOf(m));
     var sub = rest.split('/')[0];
     if (rest && g && g.modes.indexOf(sub) >= 0) { m = sub; rest = rest.split('/').slice(1).join('/'); }       // 'lecciones/basico[/id]'
+    var was = mode;
     setMode(m, opts);
+    if (!rest && m === 'escuela' && was === 'escuela' && C150.Escuela && isFn(C150.Escuela.go)) safe(function () { C150.Escuela.go(''); }, 'Escuela.go');     // '#escuela' estando adentro de un módulo o una lección: vuelve al mapa (desde otra pestaña sigue "EN CURSO")
     if (rest) {
       if (m === 'explorar' && CTRL[rest]) openControlRaw(rest, 'list');
       else if (m === 'aire' && C150.Lab && isFn(C150.Lab.startExperiment)) safe(function () { C150.Lab.startExperiment(rest); }, 'Lab.startExperiment');
@@ -970,6 +972,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         var g = it.getAttribute('data-group');
         sheetEnsure('half');
         if (groupOf(mode) === g) {                                    // re-tap: inside a detail → UP to the tab's list; again → back to the top
+          var pv = g === 'escuela' ? navProvider(mode) : null;
+          if (pv && isFn(pv.inDetail) && pv.inDetail()) { navGo('escuela'); return; }      // ESCUELA: el toque vuelve al mapa de una vez (Atrás te devuelve a la lección)
           if (!navUpTap()) { scrollPanelTop(); syncNav(); }
           return;
         }
@@ -5189,7 +5193,9 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         focusControl(id, true);
         return true;
       },
-      hidePeek: hidePeek
+      hidePeek: hidePeek,
+      sheetCollapse: function () { if (!SH.active) return null; var prev = SH.snap; if (prev !== 'peek') sheetApply('peek', false); return prev; },          // phones: the visor needs the screen (returns the previous snap)
+      sheetRestore: function (snap) { if (SH.active && snap && SH.snap === 'peek') sheetApply(snap, false); }
     };
   }
   function labOk() { var Lb = C150.Lab; return !!(Lb && isFn(Lb.mount) && isFn(Lb.enter)); }

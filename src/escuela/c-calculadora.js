@@ -575,7 +575,10 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         if (t === 'lista') {
           var ul = h('ul', { 'class': 'es-list' }); arr(s.valor).forEach(function (x) { ul.appendChild(h('li', { text: x })); });
           var cp = (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) ? K.button({ label: 'Copiar la lista', icon: 'list', size: 'small', variant: 'secondary', onClick: function () {
-            try { navigator.clipboard.writeText(arr(s.valor).map(function (x) { return '• ' + x; }).join('\n')); if (ctx.api && isFn(ctx.api.showToast)) ctx.api.showToast('Lista copiada', 'good'); } catch (er) { /* sin portapapeles */ } } }) : null;
+            // writeText devuelve una promesa que puede rechazarse (sin permiso, ventana sin foco): se atiende y el aviso dice la verdad
+            var avisar = function (t, tono) { if (ctx.api && isFn(ctx.api.showToast)) ctx.api.showToast({ text: t, kind: tono }); };      // showToast recibe {text, kind}
+            var bien = function () { avisar('Lista copiada', 'good'); }, mal = function () { avisar('No se pudo copiar: seleccioná la lista y copiala a mano', 'warn'); };
+            try { var pr = navigator.clipboard.writeText(arr(s.valor).map(function (x) { return '• ' + x; }).join('\n')); if (pr && isFn(pr.then)) pr.then(bien, mal); else bien(); } catch (er) { mal(); } } }) : null;
           grid.appendChild(h('div', { 'class': 'es-out-list' }, h('span', { 'class': 'stat-label', text: s.etiqueta }), ul, cp)); return;
         }
         var st = K.stat({ label: s.etiqueta, value: t === 'num' ? ((s.signo && s.valor > 0 ? '+' : '') + F(s.valor, s.dec || 0)) : String(s.valor), unit: s.unidad || '', small: !s.destacada });

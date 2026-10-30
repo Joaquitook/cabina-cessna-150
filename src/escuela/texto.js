@@ -32,7 +32,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   T.ROTULO = { texto: 'Punto clave', definicion: 'Definición', regla: 'Regla', dato: 'Dato', idea: 'Idea clave', ojo: 'Ojo', ejemplo: 'Ejemplo', lista: 'Paso a paso' };
   var CAMPOS = { titulo: 1, texto: 1, tipo: 1, dato: 1, ejemplo: 1, ojo: 1, resumen: 1, n: 1 };
   // componentes que piden dos columnas (texto a la izquierda, figura a la derecha); el resto va en una tarjeta centrada
-  var DOS = { simulador: 1, diagrama: 1, animacion: 1, calculadora: 1, enlace3d: 1, mapa: 1, diapositiva: 1 };
+  var DOS = { simulador: 1, diagrama: 1, animacion: 1, calculadora: 1, enlace3d: 1, diapositiva: 1 };      // el mapa necesita ancho: va en una tarjeta centrada (layout 'centro')
 
   /* ------------------------------------------------------------------ mini-marcado */
   T.markup = function (s) {

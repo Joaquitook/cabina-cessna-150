@@ -204,6 +204,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       vista.cx = Math.max(VX + w / 2, Math.min(VX + VW - w / 2, vista.cx)); vista.cy = Math.max(VY + hgt / 2, Math.min(VY + VH - hgt / 2, vista.cy));
       svg.setAttribute('viewBox', (vista.cx - w / 2) + ' ' + (vista.cy - hgt / 2) + ' ' + w + ' ' + hgt);
       view.classList.toggle('is-zoom', vista.s > 1.001);
+      if (svg._dgMedir) svg._dgMedir();           // el zoom cambia la escala: las etiquetas se miden de nuevo
       if (zIn) { zIn.disabled = vista.s >= 4; zOut.disabled = vista.s <= 1.001; zRe.disabled = vista.s <= 1.001 && Math.abs(vista.cx - (VX + VW / 2)) < 1; }
     }
     function zoom(f, px, py) {
@@ -286,7 +287,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       if (!sel) { ficha.appendChild(h('p', { 'class': 'es-note' }, icon('hand'), h('span', { text: 'Tocá un punto del dibujo para ver qué es.' }))); return; }
       var x = porId[sel], capa = x.capa ? datos.capas.filter(function (c) { return c.id === x.capa; })[0] : null;
       ficha.appendChild(h('p', { 'class': 'es-meta', text: 'Punto ' + x._n + ' de ' + n + (capa ? ' · ' + capa.nombre : '') + ' · abiertos ' + Object.keys(abiertos).length + ' de ' + n }));
-      ficha.appendChild(h('h5', { 'class': 'es-dgr-t', text: x.titulo }));
+      ficha.appendChild(h('h4', { 'class': 'es-dgr-t', text: x.titulo }));
       String(x.texto || '').split('\n').filter(Boolean).forEach(function (t) { ficha.appendChild(h('p', { 'class': 'es-dgr-p', text: t })); });
       if (!x.texto) ficha.appendChild(h('p', { 'class': 'es-note', text: 'Probá el modo prueba para ver si lo ubicás sin ayuda.' }));
       if (ctx.glosario) { /* los términos del texto los marca la lección con el glosario; acá sólo se muestra el texto */ }
@@ -346,8 +347,9 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     K.add(raiz, [barra, capasBox, h('div', { 'class': 'es-dgr-stage' }, view), leyenda, ficha, datos.nota ? h('p', { 'class': 'es-note', text: datos.nota }) : null]);
     host.appendChild(raiz);
     pintarCapas(); pintarFicha(); aplicarVista();
+    var offEt = U.escalarEtiquetas(svg);       // etiquetas de 11 px o más en pantalla (v9)
     return {
-      destroy: function () { ptrs = {}; },
+      destroy: function () { ptrs = {}; offEt(); },
       getState: function () { return { abiertos: Object.keys(abiertos), prueba: prueba, zoom: vista.s, ok: P ? P.ok : null }; }
     };
   }

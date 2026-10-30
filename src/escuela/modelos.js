@@ -116,6 +116,36 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     }
     return el;
   };
+  /* ---- etiquetas de las figuras que nunca bajan de 11 px en pantalla (v9). El dibujo se escala al ancho de su caja: una etiqueta de 11 unidades en un SVG de 480
+   * que se ve a 360 px mide 8 px. --dg-s = píxeles de pantalla por unidad del dibujo; el CSS (.dg-lbl, .dg-tx, .an-l…) usa max(base · s, 11px) / s. */
+  U.ETIQUETA_MIN = 11;
+  /** Píxeles de pantalla por unidad del dibujo: el SVG cabe entero (meet) en ancho × alto. 1 si no se puede medir. */
+  U.escalaDibujo = function (ancho, alto, vbW, vbH) {
+    if (!(ancho > 0) || !(vbW > 0)) return 1;
+    var s = ancho / vbW;
+    if (alto > 0 && vbH > 0) s = Math.min(s, alto / vbH);
+    return Math.round(s * 1000) / 1000 || 1;
+  };
+  /** Tamaño en pantalla (px) de una etiqueta de `base` unidades cuando el dibujo está a escala `s`. */
+  U.etiquetaEfectiva = function (base, s, min) { return Math.max(base * (s > 0 ? s : 1), min === undefined ? U.ETIQUETA_MIN : min); };
+  /** Mantiene --dg-s al día en un <svg> (ResizeObserver, zoom incluido). Devuelve una función que corta la observación. */
+  U.escalarEtiquetas = function (svg) {
+    if (!svg || !svg.getBoundingClientRect || !svg.style) return function () {};
+    var ro = null, t1 = 0, t2 = 0, ultimo = 0;
+    function medir() {
+      var r = svg.getBoundingClientRect(), vb = svg.viewBox && svg.viewBox.baseVal;
+      if (!r.width || !vb || !vb.width) return;
+      var s = U.escalaDibujo(r.width, r.height, vb.width, vb.height);
+      if (Math.abs(s - ultimo) < 0.004) return;
+      ultimo = s; svg.style.setProperty('--dg-s', String(s));
+    }
+    medir();
+    t1 = setTimeout(medir, 60); t2 = setTimeout(medir, 400);
+    if (typeof ResizeObserver === 'function') { try { ro = new ResizeObserver(medir); ro.observe(svg); } catch (e) { ro = null; } }
+    if (!ro && typeof window !== 'undefined') window.addEventListener('resize', medir);
+    svg._dgMedir = medir;
+    return function () { clearTimeout(t1); clearTimeout(t2); if (ro) { try { ro.disconnect(); } catch (e) { /* idem */ } } else if (typeof window !== 'undefined') window.removeEventListener('resize', medir); };
+  };
   /** Colores por tono (los tokens del tema: valen en claro y en oscuro). */
   U.TONO = { ok: 'var(--ok)', info: 'var(--info)', warn: 'var(--warn)', bad: 'var(--bad)' };
   /** Tono desde una palabra libre del plan ("rojo", "verde", "amarillo"…). */

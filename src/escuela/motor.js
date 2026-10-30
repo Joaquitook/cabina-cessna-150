@@ -13,7 +13,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
  *   });
  *
  *   tipo        uno de Mot.TODOS: simulador diagrama animacion clasificar emparejar enlace3d calculadora situacion   (pasada 1)
- *                                  ordenar completar tarjetas diapositiva quiz caso    (pasada 2)    mapa fraseologia    (más adelante)
+ *                                  ordenar completar tarjetas diapositiva quiz caso mapa    (pasada 2)    fraseologia    (más adelante)
  *   normalizar  FUNCIÓN PURA (también corre en Node: tests/validate-escuela.js la ejecuta sobre los datos de src/data/escuela/*.json y
  *               exige que devuelva un valor o null SIN tirar error). Recibe el `datos` libre del plan (los esbozos varían: pares como
  *               [a,b] o {a,b}, "texto" con [[hueco]], etc.) y devuelve el esquema propio del componente, o null si no puede armar
@@ -57,7 +57,13 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
  *   clasificar    { categorias:[{id,nombre}], items:[{texto,cat,explicacion?}] }          emparejar  { pares:[{a,b}], distractoresB? }
  *   enlace3d      { destino:'cabina|aire|exterior|vuelo', control?, pose?, aire?:{vista,foco}, estado?, resaltar?, consigna? }
  *   calculadora   { herramienta, entradas:[{id,etiqueta,unidad,valor}], ejemplo?, pasos:true }       situacion  { escena, opciones:[{texto,resultado,correcta,siguiente?}], leccionFinal }
- *   (pasada 2)    ordenar { items, orden, explicaciones? } · completar { frases, fichas? } · tarjetas { mazo } · diapositiva { pasos, autoplay? } · quiz { preguntas } · caso { … }
+ *   ordenar       { consigna?, items:[{id, texto, icono?, explicacion?}] (YA en el orden correcto), inicio?, fin?, nota? }                       (c-ordenar.js; acepta items+orden, pasos, sólo orden…)
+ *   completar     { consigna?, frases:[{texto con ___, huecos:[{respuesta, alternativas?, tipo?:'ficha'|'escribir'|'libre', unidad?, explicacion?, pista?, sugerencias?}], explicacion?}], distractores?, nota? }   (c-completar.js)
+ *   tarjetas      { consigna?, mazo:[{idx, frente, dorso, pista?, figura?, bloque?}], bloques?:[{id, nombre, n}], nota? }                        (c-tarjetas.js; el repaso espaciado va en store.js)
+ *   diapositiva   { pasos:[{titulo?, texto, escena?|figura?+capas?/mostrar?/ocultar?/resalta?, icono?, dato?}], figura?, autoplay?, nota? }                  (c-diapositiva.js; escena = icono · dato · lista · comparar · flujo · formula)
+ *   mapa          { fondo:'plano-hangares-sur'|…, capas?, puntos:[{id,x,y,nombre,texto?,rol?,capa?}], zonas:[{id,poligono|rect,nombre,texto?,capa?,tono?}], rutas?, vistas?|carnets?, encontra?, nota? }   (c-mapa.js + mapas.js; x 0–100, y 0–66,7)
+ *   caso          { titulo, contexto, ficticio?, pasos:[{titulo?, cuando?, texto, decision?:{pregunta, opciones, correcta, explicacion, resultado?}}], aprendizajes:[…], fuente?, nota? }   (c-caso.js)
+ *   quiz          { preguntas:[{pregunta, opciones, correcta, explicacion?, pagina?}], n?, aprobacion?, aciertosMinimos?, repetible?, titulo? }                 (c-quiz.js; comparte la cara del mini-quiz: ES.leccion.vistaPregunta)
  *
  * ============================================================  API DEL MOTOR (Mot = C150.ESCUELA.componentes)
  *   Mot.register(tipo, def) → bool      Mot.get(tipo) → def|null     Mot.has(tipo)     Mot.tipos() → tipos registrados     Mot.unregister(tipo)
@@ -79,12 +85,12 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
   function log(msg, e) { if (root.console && console.error) console.error('[Escuela] ' + msg, e || ''); }
 
   Mot.TIPOS_P1 = ['simulador', 'diagrama', 'animacion', 'clasificar', 'emparejar', 'enlace3d', 'calculadora', 'situacion'];
-  Mot.TIPOS_P2 = ['ordenar', 'completar', 'tarjetas', 'diapositiva', 'quiz', 'caso'];
-  Mot.TIPOS_LUEGO = ['mapa', 'fraseologia'];
+  Mot.TIPOS_P2 = ['ordenar', 'completar', 'tarjetas', 'diapositiva', 'quiz', 'caso', 'mapa'];
+  Mot.TIPOS_LUEGO = ['fraseologia'];
   Mot.TODOS = Mot.TIPOS_P1.concat(Mot.TIPOS_P2, Mot.TIPOS_LUEGO);
   Mot.META = {
     simulador: { codigo: 'SIM', nombre: 'Simulador' }, diagrama: { codigo: 'DGR', nombre: 'Diagrama interactivo' }, animacion: { codigo: 'ANI', nombre: 'Animación paso a paso' },
-    clasificar: { codigo: 'CLA', nombre: 'Clasificá' }, emparejar: { codigo: 'EMP', nombre: 'Unir pares' }, enlace3d: { codigo: '3D', nombre: 'Mirá en la cabina' },
+    clasificar: { codigo: 'CLA', nombre: 'Clasificá' }, emparejar: { codigo: 'EMP', nombre: 'Unir pares' }, enlace3d: { codigo: '3D', nombre: 'Mirá en 3D' },
     calculadora: { codigo: 'CAL', nombre: 'Calculadora guiada' }, situacion: { codigo: 'SIT', nombre: 'Situación para decidir' },
     ordenar: { codigo: 'ORD', nombre: 'Poné en orden' }, completar: { codigo: 'CMP', nombre: 'Completá' }, tarjetas: { codigo: 'TAR', nombre: 'Tarjetas de repaso' },
     diapositiva: { codigo: 'DIA', nombre: 'Diapositiva animada' }, quiz: { codigo: 'QUZ', nombre: 'Quiz tipo DINACIA' }, caso: { codigo: 'CAS', nombre: 'Caso real' },
@@ -165,7 +171,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     var inner = h('div', { 'class': 'es-comp-host' });
     host.appendChild(h('section', { 'class': 'es-comp es-comp--' + (Mot.conocido(comp.tipo) ? comp.tipo : 'x'), 'data-tipo': comp.tipo || '' },
       h('p', { 'class': 'es-comp-k' }, h('span', { 'class': 'es-code', text: Mot.codigo(comp.tipo) }), h('span', { text: Mot.nombre(comp.tipo) })),
-      comp.titulo ? h('h4', { 'class': 'es-comp-t', text: comp.titulo }) : null,
+      comp.titulo ? h('h3', { 'class': 'es-comp-t', text: comp.titulo }) : null,
       inner));
     var def = Mot.get(comp.tipo), motivo = def ? 'datos' : 'pronto';
     if (def) {

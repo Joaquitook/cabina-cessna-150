@@ -260,9 +260,10 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
       datos.nota ? h('p', { 'class': 'es-note', text: datos.nota }) : null]);
     host.appendChild(raiz);
     marcarBoton(); ir(0); estado.hidden = true;
+    var offEt = U.escalarEtiquetas(svg);       // etiquetas de 11 px o más en pantalla (v9)
 
     return {
-      destroy: function () { if (timer) { clearInterval(timer); timer = null; } jugando = false; },
+      destroy: function () { if (timer) { clearInterval(timer); timer = null; } jugando = false; offEt(); },
       pause: function () { if (jugando) pausar(); },
       resume: function () { /* queda en pausa: lo reanuda el alumno */ },
       getState: function () { return { t: t, escena: idx, jugando: jugando, vel: vel, vistas: Object.keys(vistas).length }; }

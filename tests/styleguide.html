@@ -64,14 +64,22 @@
 <script src="../src/escuela/motor.js"></script>
 <script src="../src/escuela/modelos.js"></script>
 <script src="../src/escuela/figuras.js"></script>
+<script src="../src/escuela/mapas.js"></script>
 <script src="../src/escuela/c-simulador.js"></script>
 <script src="../src/escuela/c-animacion.js"></script>
 <script src="../src/escuela/c-calculadora.js"></script>
 <script src="../src/escuela/c-diagrama.js"></script>
 <script src="../src/escuela/c-clasificar.js"></script>
 <script src="../src/escuela/c-emparejar.js"></script>
+<script src="../src/escuela/c-tarjetas.js"></script>
+<script src="../src/escuela/c-completar.js"></script>
+<script src="../src/escuela/c-ordenar.js"></script>
 <script src="../src/escuela/c-situacion.js"></script>
 <script src="../src/escuela/c-enlace3d.js"></script>
+<script src="../src/escuela/c-diapositiva.js"></script>
+<script src="../src/escuela/c-mapa.js"></script>
+<script src="../src/escuela/c-caso.js"></script>
+<script src="../src/escuela/c-quiz.js"></script>
 <script src="../src/escuela/texto.js"></script>
 <script src="../src/escuela/bloques.js"></script>
 <script src="../src/escuela/leccion.js"></script>
@@ -445,6 +453,118 @@
     root.appendChild(llamadas);
     comp('Clasificar con «reducir movimiento» (sin vibración ni animaciones)',
       { tipo: 'clasificar', titulo: '¿Es materia del curso?', descripcion: 'Sí o no.', datos: { categorias: [{ id: 'si', nombre: 'Es materia del curso' }, { id: 'no', nombre: 'No es materia del curso' }], items: [{ texto: 'Aerodinámica', categoria: 'si' }, { texto: 'Meteorología', categoria: 'si' }, { texto: 'Contabilidad', categoria: 'no' }, { texto: 'Mecánica automotriz', categoria: 'no' }] } }, { reducedMotion: true });
+  })();
+
+  /* ---- ESCUELA · práctica Q1 (pasada 2): ordenar, completar y tarjetas, con el código real y datos canónicos (y esbozos del plan) */
+  sec('Escuela · práctica', 'ordenar · completar · tarjetas');
+  (function () {
+    var ES = C150.ESCUELA, Mot = ES.componentes;
+    function marco4(el) { var w = h('div', { 'class': 'sg-demo sg-paper paper es-root', style: { display: 'block', 'max-width': '720px' } }); w.appendChild(h('div', { 'class': 'es-view' }, h('div', { 'class': 'es-lesson es-root', style: { '--es-hue': '#2F6FE0' } }, el))); root.appendChild(w); }
+    function comp(tit, c, extra) { label(tit); var host = h('div', { 'class': 'es-comps' }); Mot.render(host, c, Mot.ctxMinimo(extra)); marco4(host); }
+    var hoy = Date.parse('2026-10-30T10:00:00');
+    comp('Ordenar (ORD): arrastrá un paso, tocalo y después tocá el lugar, usá ▲ ▼ o el teclado (Enter agarra, ↑ ↓ mueven, Enter suelta, Esc cancela); marca cada paso con ícono y texto; pista desde el 2.º intento; «Ver la respuesta» tras el primer fallo',
+      { tipo: 'ordenar', titulo: 'El orden del apagado', descripcion: 'Ordená del primero al último.', datos: { consigna: 'Ordená el apagado del avión.', items: [
+        { id: 'mezcla', texto: 'Mezcla: corte (el motor se para)', icono: 'engine' }, { id: 'freno', texto: 'Freno de estacionamiento: puesto', icono: 'hand' }, { id: 'llave', texto: 'Llave de encendido: OFF', icono: 'lock' }, { id: 'radios', texto: 'Radios y transpondedor: apagados', icono: 'sound' }, { id: 'master', texto: 'Master: OFF', icono: 'bolt' }],
+        orden: ['freno', 'radios', 'mezcla', 'llave', 'master'], explicaciones: { freno: 'Primero que el avión no se mueva.', radios: 'Se apagan antes de cortar el motor.', mezcla: 'Así se apaga el 150: se corta la nafta.', llave: 'Desconecta los magnetos.', master: 'Si queda prendido, se descarga la batería.' }, inicio: 'Primero', fin: 'Último' } });
+    comp('Ordenar con el esbozo más simple del plan (sólo `orden`, con los textos) y «reducir movimiento»',
+      { tipo: 'ordenar', titulo: 'Recuperar de la pérdida', descripcion: 'Tres acciones.', datos: { orden: ['Bajar la nariz por debajo del horizonte', 'Aplicar toda la potencia', 'Recuperar la altura cuando haya velocidad suficiente'] } }, { reducedMotion: true });
+    comp('Completar (CMP): ficha y hueco (tocá uno y después el otro, o arrastrá); se corrige al instante; el banco marca la ficha tras 2 intentos; huecos escritos con unidad (75 %), números como números',
+      { tipo: 'completar', titulo: 'Los números del test', descripcion: 'Completá con la ficha.', datos: { frases: [
+        { texto: 'La **nota mínima** de un test es ___ %.', huecos: [{ respuesta: '75', tipo: 'ficha', explicacion: 'Por debajo hay re-take.' }] },
+        ['Se llega a un vuelo ___ minutos antes de la hora acordada.', '30'],
+        { texto: 'Una cancelación se avisa con ___ horas de anticipación como mínimo.', respuesta: '24', alternativas: ['veinticuatro'], tipo: 'escribir', unidad: 'h' }], distractores: ['70', '15', '60', '48'], consigna: 'Dos huecos se llenan con fichas; el último se escribe.' } });
+    comp('Completar libre (la bitácora de INT-01-01): sin respuesta correcta, con ideas sugeridas; se guarda sola en este dispositivo',
+      { tipo: 'completar', titulo: 'Mi bitácora', descripcion: 'Con tus palabras.', datos: { texto: 'Me llamo [[nombre]] y quiero ser piloto porque [[motivo]].', huecos: [{ id: 'nombre', tipo: 'texto-libre' }, { id: 'motivo', fichas: ['me apasiona volar', 'busco libertad y desafíos'], libre: true }] } });
+    comp('Tarjetas (TAR): das vuelta la tarjeta (con «reducir movimiento»: fundido), te calificás, las que cuestan vuelven antes; cada botón dice cuándo vuelve; resumen de la sesión (acá el repaso no se guarda en el dispositivo)',
+      { tipo: 'tarjetas', titulo: 'Venturi en una frase', descripcion: 'Pensá antes de dar vuelta.', datos: { mazo: [
+        { frente: 'Estrechamiento', dorso: 'Aumenta la velocidad del fluido.', figura: 'venturi-tubo' }, { frente: 'Aumenta la velocidad', dorso: 'Disminuye la presión.' },
+        { frente: '¿Qué teorema explica el efecto Venturi?', dorso: 'El teorema de Bernoulli.', pista: 'Empieza con B.' }, { frente: '¿Dónde hay un Venturi en el C150?', dorso: 'En el carburador.', figura: 'carburador-venturi' }] } },
+      { store: ES.store.crear({ storage: null, now: function () { return hoy; } }), ahora: function () { return hoy; } });
+    comp('Tarjetas con bloques y reducir movimiento (mazo largo: portada de la sesión con «hoy vemos 12», elección de bloque)',
+      { tipo: 'tarjetas', titulo: 'Mazo con bloques', descripcion: 'Elegí qué repasar.', datos: { mazo: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].map(function (n) { return { bloque: n < 8 ? 1 : 2, frente: '¿Qué dato es el número ' + n + '?', dorso: 'El dato ' + n + ', con **su porqué**.' }; }) } },
+      { reducedMotion: true, store: ES.store.crear({ storage: null, now: function () { return hoy; } }), ahora: function () { return hoy; } });
+  })();
+
+  /* ---- ESCUELA · explicar y practicar Q2 (pasada 2): diapositiva, mapa, caso y quiz, con el código real */
+  sec('Escuela · explicar y practicar', 'diapositiva · mapa · caso · quiz');
+  (function () {
+    var ES = C150.ESCUELA, Mot = ES.componentes;
+    function marco5(el, ancho) { var w = h('div', { 'class': 'sg-demo sg-paper paper es-root', style: { display: 'block', 'max-width': (ancho || 760) + 'px' } }); w.appendChild(h('div', { 'class': 'es-view' }, h('div', { 'class': 'es-lesson es-root', style: { '--es-hue': '#2F6FE0' } }, el))); root.appendChild(w); }
+    function comp(tit, c, extra, ancho) { label(tit); var host = h('div', { 'class': 'es-comps' }); Mot.render(host, c, Mot.ctxMinimo(extra)); marco5(host, ancho); }
+    comp('Diapositiva (DIA) con una figura propia: cada paso prende o apaga capas del dibujo (capas · mostrar · resalta); puntitos, Anterior / Siguiente, ← → Inicio Fin, espacio reproduce',
+      { tipo: 'diapositiva', titulo: 'Las cuatro fuerzas, una por una', descripcion: 'Paso a paso.', datos: { figura: 'cuatro-fuerzas', pasos: [
+        { titulo: 'El avión', texto: 'Empezamos con el avión solo, en vuelo recto y nivelado.', capas: ['avion'] },
+        { titulo: 'Arriba y abajo', texto: 'La **sustentación** empuja hacia arriba y el peso hacia abajo.', mostrar: ['sustentacion', 'peso'], resalta: ['sustentacion'] },
+        { titulo: 'Adelante y atrás', texto: 'La tracción tira hacia adelante y la resistencia frena.', mostrar: ['traccion', 'resistencia'], resalta: ['traccion', 'resistencia'] }] } });
+    comp('Diapositiva con dibujos generados (sin figura): agenda con marcas, flujo, comparación, cifra grande y fórmula; con autoplay (sólo se reproduce cuando se la ve)',
+      { tipo: 'diapositiva', titulo: 'Cómo funciona el test', descripcion: 'Cuatro pasos.', datos: { autoplay: true, pasos: [
+        { titulo: 'Es hora de estudiar', texto: 'La Introducción termina con el aviso del test.', escena: { tipo: 'lista', items: ['La escuela', 'El acceso', 'Las reglas', 'La seguridad', 'Tus trámites'], hecho: [0, 1, 2], actual: 3 } },
+        { titulo: 'Simulacro y test', texto: 'Primero el simulacro, que se repite en casa; después el test.', escena: { tipo: 'flujo', nodos: ['Aviso', 'Simulacro', 'Test', 'Resultado'], actual: 2 } },
+        { titulo: 'SMS o Calidad', texto: 'Dos formularios con objetivos distintos.', escena: { tipo: 'comparar', a: { titulo: 'SMS: seguridad', icono: 'warning' }, b: { titulo: 'Calidad: tu opinión', icono: 'help' }, foco: 'a' } },
+        { titulo: '75 %', texto: 'Si no llegás al 75 %, repasás y hacés el re-take.', escena: { tipo: 'dato', valor: '75', unidad: '%', etiqueta: 'Lo mínimo para aprobar' } },
+        { titulo: 'La fórmula', texto: 'La sustentación depende de la velocidad al cuadrado.', escena: { tipo: 'formula', texto: 'L = ½ · ρ · V² · S · CL', nota: 'Más velocidad, mucha más sustentación.' } }] } });
+    comp('Diapositiva con «reducir movimiento»: no se reproduce sola, los cambios son instantáneos',
+      { tipo: 'diapositiva', titulo: 'Qué son las calzas', descripcion: 'Tres pasos.', datos: { autoplay: true, pasos: [{ titulo: 'Qué son', texto: 'Cuñas que se ponen contra las ruedas.' }, { titulo: 'Para qué', texto: 'Para que el avión estacionado no se mueva.' }, { titulo: 'En el Cervesómetro', texto: 'No sacarlas es una falta leve.' }] } }, { reducedMotion: true });
+    comp('Mapa (MAP): plano esquemático con zoom, arrastre, capas, puntos y zonas numerados con su ficha al costado (en pantallas anchas) y lista de 44 px; el modo «Encontrá» pide tocar el lugar con clave de respuesta',
+      { tipo: 'mapa', titulo: 'Plano de los Hangares Sur', descripcion: 'Tocá un número.', datos: { fondo: 'plano-hangares-sur', capas: ['horarios', 'reglas de plataforma'], puntos: [
+        { id: 'starbucks', x: 22, y: 30, nombre: 'Starbucks', texto: 'Es la referencia: el portón 6A está detrás.' }, { id: 'porton-6a', x: 30, y: 24, nombre: 'Portón 6A', texto: 'Acceso principal. De lunes a viernes de 06:00 a 21:00.', capa: 'horarios' },
+        { id: 'puesto-control', x: 38, y: 24, nombre: 'Puesto de control', texto: 'La PAN revisa quién entra.' }, { id: 'porton-bomberos', x: 88, y: 12, nombre: 'Portón de Bomberos', texto: 'Se usa cuando el 6A está cerrado. Abre las 24 horas.', capa: 'horarios' }],
+        zonas: [{ id: 'hangares-sur', poligono: [[48, 22], [90, 22], [90, 40], [48, 40]], nombre: 'Hangares Sur', texto: 'Zona de hangares de aviación general.' }, { id: 'plataforma', poligono: [[48, 44], [90, 44], [90, 56], [48, 56]], nombre: 'Plataforma', texto: 'Donde se estacionan los aviones.', capa: 'reglas de plataforma' }],
+        rutas: [{ id: 'a-pie', nombre: 'Camino a pie', texto: 'Del portón al hangar.', tono: 'info', puntos: [[30, 24], [38, 34], [43, 38], [52, 41]] }] } }, null, 900);
+    comp('Mapa con un selector de casos (carnets): cada zona se pinta según el carnet, con color + texto + borde (nunca sólo color)',
+      { tipo: 'mapa', titulo: 'Zonas habilitadas', descripcion: 'Elegí un carnet.', datos: { fondo: 'plano-carrasco-zonas', zonas: [
+        { id: 'hangares-sur', poligono: [[8, 30], [46, 30], [46, 54], [8, 54]], nombre: 'Hangares Sur', datos: { color: 'amarillo', habilitan: ['4', '3S'] } },
+        { id: 'plataformas', poligono: [[52, 18], [92, 18], [92, 54], [52, 54]], nombre: 'Plataformas', datos: { color: 'amarillo', habilitan: ['4'], soloConInstructor: true } }],
+        carnets: [{ id: '4', zonas: [{ id: 'hangares-sur', permitido: true }, { id: 'plataformas', permitido: true, soloConInstructor: true }] }, { id: '3S', zonas: [{ id: 'hangares-sur', permitido: true }, { id: 'plataformas', permitido: false }] }] } }, null, 900);
+    comp('Caso (CAS): relato con línea de tiempo, el dibujo del momento (a la derecha en pantallas anchas), decisiones «¿qué hubieras hecho?» con el resultado real y tarjeta de lección aprendida',
+      { tipo: 'caso', titulo: 'Un charco de aceite', descripcion: 'Un ejemplo inventado.', datos: { ficticio: true, titulo: 'Un charco de aceite bajo el avión', contexto: 'Un alumno llega a volar y mira el avión antes de subirse.', pasos: [
+        { titulo: 'Un charco', texto: 'Antes del vuelo, el alumno ve un charco de aceite bajo el avión.', escena: { tipo: 'icono', icono: 'warning' }, decision: { pregunta: '¿Qué hacés?', opciones: ['Lo ignoro', 'Dejo un reporte en el buzón SMS, aunque sea sin nombre', 'Despego igual'], correcta: 1, explicacion: 'El SMS sirve para identificar peligros antes de un accidente.', resultado: 'El alumno deja un reporte sin su nombre.' } },
+        { titulo: 'La revisión', texto: 'La escuela revisa el motor y encuentra una pérdida de aceite.', escena: { tipo: 'icono', icono: 'engine' } },
+        { titulo: 'Vuelo seguro', texto: 'La pérdida se arregla antes de volar.', escena: { tipo: 'icono', icono: 'check' } }], aprendizajes: ['Reportar a tiempo evita accidentes.', 'Reportar no tiene castigo.'] } }, null, 900);
+    comp('Quiz (QUZ) tipo DINACIA: pantalla de inicio, una pregunta por pantalla (misma cara que el mini-quiz), explicación con la página, resultado contra la nota mínima y lo que hay que repasar',
+      { tipo: 'quiz', titulo: 'Simulacro corto', descripcion: 'Seis preguntas.', datos: { n: 4, aprobacion: 0.75, preguntas: [
+        { pregunta: '¿Cuántos puntos tiene la agenda de la Introducción?', opciones: ['Tres', 'Cinco', 'Cuatro', 'Siete'], correcta: 1, explicacion: 'Son cinco: la escuela, el acceso, las reglas, la seguridad y los trámites.', pagina: 3 },
+        { pregunta: '¿Qué significa ALARP?', opciones: ['Alto riesgo permanente', 'Tan bajo como sea razonablemente practicable', 'Aviso de límite de rodaje', 'Análisis local de riesgos'], correcta: 1, explicacion: 'As Low As Reasonably Practicable.', pagina: 36 },
+        { pregunta: '¿Dónde queda el portón 6A?', opciones: ['Junto a la torre', 'Detrás del Starbucks', 'Frente a la terminal', 'Al lado de Bomberos'], correcta: 1, explicacion: 'Es el acceso principal a los Hangares Sur.', pagina: 21 },
+        { pregunta: '¿Desde qué porcentaje se aprueba el test?', opciones: ['60 %', '70 %', '75 %', '90 %'], correcta: 2, explicacion: 'Con menos de 75 % hay re-take.', pagina: 12 },
+        { pregunta: '¿Qué te dan en Personal Aeronáutico de DINACIA?', opciones: ['El psicofísico', 'La licencia de alumno piloto', 'El carnet provisorio', 'La carta de la escuela'], correcta: 1, explicacion: 'El psicofísico sale de Medicina Aeronáutica.', pagina: 44 },
+        { pregunta: '¿Cuándo es obligatorio el chaleco?', opciones: ['Sólo de noche', 'Siempre que estés en la plataforma', 'Sólo con aviones moviéndose', 'Adentro de la escuela'], correcta: 1, explicacion: 'La plataforma es un área operativa.', pagina: 29 }] } }, null, 820);
+  })();
+
+  /* ---- ESCUELA · ejercicios (QA Q3): el catálogo de los 15 componentes de práctica y de aprendizaje, uno de cada uno, con datos mínimos y el código real.
+   *      Todos menos `fraseologia` (que llega después y mientras tanto muestra la tarjeta de reserva, que se ve al final). tests/validate-escuela.js comprueba
+   *      que esta sección tenga un ejemplo de cada tipo registrado. */
+  sec('ESCUELA · ejercicios', '15 componentes · SIM DGR ANI CLA EMP 3D CAL SIT · ORD CMP TAR DIA QUZ CAS MAP');
+  (function () {
+    var ES = C150.ESCUELA, Mot = ES.componentes;
+    var ancho = { diapositiva: 820, mapa: 900, caso: 900, quiz: 820, simulador: 760, diagrama: 820, animacion: 820 };
+    function marcoE(el, tipo) { var w = h('div', { 'class': 'sg-demo sg-paper paper es-root', style: { display: 'block', 'max-width': (ancho[tipo] || 700) + 'px' } }); w.appendChild(h('div', { 'class': 'es-view' }, h('div', { 'class': 'es-lesson es-root', style: { '--es-hue': '#2F6FE0' } }, el))); root.appendChild(w); }
+    function ej(que, c, extra) { label(Mot.codigo(c.tipo) + ' · ' + Mot.nombre(c.tipo) + ' — ' + que); var host = h('div', { 'class': 'es-comps' }); Mot.render(host, c, Mot.ctxMinimo(extra)); marcoE(host, c.tipo); }
+    var hoyE = Date.parse('2026-10-30T10:00:00');
+    var indice = h('ul', { 'class': 'es-chips', 'aria-label': 'Los 15 componentes de ejercicio' });
+    Mot.TIPOS_P1.concat(Mot.TIPOS_P2).forEach(function (t) { indice.appendChild(h('li', null, h('span', { 'class': 'es-code', text: Mot.codigo(t) }), h('span', { text: Mot.nombre(t) }))); });
+    root.appendChild(h('div', { 'class': 'sg-demo sg-paper paper es-root', style: { display: 'block', 'max-width': '820px' } }, h('div', { 'class': 'es-lesson es-root' }, indice)));
+    /* ---- aprender: ver, mover, escuchar */
+    ej('un modelo con cifras en vivo, semáforo y gráfico', { tipo: 'simulador', titulo: 'Ángulo de ataque y pérdida', descripcion: 'Subí el ángulo.', datos: { modelo: 'sustentacion-alfa' } });
+    ej('una figura propia con capas y puntos que abren una ficha', { tipo: 'diagrama', titulo: 'El ala por dentro', descripcion: 'Prendé y apagá capas.', datos: { figura: 'perfil-ala' } });
+    ej('pasos con una ficha que avanza, pausa y velocidad', { tipo: 'animacion', titulo: 'El camino de un test', descripcion: 'Paso a paso.', datos: { pasos: ['Terminás la materia', 'Simulacro', 'Test por Classroom', '¿75 % o más?', 'Aprobado'] } });
+    ej('el botón Mirarlo mueve sólo la cámara; Abrir la ficha va a otra pantalla', { tipo: 'enlace3d', titulo: 'Mirá los pedales', descripcion: 'En la cabina.', datos: { destino: 'cabina', controles: ['rudder-pedals', 'toe-brakes'] } });
+    ej('entradas con unidades, resultado y pasos a la vista', { tipo: 'calculadora', titulo: 'Viento cruzado', descripcion: 'Cuánto empuja de costado.', datos: { herramienta: 'viento-cruzado' } });
+    ej('un dibujo que cambia paso a paso (puntitos, flechas, espacio reproduce)', { tipo: 'diapositiva', titulo: 'Las cuatro fuerzas', descripcion: 'Una por una.', datos: { figura: 'cuatro-fuerzas', pasos: [{ titulo: 'El avión', texto: 'Empezamos con el avión solo.', capas: ['avion'] }, { titulo: 'Arriba y abajo', texto: 'La **sustentación** sube y el peso baja.', mostrar: ['sustentacion', 'peso'], resalta: ['sustentacion'] }, { titulo: 'Adelante y atrás', texto: 'La tracción tira y la resistencia frena.', mostrar: ['traccion', 'resistencia'] }] } });
+    ej('un plano con zoom, números, ficha al costado y modo Encontrá', { tipo: 'mapa', titulo: 'Plano de los Hangares Sur', descripcion: 'Tocá un número.', datos: { fondo: 'plano-hangares-sur', puntos: [{ id: 'starbucks', x: 22, y: 30, nombre: 'Starbucks', texto: 'La referencia: el portón 6A está detrás.' }, { id: 'porton-6a', x: 30, y: 24, nombre: 'Portón 6A', texto: 'Acceso principal.' }, { id: 'control', x: 38, y: 24, nombre: 'Puesto de control', texto: 'Revisan quién entra.' }], zonas: [{ id: 'hangares', poligono: [[48, 22], [90, 22], [90, 40], [48, 40]], nombre: 'Hangares Sur', texto: 'Aviación general.' }] } });
+    ej('un relato con decisiones «¿qué hubieras hecho?» y lección aprendida', { tipo: 'caso', titulo: 'Un charco de aceite', descripcion: 'Un ejemplo inventado.', datos: { ficticio: true, titulo: 'Un charco de aceite bajo el avión', contexto: 'Un alumno mira el avión antes de subirse.', pasos: [{ titulo: 'Un charco', texto: 'Ve un charco de aceite bajo el avión.', escena: { tipo: 'icono', icono: 'warning' }, decision: { pregunta: '¿Qué hacés?', opciones: ['Lo ignoro', 'Dejo un reporte SMS', 'Despego igual'], correcta: 1, explicacion: 'El SMS identifica peligros antes de un accidente.', resultado: 'Deja un reporte sin su nombre.' } }, { titulo: 'La revisión', texto: 'La escuela revisa y encuentra una pérdida.', escena: { tipo: 'icono', icono: 'engine' } }], aprendizajes: ['Reportar a tiempo evita accidentes.'] } });
+    /* ---- practicar: hacer, corregir, repetir */
+    ej('fichas que se llevan a su caja (tocá la ficha y después la caja, o arrastrá)', { tipo: 'clasificar', titulo: '¿Es materia del curso?', descripcion: 'Sí o no.', datos: { categorias: [{ id: 'si', nombre: 'Es materia' }, { id: 'no', nombre: 'No es materia' }], items: [{ texto: 'Aerodinámica', cat: 'si' }, { texto: 'Meteorología', cat: 'si' }, { texto: 'Contabilidad', cat: 'no' }, { texto: 'Mecánica automotriz', cat: 'no' }] } });
+    ej('dos columnas: tocá uno de cada lado y el par se funde', { tipo: 'emparejar', titulo: 'Siglas del primer día', descripcion: 'Uní cada sigla.', datos: { pares: [['CIAC', 'Centro de Instrucción de Aeronáutica Civil'], ['DINACIA', 'Dirección Nacional de Aviación Civil'], ['MEC', 'Ministerio de Educación y Cultura']] } });
+    ej('un escenario con opciones, consecuencia y porqué', { tipo: 'situacion', titulo: 'Beacon prendido', descripcion: 'Qué hacés.', datos: { escenas: [{ id: 'a', escenario: 'Ves un avión con el beacon prendido y la hélice parada.', opciones: [{ texto: 'No me acerco', correcta: true, resultado: 'Beacon prendido es peligro de hélice.' }, { texto: 'Paso por detrás', correcta: false, resultado: 'Detrás hay chorro de hélice.' }, { texto: 'Me acerco a saludar', correcta: false, resultado: 'No hay que acercarse.' }] }], leccionFinal: 'Con el beacon prendido, la hélice está viva.' } });
+    ej('pasos para poner en orden (arrastrá, tocá, ▲▼ o teclado)', { tipo: 'ordenar', titulo: 'El orden del apagado', descripcion: 'Del primero al último.', datos: { items: [{ id: 'freno', texto: 'Freno de estacionamiento: puesto', icono: 'hand' }, { id: 'radios', texto: 'Radios apagadas', icono: 'sound' }, { id: 'mezcla', texto: 'Mezcla: corte', icono: 'engine' }, { id: 'llave', texto: 'Llave: OFF', icono: 'lock' }, { id: 'master', texto: 'Master: OFF', icono: 'bolt' }], inicio: 'Primero', fin: 'Último' } });
+    ej('huecos con fichas, con respuesta escrita y números como números', { tipo: 'completar', titulo: 'Los números del test', descripcion: 'Completá.', datos: { frases: [{ texto: 'La nota mínima de un test es ___ %.', huecos: [{ respuesta: '75', tipo: 'ficha' }] }, { texto: 'Una cancelación se avisa con ___ horas de anticipación.', respuesta: '24', tipo: 'escribir', unidad: 'h' }], distractores: ['70', '60'] } });
+    ej('tarjetas con pregunta y respuesta; te calificás y vuelven antes las que cuestan', { tipo: 'tarjetas', titulo: 'Venturi', descripcion: 'Pensá antes de dar vuelta.', datos: { mazo: [{ frente: 'Estrechamiento', dorso: 'Aumenta la velocidad del fluido.' }, { frente: 'Aumenta la velocidad', dorso: 'Disminuye la presión.' }, { frente: '¿Qué teorema lo explica?', dorso: 'Bernoulli.', pista: 'Empieza con B.' }] } },
+      { store: ES.store.crear({ storage: null, now: function () { return hoyE; } }), ahora: function () { return hoyE; } });
+    ej('una pregunta por pantalla, explicación con la página y resultado contra la nota mínima', { tipo: 'quiz', titulo: 'Simulacro corto', descripcion: 'Tres preguntas.', datos: { n: 3, aprobacion: 0.66, preguntas: [{ pregunta: '¿Cuántos puntos tiene la agenda?', opciones: ['Tres', 'Cinco', 'Cuatro', 'Siete'], correcta: 1, explicacion: 'Son cinco.', pagina: 3 }, { pregunta: '¿Desde qué porcentaje se aprueba el test?', opciones: ['60 %', '70 %', '75 %', '90 %'], correcta: 2, explicacion: 'Con menos de 75 % hay re-take.', pagina: 12 }, { pregunta: '¿Dónde queda el portón 6A?', opciones: ['Junto a la torre', 'Detrás del Starbucks', 'Frente a la terminal', 'Al lado de Bomberos'], correcta: 1, explicacion: 'Es el acceso a los Hangares Sur.', pagina: 21 }] } });
+    /* ---- lo que todavía no existe: la tarjeta de reserva (nada se bloquea) */
+    label('FRA · Fraseología y radio — todavía sin componente: la tarjeta de reserva con «Marcar como hecho» (nada se bloquea)');
+    var hostF = h('div', { 'class': 'es-comps' }); Mot.render(hostF, { tipo: 'fraseologia', titulo: 'Tu primer mensaje por radio', descripcion: 'Leé el mensaje en voz alta y marcalo cuando lo hayas practicado.', datos: {} }, Mot.ctxMinimo()); marcoE(hostF, 'fraseologia');
   })();
 
   /* ---- 14 íconos */
