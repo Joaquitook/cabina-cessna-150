@@ -11,7 +11,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
  *     desafio?:false,                                       el modo desafío aparece solo si la herramienta lo tiene; false lo apaga
  *     pasos?:true, nota?:'texto' }
  *   Herramientas de partida: conversion · viento-cruzado · tvd (tiempo, velocidad, distancia) · combustible · altitud-isa · plazo (fecha límite) ·
- *   fecha-minima · hora-llegada · horario-reglas · costo-opcion · area-ala · anticipacion · lista-condicional (las últimas se arman con los datos de la lección) ·
+ *   fecha-minima · hora-llegada · sesion-estudio · horario-reglas · costo-opcion · area-ala · anticipacion · lista-condicional (las últimas se arman con los datos de la lección) ·
  *   tramite-licencia (INT-07-06: la fecha del psicofísico → calendario, costo en UR y lo que se lleva a cada lugar).
  *   normalizar acepta también los esbozos libres del plan (reconoce la herramienta por palabras; las que necesitan datos propios los toman de ahí) y devuelve null si no entiende.
  *
@@ -280,6 +280,21 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
         pasos: ['La hora acordada (' + v.hora + ') es ' + (r.es || 'la de la actividad') + '.', 'Para ' + v.tipo.toLowerCase() + ' llegás ' + (r.antes ? r.antes + ' minutos antes' : 'a la hora') + ': ' + v.hora + ' − ' + r.antes + ' min = ' + U.minAHora(ll) + '.'] };
     },
     desafio: { salida: 'llegada', tipo: 'hora', pregunta: 'A qué hora tenés que llegar a la escuela (formato HH:MM).', generar: function (rnd) { return { hora: U.minAHora(pick(rnd, [8, 9, 10, 11, 14, 15, 16, 17]) * 60 + pick(rnd, [0, 15, 30, 45])) }; } }
+  });
+
+  /* ---- tu sesión de estudio al ritmo del curso: bloques de 40 minutos con recreos de 5 */
+  Herr.register('sesion-estudio', {
+    nombre: 'Tu sesión de estudio', resumen: 'Bloques de 40 minutos con recreos de 5, al ritmo del curso: cuántos recreos tenés y a qué hora terminás.', prioridad: 40,
+    reconoce: [/sesion de estudio|modo clase|estudiar al ritmo/],
+    entradas: [{ id: 'hora', etiqueta: 'Hora en que empezás', tipo: 'hora', valor: '19:00', claves: [/hora|inicio/] }, num('bloques', 'Bloques de 40 min', 'bloques', 3, 1, 8, 1, { claves: [/bloques?|estudio/] })],
+    calcular: function (v) {
+      var t = U.horaAMin(v.hora); if (t === null || !U.isNum(v.bloques) || v.bloques < 1) return { error: 'Elegí la hora de inicio y cuántos bloques querés estudiar.', salidas: [], pasos: [] };
+      var b = Math.round(v.bloques), rec = b - 1, estudio = b * 40, total = estudio + rec * 5, fin = t + total;
+      return { salidas: [{ id: 'recreos', etiqueta: 'Recreos de 5 minutos', valor: rec, dec: 0 }, { id: 'total', etiqueta: 'Duración total', valor: hm(total), tipo: 'texto' }, { id: 'fin', etiqueta: 'Terminás a las', valor: U.minAHora(fin), tipo: 'hora', destacada: true }],
+        pasos: [b + ' bloques de 40 minutos = ' + estudio + ' minutos de estudio.', 'Entre un bloque y el siguiente hay un recreo de 5 minutos: ' + rec + ' recreos = ' + (rec * 5) + ' minutos.', 'Total: ' + estudio + ' + ' + (rec * 5) + ' = ' + total + ' minutos (' + hm(total) + '). ' + v.hora + ' + ' + hm(total) + ' = ' + U.minAHora(fin) + '.'] };
+    },
+    ejemplos: [{ nombre: 'Una tarde de tres bloques', valores: { hora: '19:00', bloques: 3 }, nota: 'Tres bloques de 40 minutos y dos recreos: de 19:00 a 21:10.' }, { nombre: 'Dos bloques antes de cenar', valores: { hora: '18:00', bloques: 2 }, nota: 'Dos bloques y un recreo: de 18:00 a 19:25.' }],
+    desafio: { salida: 'fin', tipo: 'hora', pregunta: 'A qué hora terminás (formato HH:MM).', generar: function (rnd) { return { hora: U.minAHora(pick(rnd, [8, 9, 14, 15, 18, 19]) * 60 + pick(rnd, [0, 30])), bloques: pick(rnd, [2, 3, 4, 5]) }; } }
   });
 
   /* ---- reglas por día y hora (qué portón corresponde) */

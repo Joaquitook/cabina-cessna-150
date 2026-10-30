@@ -56,27 +56,27 @@
   ]},
   {"id":"AER","orden":2,"titulo":"Aerodinámica","fuente":"aerosur","paginas":"48–193","color":"#2F6FE0","icono":"flaps","resumen":"Las cuatro fuerzas, el ala y la pérdida: por qué vuela un avión y cómo lo controlás.","examen":{"numPreguntas":40},"unidades":[
     {"id":"AER-01","titulo":"Las cuatro fuerzas y el ala","paginas":"48–55","lecciones":[
-      {"id":"AER-01-01","titulo":"Aerodinámica: qué estudia y mapa del módulo","paginas":"48–50","minutos":6,"componentes":["diagrama","enlace3d","completar"],"enlaces":3,"detalle":"proximamente"},
-      {"id":"AER-01-02","titulo":"Las cuatro fuerzas","paginas":"51","minutos":7,"componentes":["clasificar","emparejar","enlace3d"],"enlaces":5,"detalle":"proximamente"},
-      {"id":"AER-01-03","titulo":"Equilibrio de fuerzas","paginas":"52","minutos":8,"componentes":["simulador","animacion","situacion"],"enlaces":6,"detalle":"proximamente"},
-      {"id":"AER-01-04","titulo":"El ala y el perfil aerodinámico","paginas":"53","minutos":6,"componentes":["animacion","diagrama","enlace3d"],"enlaces":4,"detalle":"proximamente"},
-      {"id":"AER-01-05","titulo":"Terminología del perfil y del ala","paginas":"54–55","minutos":8,"componentes":["emparejar","calculadora","diagrama"],"enlaces":3,"detalle":"proximamente"}
+      {"id":"AER-01-01","titulo":"Aerodinámica: qué estudia y mapa del módulo","paginas":"48–50","minutos":6,"componentes":["enlace3d","diagrama","completar"],"enlaces":2,"detalle":"completo"},
+      {"id":"AER-01-02","titulo":"Las cuatro fuerzas","paginas":"51","minutos":7,"componentes":["diagrama","enlace3d","clasificar","emparejar"],"enlaces":4,"detalle":"completo"},
+      {"id":"AER-01-03","titulo":"Equilibrio de fuerzas","paginas":"52","minutos":8,"componentes":["diagrama","simulador","animacion","enlace3d","situacion"],"enlaces":6,"detalle":"completo"},
+      {"id":"AER-01-04","titulo":"El ala y el perfil aerodinámico","paginas":"53","minutos":6,"componentes":["animacion","diagrama","enlace3d"],"enlaces":2,"detalle":"completo"},
+      {"id":"AER-01-05","titulo":"Terminología del perfil y del ala","paginas":"54–55","minutos":8,"componentes":["diagrama","calculadora","enlace3d","emparejar"],"enlaces":2,"detalle":"completo"}
     ]},
     {"id":"AER-02","titulo":"Por qué vuela un avión","paginas":"56–69","lecciones":[
-      {"id":"AER-02-01","titulo":"Presión y velocidad: el teorema de Bernoulli","paginas":"56–58","minutos":9,"componentes":["simulador","enlace3d","completar"],"enlaces":4,"detalle":"proximamente"},
-      {"id":"AER-02-02","titulo":"Efecto Venturi","paginas":"59","minutos":6,"componentes":["simulador","diagrama","tarjetas"],"enlaces":4,"detalle":"proximamente"},
-      {"id":"AER-02-03","titulo":"La fuerza aerodinámica nace en el perfil","paginas":"60–61","minutos":8,"componentes":["diagrama","animacion","enlace3d"],"enlaces":3,"detalle":"proximamente"},
-      {"id":"AER-02-04","titulo":"Sustentación y resistencia inducida: cómo se descompone la fuerza","paginas":"62","minutos":7,"componentes":["diagrama","clasificar","enlace3d"],"enlaces":3,"detalle":"proximamente"},
-      {"id":"AER-02-05","titulo":"La fórmula de la sustentación: densidad, velocidad y superficie","paginas":"63–64","minutos":10,"componentes":["simulador","simulador","clasificar","diapositiva"],"enlaces":5,"detalle":"proximamente"},
-      {"id":"AER-02-06","titulo":"Coeficiente aerodinámico y ángulo de ataque como factores","paginas":"65–66","minutos":9,"componentes":["simulador","diagrama","clasificar"],"enlaces":6,"detalle":"proximamente"},
-      {"id":"AER-02-07","titulo":"Viento relativo, trayectoria de vuelo y ángulo de ataque","paginas":"67–68","minutos":9,"componentes":["diagrama","animacion","enlace3d"],"enlaces":6,"detalle":"proximamente"},
-      {"id":"AER-02-08","titulo":"El flujo al aumentar el ángulo de ataque","paginas":"69","minutos":8,"componentes":["simulador","ordenar","enlace3d"],"enlaces":4,"detalle":"proximamente"}
+      {"id":"AER-02-01","titulo":"Presión y velocidad: el teorema de Bernoulli","paginas":"56–58","minutos":9,"componentes":["enlace3d","simulador","completar"],"enlaces":2,"detalle":"completo"},
+      {"id":"AER-02-02","titulo":"Efecto Venturi","paginas":"59","minutos":6,"componentes":["simulador","diagrama","enlace3d","tarjetas"],"enlaces":4,"detalle":"completo"},
+      {"id":"AER-02-03","titulo":"La fuerza aerodinámica nace en el perfil","paginas":"60–61","minutos":8,"componentes":["animacion","diagrama","simulador","enlace3d","clasificar"],"enlaces":2,"detalle":"completo"},
+      {"id":"AER-02-04","titulo":"Sustentación y resistencia inducida: cómo se descompone la fuerza","paginas":"62","minutos":7,"componentes":["animacion","diagrama","simulador","enlace3d","clasificar"],"enlaces":2,"detalle":"completo"},
+      {"id":"AER-02-05","titulo":"La fórmula de la sustentación: densidad, velocidad y superficie","paginas":"63–64","minutos":10,"componentes":["diagrama","simulador","enlace3d","simulador","diapositiva","clasificar"],"enlaces":4,"detalle":"completo"},
+      {"id":"AER-02-06","titulo":"Coeficiente aerodinámico y ángulo de ataque como factores","paginas":"65–66","minutos":9,"componentes":["diagrama","simulador","enlace3d","clasificar"],"enlaces":4,"detalle":"completo"},
+      {"id":"AER-02-07","titulo":"Viento relativo, trayectoria de vuelo y ángulo de ataque","paginas":"67–68","minutos":9,"componentes":["diagrama","animacion","simulador","enlace3d","clasificar"],"enlaces":5,"detalle":"completo"},
+      {"id":"AER-02-08","titulo":"El flujo al aumentar el ángulo de ataque","paginas":"69","minutos":8,"componentes":["simulador","diagrama","enlace3d","ordenar"],"enlaces":3,"detalle":"completo"}
     ]},
     {"id":"AER-03","titulo":"La pérdida","paginas":"70–77","lecciones":[
-      {"id":"AER-03-01","titulo":"Qué es la pérdida (stall)","paginas":"70–73","minutos":10,"componentes":["diagrama","simulador","animacion","enlace3d"],"enlaces":6,"detalle":"proximamente"},
-      {"id":"AER-03-02","titulo":"Pérdida, peso y altitud","paginas":"74–75","minutos":8,"componentes":["animacion","simulador","clasificar"],"enlaces":5,"detalle":"proximamente"},
-      {"id":"AER-03-03","titulo":"Sistemas de aviso de pérdida","paginas":"76","minutos":6,"componentes":["animacion","simulador","emparejar"],"enlaces":5,"detalle":"proximamente"},
-      {"id":"AER-03-04","titulo":"Recuperación de la pérdida","paginas":"77","minutos":8,"componentes":["ordenar","simulador","situacion"],"enlaces":9,"detalle":"proximamente"}
+      {"id":"AER-03-01","titulo":"Qué es la pérdida (stall)","paginas":"70–73","minutos":10,"componentes":["diagrama","simulador","animacion","enlace3d","clasificar"],"enlaces":5,"detalle":"completo"},
+      {"id":"AER-03-02","titulo":"Pérdida, peso y altitud","paginas":"74–75","minutos":8,"componentes":["animacion","simulador","enlace3d","clasificar"],"enlaces":4,"detalle":"completo"},
+      {"id":"AER-03-03","titulo":"Sistemas de aviso de pérdida","paginas":"76","minutos":6,"componentes":["simulador","animacion","enlace3d","emparejar"],"enlaces":4,"detalle":"completo"},
+      {"id":"AER-03-04","titulo":"Recuperación de la pérdida","paginas":"77","minutos":8,"componentes":["animacion","simulador","enlace3d","ordenar","situacion"],"enlaces":9,"detalle":"completo"}
     ]},
     {"id":"AER-04","titulo":"La barrena (tirabuzón)","paginas":"78–82","lecciones":[
       {"id":"AER-04-01","titulo":"Barrena o tirabuzón: qué es y por qué gira","paginas":"78–80","minutos":10,"componentes":["animacion","simulador","enlace3d","clasificar"],"enlaces":6,"detalle":"proximamente"},

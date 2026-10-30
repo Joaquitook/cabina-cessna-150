@@ -217,6 +217,22 @@ ok(A('velocidad-perdida', { peso: 1100, altitud: 0 }).ias < 47 && A('velocidad-p
 eq([r2(A('sustentacion-formula', {}).L, 0), r2(A('sustentacion-formula', { vel: 40 }).L, 0), A('sustentacion-formula', { temp: 5 }).L > 100], [100, 25, true], 'sustentacion-formula: 100 % de referencia, un cuarto al bajar a la mitad la velocidad, más sustentación con aire frío');
 eq([A('fuerzas-acelerador', { acelerador: 100, vel: 100 }).T === A('fuerzas-acelerador', { acelerador: 100, vel: 100 }).D, A('fuerzas-acelerador', { acelerador: 100, vel: 100 }).eq], [true, 100], 'fuerzas-acelerador: a plena potencia el equilibrio llega a 100 kt (T = D)');
 eq([r2(A('isa', { altitud: 5000 }).temp, 1), r2(A('isa', { altitud: 0 }).inhg, 2)], [5.1, 29.92], 'isa: temperatura y presión estándar');
+// venturi con los números del curso (base = 10: V = 10 y P = 5 en el tubo recto; la garganta lleva a V = 12 y P = 3)
+{
+  const vv = (e) => MD.calc('venturi', { estrechamiento: e }, { base: 10 });
+  ok(vv(0).v === 10 && vv(0).p === 5 && Math.abs(vv(17).v - 12.05) < 0.01 && Math.abs(vv(17).p - 2.95) < 0.01 && vv(30).v + vv(30).p === 15, 'venturi con base 10: tubo recto V = 10 y P = 5; con 17 % de estrechamiento V ≈ 12 y P ≈ 3 (suma 15)');
+  ok(MD.get('venturi').desdeDatos({ base: 10 }).params.base === 10 && MD.get('venturi').desdeDatos({}) === null && MD.get('venturi').desdeDatos({ base: 99 }) === null, 'venturi: desdeDatos toma la base de los datos y descarta la que no sirve');
+}
+// AER-01 y AER-02: ala-presion, descomposicion-fuerza, alfa-actitud, flujo-alfa, verano-invierno
+eq([A('ala-presion', { curv: 100 }).Va, A('ala-presion', { curv: 100 }).Pa, A('ala-presion', { curv: 100 }).Pb, A('ala-presion', { curv: 100 }).F, A('ala-presion', { curv: 0 }).F, A('ala-presion', { curv: 50 }).Va], [12, 3, 5, 100, 0, 11], 'ala-presion: con la curvatura del curso la partícula de arriba va a V = 12 y P = 3, la de abajo sigue en P = 5; sin curvatura no hay fuerza');
+ok([0, 30, 70, 100].every((k) => A('ala-presion', { curv: k }).Va + A('ala-presion', { curv: k }).Pa === 15), 'ala-presion: velocidad + presión = 15 a cualquier curvatura (Bernoulli del curso)');
+eq([r2(A('descomposicion-fuerza', { alfa: 0 }).L, 1), r2(A('descomposicion-fuerza', { alfa: 0 }).D, 1), r2(A('descomposicion-fuerza', { alfa: 10 }).L, 1), r2(A('descomposicion-fuerza', { alfa: 10 }).D, 1)], [100, 0, 98.5, 17.4], 'descomposicion-fuerza: L = F cos α y D = F sen α (10°: 98,5 y 17,4)');
+ok([2, 8, 16, 20].every((a) => Math.abs(Math.hypot(A('descomposicion-fuerza', { alfa: a }).L, A('descomposicion-fuerza', { alfa: a }).D) - 100) < 1e-9) && A('descomposicion-fuerza', { alfa: 16 }).D > A('descomposicion-fuerza', { alfa: 8 }).D, 'descomposicion-fuerza: L y D siempre componen F (Pitágoras) y D crece con el ángulo');
+eq([A('alfa-actitud', { actitud: 8, trayectoria: 0 }).alfa, A('alfa-actitud', { actitud: 8, trayectoria: 5 }).alfa, A('alfa-actitud', { actitud: 8, trayectoria: -6 }).alfa, A('alfa-actitud', { actitud: 12, trayectoria: -6 }).nivel, A('alfa-actitud', { actitud: 8, trayectoria: 0 }).nivel], [8, 3, 14, 'perdida', 'normal'], 'alfa-actitud: α = actitud − trayectoria; con 12° de nariz y −6° de trayectoria se pasa el crítico');
+eq([[0, 8, 12, 17, 19, 22].map((a) => A('flujo-alfa', { alfa: a }).turb), A('flujo-alfa', { alfa: 8 }).nivel, A('flujo-alfa', { alfa: 12 }).nivel, A('flujo-alfa', { alfa: 17 }).nivel, A('flujo-alfa', { alfa: 19 }).nivel], [[0, 12, 35, 70, 92, 100], 'pegado', 'avanza', 'critico', 'perdida'], 'flujo-alfa: la capa turbulenta crece con el ángulo (12, 35, 70, 92 %) y las cuatro fases del curso');
+ok(A('flujo-alfa', { alfa: 16 }).cl > A('flujo-alfa', { alfa: 12 }).cl && A('flujo-alfa', { alfa: 19 }).cl < A('flujo-alfa', { alfa: 16 }).cl && A('flujo-alfa', { alfa: 16 }).aS === 16, 'flujo-alfa: CL llega al máximo en el crítico (16°) y cae después');
+eq([r2(A('verano-invierno', {}).rho, 0), r2(A('verano-invierno', {}).masVel, 1), r2(A('verano-invierno', {}).carrera, 0), r2(A('verano-invierno', { tcalor: 5, tfrio: 5 }).masVel, 1)], [90, 5.3, 11, 0], 'verano-invierno: a 35 °C el aire tiene el 90 % de la densidad que a 5 °C y hay que ir un 5 % más rápido');
+['ala-presion', 'descomposicion-fuerza', 'alfa-actitud', 'flujo-alfa', 'verano-invierno'].forEach((id) => ok(MD.has(id) && MD.get(id).prioridad > 90, id + ': registrado con prioridad baja (no le saca el modelo a los esbozos de otros módulos)'));
 {
   const f = MD.get('franjas'), fr = [{ nombre: 'Leve', desde: 1, hasta: 3 }, { nombre: 'Media', desde: 1, hasta: 6 }, { nombre: 'Grave', desde: 6, hasta: 24 }];
   const dd = f.desdeDatos({ franjas: fr });
@@ -247,6 +263,7 @@ eq([sal(C_('plazo', { inicio: '2026-03-15', cantidad: 18, unidad: 'meses', _hoy:
 eq([sal(C_('fecha-minima', { base: '2026-08-04', dias: 3, prueba: '2026-08-05' }), 'minima'), sal(C_('fecha-minima', { base: '2026-08-04', dias: 3, prueba: '2026-08-05' }), 'puede'), sal(C_('fecha-minima', { base: '2026-08-04', dias: 3, prueba: '2026-08-07' }), 'puede')], ['viernes 7 de agosto de 2026', 'No: es antes de la fecha mínima', 'Sí, se puede'], 'fecha-minima: +3 días');
 eq([sal(C_('anticipacion', { visita: 'miércoles 10:00', tramite: 'lunes 10:00' }), 'alcanza'), sal(C_('anticipacion', { visita: 'miércoles 10:00', tramite: 'martes 12:00' }), 'alcanza'), sal(C_('anticipacion', { visita: 'domingo 11:00', tramite: 'jueves 18:00' }), 'alcanza'), sal(C_('anticipacion', { visita: 'domingo 11:00', tramite: 'viernes 09:00' }), 'alcanza')], ['Sí, alcanza', 'No alcanza', 'Sí, alcanza', 'No alcanza'], 'anticipacion: 48 h entre semana; el jueves a más tardar para fin de semana');
 eq([sal(C_('area-ala', { envergadura: 10, cuerda: 1.5 }), 'm2'), r2(sal(C_('area-ala', { envergadura: 10, cuerda: 1.5 }), 'ft2'), 0)], [15, 161], 'area-ala: m² y ft²');
+eq([sal(C_('sesion-estudio', { hora: '19:00', bloques: 3 }), 'fin'), sal(C_('sesion-estudio', { hora: '19:00', bloques: 3 }), 'recreos'), sal(C_('sesion-estudio', { hora: '18:00', bloques: 2 }), 'fin'), sal(C_('sesion-estudio', { hora: '19:00', bloques: 1 }), 'recreos'), C_('sesion-estudio', { hora: '', bloques: 3 }).error ? 'error' : 'ok'], ['21:10', 2, '19:25', 0, 'error'], 'sesion-estudio: tres bloques de 40 min con dos recreos de 5 desde las 19:00 terminan a las 21:10');
 {
   const hl = HR.get('hora-llegada').desdeDatos({ regla: { Vuelo: { antes: 30, hora_acordada_es: 'la puesta en marcha', haces: 'revisar el avión' }, Simulador: { antes: 15 }, 'Teórico': { antes: 0 } } });
   ok(hl && sal(C_('hora-llegada', { tipo: 'Vuelo', hora: '10:30' }, hl.params), 'llegada') === '10:00' && sal(C_('hora-llegada', { tipo: 'Simulador', hora: '15:00' }, hl.params), 'llegada') === '14:45' && HR.get('hora-llegada').desdeDatos({ regla: 3 }) === null, 'hora-llegada: vuelo 30 min antes, simulador 15; sin reglas no hay herramienta');
@@ -272,6 +289,25 @@ FG.ids().forEach((id) => {
   ok(f.hotspots.length >= 4 && new Set(f.hotspots.map((x) => x.id)).size === f.hotspots.length && f.hotspots.every((x) => x.titulo && x.texto && isFinite(x.x) && isFinite(x.y) && (!x.capa || ids.includes(x.capa))), w + 'puntos con título, texto, coordenadas y capa válida');
 });
 eq([FG.paraNombres(['contorno', 'cuerda', 'presión', 'partículas']), FG.paraNombres(['planta', 'perfil']), FG.paraNombres(['uno', 'dos'])], ['perfil-ala', 'ala-planta', null], 'figuras: se elige por los nombres de las capas');
+// figuras de Aerodinámica (AER-01 y AER-02): cada una sirve de entrada al diagrama y a la animación, y sus números son los de los modelos
+{
+  const AERF = ['cuatro-fuerzas', 'venturi-tubo', 'carburador-venturi', 'perfil-presiones', 'fuerza-descompuesta', 'angulo-ataque', 'actitud-alfa', 'flujo-aoa', 'perfiles-comparados', 'ala-rodajas', 'formula-sustentacion'];
+  AERF.forEach((id) => {
+    const d = Mot.get('diagrama').normalizar({ figura: id }, {}, {}), a = d && Mot.get('diagrama').normalizar(d, {}, {});
+    ok(FG.has(id) && d && d.figura === id && d.hotspots.length >= 4 && d.modoPrueba === true && a && a.hotspots.length === d.hotspots.length, id + ': {figura:"' + id + '"} normaliza como diagrama (con modo prueba) y la salida vuelve a normalizarse');
+    const an = Mot.get('animacion').normalizar({ figura: id, forma: 'figura', escenas: [{ t: 0, texto: 'uno', cambios: { mostrar: [FG.get(id).capas[0].id] } }, { t: 2, texto: 'dos', cambios: { ocultar: [FG.get(id).capas[0].id] } }] }, {}, {});
+    ok(an && an.forma === 'figura' && an.figura === id, id + ': sirve de figura para una animación');
+  });
+  // las cuatro flechas de fuerza miden lo mismo (vuelo recto y nivelado: las fuerzas se igualan de a pares)
+  const larga = (capa) => { const m = /x1="([\d.]+)" y1="([\d.]+)" x2="([\d.]+)" y2="([\d.]+)"/.exec(FG.get('cuatro-fuerzas').capas.find((c) => c.id === capa).svg); return Math.hypot(m[3] - m[1], m[4] - m[2]); };
+  ok(['sustentacion', 'peso', 'traccion', 'resistencia'].every((k) => Math.abs(larga(k) - larga('sustentacion')) < 14) && larga('peso-menos') < larga('peso') && larga('sust-menos') < larga('sustentacion'), 'cuatro-fuerzas: sustentación, peso, tracción y resistencia miden lo mismo; las variantes "menor" son más cortas');
+  // actitud-alfa: los rótulos de cada escena son los α del modelo (8° de actitud con trayectoria 0°, +5° y −6°)
+  const nom = (id) => FG.get('actitud-alfa').capas.find((c) => c.id === id).nombre;
+  eq(['nivelado', 'ascenso', 'descenso'].map((k) => +/α = (\d+)°/.exec(nom(k))[1]), [[0, 5, -6].map((g) => A('alfa-actitud', { actitud: 8, trayectoria: g }).alfa)][0], 'actitud-alfa: los α de las tres escenas son los del modelo alfa-actitud');
+  // flujo-aoa: una capa por cada ángulo del curso y un punto por capa
+  const fa = FG.get('flujo-aoa');
+  ok(['t8', 't12', 't17', 't19'].every((k) => fa.capas.some((c) => c.id === k) && fa.hotspots.some((h) => h.capa === k)) && fa.capas.find((c) => c.id === 't8').visible === true, 'flujo-aoa: una capa y un punto por cada ángulo (8°, 12°, 16°–18°, 18°–20°)');
+}
 // normalizar sobre entradas raras: nunca tira, devuelve null u objeto
 const raros = [undefined, null, 0, 'texto', [], [1, 2], {}, { a: 1 }, { escenas: 'x' }, { pasos: [1] }, { hotspots: [{}, {}] }, { entradas: [null, 3, 'x'] }, { modelo: 'no-existe' }, { herramienta: 'no-existe' }, { figura: 'no-existe', capas: [1] }, JSON.parse('{"pasos":[null,{},"a","b"]}')];
 ['simulador', 'calculadora', 'diagrama', 'animacion'].forEach((t) => {
@@ -600,7 +636,7 @@ seccion('lectura editorial (puro): el contenido real y el armado de pasos');
   const tipos = (id) => lec(id).contenido.map((x) => (typeof x === 'object' ? x.tipo || 'texto' : 'texto'));
   const extras = (id, k) => lec(id).contenido.some((x) => typeof x === 'object' && x[k]);
   ok(tipos('INT-02-02').includes('dato') && tipos('INT-02-02').includes('regla') && lec('INT-02-02').contenido.some((x) => x.dato && x.dato.valor === 75), 'INT-02-02: dato (75 %) y regla');
-  ok(tipos('INT-03-02').includes('idea') && extras('INT-03-02', 'ojo') && tipos('INT-03-02').filter((t) => t === 'regla').length >= 5, 'INT-03-02: idea + ojo + reglas numeradas');
+  ok(tipos('INT-03-02').includes('idea') && extras('INT-03-02', 'ojo') && tipos('INT-03-02').filter((t) => t === 'regla').length >= 4, 'INT-03-02: idea + ojo + reglas numeradas');
   ok(tipos('INT-04-01').includes('definicion') && tipos('INT-04-01').includes('lista') && extras('INT-04-01', 'ejemplo') && tipos('INT-04-01').includes('ojo'), 'INT-04-01: definición + ejemplo + lista');
   ['INT-02-02', 'INT-03-02', 'INT-04-01'].forEach((id) => ok(lec(id).componentes.length >= 3 && lec(id).preguntas.length >= 3 && lec(id).resumen, id + ': conserva componentes y preguntas y tiene resumen'));
   ok(Object.keys(tiposVistos).length >= 5, 'el contenido real usa varios tipos de punto clave (' + Object.keys(tiposVistos).join(', ') + ')');
@@ -613,6 +649,106 @@ seccion('lectura editorial (puro): el contenido real y el armado de pasos');
   ok(pp[0].texto === 'Texto viejo. Con dos oraciones.' && pp[0].item.obj === false && pp[3].texto === '' && pp[3].item.dato.valor === '5', 'armar: un texto viejo sigue siendo texto; el dato sin texto es válido');
   eq(LE.indice(px).map((e) => e.num + '|' + e.titulo), ['|Antes de empezar', '01|Figura 1', '02|Mi regla', '03|Punto clave 3', '04|Punto clave 4', '|Resumen'], 'indice: número y título de cada etapa');
   eq(LE.llevas(px, { resumen: ['Línea uno'] }).map((x) => x.n + ':' + x.texto), ['1:Línea uno', '2:a', '3:b', '4:5 kt'], 'llevas: resumen del punto, primera oración o el dato');
+  { const pl = LE.armar({ id: 'XXX-01-01', contenido: [{ titulo: 'Los pasos', tipo: 'lista', texto: 'Para entrar:\n1. Mostrá el DNI\n2. Firmá' }], componentes: [], preguntas: [] }), ll = LE.llevas(pl, {}); ok(ll.length === 1 && ll[0].texto === 'Para entrar: Mostrá el DNI' && !/:$/.test(ll[0].texto), 'llevas: una lista sin resumen propio no queda con los dos puntos colgando'); }
+}
+
+seccion('calidad del contenido publicado (INT y AER-01..03): tipos, títulos, preguntas, componentes');
+{
+  const T = ES.texto;
+  // el contenido terminado: INT completa (37 lecciones) y AER-01..03 (17)
+  const lecIdx = (modId, unidades) => ix.modulos.find((m) => m.id === modId).unidades.filter((u) => !unidades || unidades.includes(u.id)).flatMap((u) => u.lecciones);
+  const terminadas = lecIdx('INT').concat(lecIdx('AER', ['AER-01', 'AER-02', 'AER-03']));
+  eq([lecIdx('INT').length, lecIdx('AER', ['AER-01', 'AER-02', 'AER-03']).length], [37, 17], 'INT tiene 37 lecciones y AER-01..03 tienen 17');
+  ok(terminadas.every((l) => l.detalle === 'completo'), 'las 54 lecciones de INT y AER-01..03 están "completo" en el índice (' + terminadas.filter((l) => l.detalle !== 'completo').map((l) => l.id).join(', ') + ')');
+  const terminadasIds = new Set(terminadas.map((l) => l.id));
+  const lecciones = todasLasLecciones.filter((l) => terminadasIds.has(l.id));
+  ok(lecciones.length === 54, 'los archivos de módulo traen las 54 lecciones terminadas (' + lecciones.length + ')');
+  const palabras = (s) => T.plano(String(s || '')).trim().split(/\s+/).filter(Boolean).length;
+  const SOLO_TITULO_GENERICO = /^punto clave\s*\d*$/i;
+  lecciones.forEach((l) => {
+    const w = l.id, xs = l.contenido, tipos = xs.map((x) => (x && typeof x === 'object' ? (x.tipo || 'texto') : 'texto'));
+    ok(!('notas' in l), w + ': sin notas');
+    ok(xs.every((x) => x && typeof x === 'object'), w + ': todos los puntos clave son objetos (formato editorial)');
+    xs.forEach((x, i) => {
+      if (!x || typeof x !== 'object') return;
+      const n = palabras(x.titulo), tt = x.tipo || 'texto';
+      ok(typeof x.titulo === 'string' && x.titulo.trim() && !SOLO_TITULO_GENERICO.test(x.titulo.trim()), w + ' punto ' + (i + 1) + ': título real (no «Punto clave N»)');
+      ok(tt === 'definicion' ? (n >= 1 && n <= 8) : (n >= 3 && n <= 7), w + ' punto ' + (i + 1) + ': el título «' + x.titulo + '» tiene de 3 a 7 palabras (la definición lleva el término: ' + n + ')');
+      ok(T.TIPOS.includes(tt), w + ' punto ' + (i + 1) + ': tipo válido (' + tt + ')');
+      if (x.dato !== undefined) ok(x.dato && String(x.dato.valor === undefined ? '' : x.dato.valor).trim() && String(x.dato.etiqueta || '').trim(), w + ' punto ' + (i + 1) + ': el dato lleva valor y etiqueta');
+      if (tt === 'dato') ok(!!x.dato, w + ' punto ' + (i + 1) + ': el punto de tipo dato trae su dato');
+    });
+    let racha = 1, maxRacha = 1;
+    tipos.forEach((t, i) => { racha = i && t === tipos[i - 1] ? racha + 1 : 1; maxRacha = Math.max(maxRacha, racha); });
+    ok(maxRacha <= 2, w + ': no hay más de dos puntos seguidos del mismo tipo (racha ' + maxRacha + ': ' + tipos.join(' · ') + ')');
+    if (xs.length >= 4) ok(new Set(tipos).size >= 3, w + ': con ' + xs.length + ' puntos usa al menos 3 tipos distintos (' + [...new Set(tipos)].join(', ') + ')');
+    ok(tipos.filter((t) => t === 'idea').length <= 1, w + ': a lo sumo una idea');
+    ok((typeof l.resumen === 'string' && l.resumen.trim()) || (Array.isArray(l.resumen) && l.resumen.length), w + ': tiene resumen');
+    // glosario: términos únicos dentro de la lección
+    const gl = (l.glosario || []).map((g) => g.termino.trim().toLowerCase());
+    ok(new Set(gl).size === gl.length, w + ': glosario sin términos repetidos');
+    // preguntas: 3 a 5
+    ok(l.preguntas.length >= 3 && l.preguntas.length <= 5, w + ': de 3 a 5 preguntas (' + l.preguntas.length + ')');
+    // la reserva (normalizar → null) no es aceptable para los ocho tipos implementados; cada lección trae algo interactivo que funciona
+    let buenos = 0;
+    l.componentes.forEach((c, i) => {
+      if (!Mot.TIPOS_P1.includes(c.tipo) || !Mot.has(c.tipo)) return;
+      let r = null; try { r = Mot.get(c.tipo).normalizar(JSON.parse(JSON.stringify(c.datos)), ctxNode, c); } catch (e) { r = null; }
+      ok(r !== null, w + ': el componente ' + i + ' (' + c.tipo + ' «' + c.titulo + '») no cae a la tarjeta de reserva');
+      if (r !== null) buenos++;
+    });
+    ok(buenos >= 1, w + ': al menos un componente implementado que funciona');
+    // animaciones y diagramas sobre una figura propia: todo id que nombran las escenas existe en la figura
+    l.componentes.forEach((c) => {
+      if (c.tipo !== 'animacion' || !c.datos || c.datos.forma !== 'figura' || !FG.has(c.datos.figura)) return;
+      const capas = new Set(FG.get(c.datos.figura).capas.map((k) => k.id)), malos = [];
+      (c.datos.escenas || []).forEach((e, j) => {
+        const cm = e.cambios || {};
+        ['mostrar', 'ocultar', 'resaltar', 'atenuar'].forEach((k) => (cm[k] || []).forEach((id) => { if (!capas.has(id)) malos.push('escena ' + (j + 1) + ' ' + k + ' ' + id); }));
+        ['mover', 'rotar', 'escala', 'opacidad', 'texto'].forEach((k) => Object.keys(cm[k] || {}).forEach((id) => { if (!capas.has(id)) malos.push('escena ' + (j + 1) + ' ' + k + ' ' + id); }));
+      });
+      eq(malos, [], w + ': las escenas de «' + c.titulo + '» sólo nombran capas de la figura ' + c.datos.figura);
+    });
+  });
+  // preguntas por módulo: la correcta repartida entre A, B, C y D (ninguna letra pasa del 40 %) y que no sea la opción más larga de forma sistemática (≤ 45 %)
+  ['INT', 'AER'].forEach((mid) => {
+    const qs = lecciones.filter((l) => l.id.startsWith(mid + '-')).flatMap((l) => l.preguntas.map((q) => ({ w: l.id, q })));
+    const cuenta = [0, 0, 0, 0]; let masLarga = 0;
+    qs.forEach(({ q }) => {
+      cuenta[q.correcta]++;
+      const lens = q.opciones.map((o) => o.length), max = Math.max(...lens);
+      if (lens[q.correcta] === max && lens.filter((n) => n === max).length === 1) masLarga++;
+    });
+    const reparto = cuenta.map((n) => Math.round(100 * n / qs.length));
+    ok(Math.max(...cuenta) / qs.length <= 0.40, mid + ': la opción correcta está repartida (A/B/C/D: ' + cuenta.join('/') + ' = ' + reparto.join(' / ') + ' %, ninguna letra pasa del 40 %)');
+    ok(masLarga / qs.length <= 0.45, mid + ': la correcta es la opción más larga en ' + masLarga + ' de ' + qs.length + ' preguntas (' + Math.round(100 * masLarga / qs.length) + ' %, tope 45 %)');
+  });
+  // AER-03: los modelos y las figuras nuevas (la pérdida)
+  ok(['aviso-perdida', 'recuperacion-perdida'].every((id) => MD.has(id) && MD.get(id).prioridad > 90), 'aviso-perdida y recuperacion-perdida: registrados con prioridad baja');
+  const AV = (v) => MD.calc('aviso-perdida', { vel: v });
+  eq([70, 54, 49, 46].map((v) => AV(v).nivel), ['normal', 'bocina', 'buffet', 'perdida'], 'aviso-perdida: normal a 70 kt, bocina a 54, bocina con vibración a 49 y pérdida a 46');
+  ok(AV(40).alfa > AV(47).alfa && AV(47).alfa > AV(60).alfa && AV(60).alfa > AV(80).alfa && Math.abs(AV(47).alfa - MD.alfaPerdida(0)) < 0.5 && AV(40).alfa <= 22 && AV(55).nivel === 'normal', 'aviso-perdida: al frenar el ángulo necesario sube y a la velocidad de pérdida (47 kt) está en el crítico');
+  const RC = (n, p, t) => MD.calc('recuperacion-perdida', { nariz: n, potencia: p, tiro: t });
+  const ABAJO = 'Bajarla bajo el horizonte', ARRIBA = 'Dejarla arriba', TODA = 'Toda la potencia', RAL = 'Ralentí';
+  eq([RC(ARRIBA, TODA, 62).nivel, RC(ABAJO, TODA, 50).nivel, RC(ABAJO, TODA, 62).nivel, RC(ABAJO, RAL, 62).nivel, RC(ABAJO, TODA, 85).nivel], ['perdida', 'secundaria', 'ok', 'mucha', 'mucha'], 'recuperacion-perdida: sin bajar la nariz sigue la pérdida; tirar a 50 kt da pérdida secundaria; nariz + potencia + 62 kt recupera; sin potencia o tarde se pierde mucha altura');
+  ok(Math.round(RC(ABAJO, TODA, 62).vmin) === 58 && RC(ABAJO, TODA, 57).nivel === 'secundaria' && RC(ABAJO, TODA, 58).nivel === 'ok' && RC(ABAJO, TODA, 62).altura < RC(ABAJO, RAL, 62).altura && RC(ABAJO, TODA, 62).altura < RC(ABAJO, TODA, 85).altura, 'recuperacion-perdida: se puede tirar a partir de unos 58 kt; con toda la potencia y sin esperar de más se pierde menos altura');
+  const NF = ['curva-sustentacion', 'aterrizaje-alfa', 'tres-perdidas', 'bocina-ala', 'recuperacion-perdida'];
+  NF.forEach((id) => {
+    const d = Mot.get('diagrama').normalizar({ figura: id }, {}, {}), an = Mot.get('animacion').normalizar({ figura: id, forma: 'figura', escenas: [{ t: 0, texto: 'uno', cambios: { mostrar: [FG.get(id).capas[0].id] } }, { t: 2, texto: 'dos', cambios: { ocultar: [FG.get(id).capas[0].id] } }] }, {}, {});
+    ok(FG.has(id) && d && d.figura === id && d.hotspots.length >= 4 && d.modoPrueba === true && an && an.forma === 'figura', id + ': normaliza como diagrama (con modo prueba) y sirve de figura para una animación');
+  });
+  // tres-perdidas: los números del dibujo son los del modelo velocidad-perdida
+  {
+    const num = (capa) => (FG.get('tres-perdidas').capas.find((c) => c.id === capa).svg.match(/\d+ kt/g) || []).map((s) => parseInt(s, 10));
+    const VP = (p, a) => MD.calc('velocidad-perdida', { peso: p, altitud: a });
+    eq(num('ias'), [VP(1100, 0).ias, VP(1600, 0).ias, VP(1100, 8000).ias].map((v) => Math.round(v)), 'tres-perdidas: las IAS dibujadas son las del modelo velocidad-perdida (liviano, pesado, liviano a 8 000 ft)');
+    eq(num('tas'), [VP(1100, 0).tas, VP(1600, 0).tas, VP(1100, 8000).tas].map((v) => Math.round(v)), 'tres-perdidas: las TAS dibujadas son las del modelo');
+  }
+  // curva-sustentacion: marcas del curso (12°, 18°, 20°), pico y capa de pérdida
+  {
+    const cs = FG.get('curva-sustentacion');
+    ok(['ejes', 'curva', 'marcas', 'pico', 'avion', 'perdida'].every((k) => cs.capas.some((c) => c.id === k)) && cs.capas.find((c) => c.id === 'perdida').visible === false && ['12°', '18°', '20°'].every((m) => cs.capas.find((c) => c.id === 'marcas').svg.includes('>' + m + '<')), 'curva-sustentacion: ejes, curva, marcas de 12°, 18° y 20°, pico y alas en rojo (capa «Pérdida» apagada de entrada)');
+  }
 }
 
 seccion('visor 3D (puro: sin DOM ni 3D)');

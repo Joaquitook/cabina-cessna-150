@@ -107,6 +107,7 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     pasos.forEach(function (p) {
       if (p.k !== 'paso' || !p.item) return;
       var t = Tx.resumenPaso(lec, p.item, p.n - 1);
+      if (!t && p.item.tipo === 'lista') { var li = Tx.listaLineas(p.item.texto); t = li.items.length ? (li.intro ? li.intro.replace(/\s*:\s*$/, ': ') : '') + li.items[0] : ''; }   // una lista sin resumen propio: su introducción (sin los dos puntos colgando) y el primer paso
       if (!t) { t = Tx.partir(p.item.texto).lead; if (!t && p.item.dato) t = [p.item.dato.valor + (p.item.dato.unidad ? ' ' + p.item.dato.unidad : ''), p.item.dato.etiqueta].filter(Boolean).join(': '); }
       t = Tx.recorte(Tx.plano(t), 170);
       if (t) out.push({ n: p.n, titulo: p.titulo, texto: t, tipo: p.item.tipo });

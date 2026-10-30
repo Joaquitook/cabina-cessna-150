@@ -23,7 +23,8 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
  *     desdeDatos?(datos) → { params?, escenarios?, controles? }     adapta claves propias del esbozo (franjas, casos, base…)
  *   }
  * Los modelos de partida (útiles para AER e INT): sustentacion-alfa · isa · factor-carga · viento-cruzado · porcentaje-umbral · clase-recreos · franjas ·
- *   riesgo-mitigacion · sustentacion-formula · bernoulli · venturi · velocidad-perdida · fuerzas-acelerador.
+ *   riesgo-mitigacion · sustentacion-formula · bernoulli · venturi · velocidad-perdida · fuerzas-acelerador ·
+ *   (AER-01/02) ala-presion · descomposicion-fuerza · alfa-actitud · flujo-alfa · verano-invierno · (AER-03) aviso-perdida · recuperacion-perdida.
  * La sustentación reutiliza la curva del simulador (C150.Sim.clCurve / stallAoa, las mismas que el túnel de AIRE) si existe; si no, una copia aproximada.
  */
 (function (C150) {
@@ -403,7 +404,12 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     prioridad: 20, reconoce: [/estrechamiento|garganta|venturi|\btubo\b/],
     controles: [{ id: 'estrechamiento', etiqueta: 'Estrechamiento del tubo', tipo: 'rango', min: 0, max: 60, paso: 5, valor: 0, unidad: '%', claves: [/estrechamiento/], marcas: [{ v: 0, t: '0' }, { v: 30, t: '30' }, { v: 60, t: '60' }] }],
     salidas: [{ id: 'v', etiqueta: 'Velocidad en la garganta', dec: 1, destacada: true, barra: { min: 0, max: 15 } }, { id: 'p', etiqueta: 'Presión en la garganta', dec: 1, destacada: true, barra: { min: 0, max: 15 } }, { id: 'suma', etiqueta: 'Suma', dec: 0 }],
-    fn: function (v) { var vel = 5 / (1 - v.estrechamiento / 100); return { v: vel, p: 15 - vel, suma: 15, _estado: v.estrechamiento > 0 ? { tono: 'info', texto: 'Por el paso angosto el aire corre más y empuja menos: eso es el Venturi.' } : { tono: 'ok', texto: 'Tubo recto: el aire va tranquilo (velocidad 5, presión 10).' } }; }
+    fn: function (v, p) {
+      var b = U.num(p && p.base, 5), vel = b / (1 - v.estrechamiento / 100);
+      return { v: vel, p: 15 - vel, suma: 15, _estado: v.estrechamiento > 0 ? { tono: 'info', texto: 'Por el paso angosto el aire corre más y empuja menos: eso es el Venturi.' } : { tono: 'ok', texto: 'Tubo recto: el aire va tranquilo (velocidad ' + U.fmt(b, 0) + ', presión ' + U.fmt(15 - b, 0) + ').' } };
+    },
+    /** `base`: la velocidad del aire en el tubo recto (5 por defecto; 10 con los números del curso: V = 10, P = 5). */
+    desdeDatos: function (d) { var b = U.num(d && d.base, null); return (b !== null && b > 0 && b < 14) ? { params: { base: b } } : null; }
   });
 
   /* ---- velocidad de pérdida según el peso y la altitud (AER-03) */
@@ -440,6 +446,192 @@ var root = (typeof window !== 'undefined') ? window : globalThis; root.C150 = ro
     },
     grafico: { tipo: 'linea', x: 'vel', y: ['D'], etiquetaX: 'Velocidad (kt)', etiquetaY: 'N' },
     escenarios: [{ nombre: 'Crucero', valores: { acelerador: 75, vel: 87 } }, { nombre: 'Plena potencia', valores: { acelerador: 100, vel: 60 } }, { nombre: 'Motor al ralentí', valores: { acelerador: 0, vel: 80 } }]
+  });
+
+  /* ================================================================== AER-01 y AER-02 (contenido de Aerodinámica; prioridad baja: no le sacan el modelo a los esbozos de otros módulos) */
+  var RAD = Math.PI / 180;
+  function interp(tab, x) {
+    if (x <= tab[0][0]) return tab[0][1];
+    for (var i = 1; i < tab.length; i++) if (x <= tab[i][0]) return tab[i - 1][1] + (tab[i][1] - tab[i - 1][1]) * (x - tab[i - 1][0]) / (tab[i][0] - tab[i - 1][0]);
+    return tab[tab.length - 1][1];
+  }
+
+  /* ---- la presión sobre el ala según la curvatura del extradós: dos partículas, la de arriba y la de abajo (AER-02-03) */
+  M.register('ala-presion', {
+    nombre: 'Dos partículas, una fuerza', resumen: 'Cuanto más curvo es el extradós, más acelera la partícula de arriba, más baja su presión y más empuja el ala hacia arriba.',
+    prioridad: 95, reconoce: [/curvatura del extrados|particula \(a\)|particulas \(a\) y \(b\)/],
+    controles: [{ id: 'curv', etiqueta: 'Curvatura del extradós', tipo: 'rango', min: 0, max: 100, paso: 10, valor: 0, unidad: '%', claves: [/curvatura/],
+      marcas: [{ v: 0, t: 'plano' }, { v: 50, t: '50' }, { v: 100, t: 'perfil del curso' }], rapidos: [{ v: 0, t: 'Sin curvatura' }, { v: 100, t: 'Perfil del curso' }] }],
+    salidas: [
+      { id: 'Va', etiqueta: 'Velocidad de la partícula de arriba (a)', dec: 1, destacada: true, barra: { min: 0, max: 15 } }, { id: 'Pa', etiqueta: 'Presión de la partícula de arriba (a)', dec: 1, destacada: true, barra: { min: 0, max: 15 } },
+      { id: 'Pb', etiqueta: 'Presión de la partícula de abajo (b)', dec: 1, barra: { min: 0, max: 15 } }, { id: 'dP', etiqueta: 'Diferencia de presión (abajo menos arriba)', dec: 1 },
+      { id: 'F', etiqueta: 'Fuerza aerodinámica hacia arriba', unidad: '% de la del perfil del curso', dec: 0, destacada: true, barra: { min: 0, max: 100 } }
+    ],
+    fn: function (v) {
+      var k = U.clamp(v.curv, 0, 100) / 100, Va = 10 + 2 * k, Pa = 15 - Va, dP = 5 - Pa;
+      return { Va: Va, Pa: Pa, Vb: 10, Pb: 5, dP: dP, F: 100 * dP / 2,
+        _estado: k <= 0 ? { tono: 'info', texto: 'Sin curvatura el aire de arriba no se acelera: las dos partículas quedan con V = 10 y P = 5 y no hay diferencia de presión.' }
+          : { tono: 'ok', texto: 'La partícula de arriba corre más y empuja menos que la de abajo: esa diferencia de presión es la fuerza que sostiene al avión.' } };
+    },
+    consigna: { texto: 'Dale al extradós la curvatura del perfil del curso, hasta que la partícula de arriba llegue a V = 12 y P = 3.', salida: 'Va', igual: 12 },
+    escenarios: [{ nombre: 'Sin curvatura', valores: { curv: 0 } }, { nombre: 'Curvatura media', valores: { curv: 50 } }, { nombre: 'Perfil del curso', valores: { curv: 100 } }]
+  });
+
+  /* ---- sustentación y resistencia inducida: las dos componentes de la fuerza aerodinámica F (AER-02-04) */
+  M.register('descomposicion-fuerza', {
+    nombre: 'Separá la flecha', resumen: 'F nace perpendicular a la cuerda; respecto del viento relativo se reparte en sustentación (L) y resistencia inducida (D).',
+    prioridad: 95, reconoce: [/descompon|descomposicion de la fuerza|componentes de f\b/],
+    controles: [{ id: 'alfa', etiqueta: 'Ángulo entre la cuerda y el viento relativo', tipo: 'rango', min: 0, max: 20, paso: 1, valor: 6, unidad: '°', claves: [/alfa|α|angulo/],
+      marcas: [{ v: 0, t: '0°' }, { v: 10, t: '10°' }, { v: 20, t: '20°' }], rapidos: [{ v: 0, t: '0°' }, { v: 8, t: '8°' }, { v: 16, t: '16°' }] }],
+    salidas: [
+      { id: 'F', etiqueta: 'Fuerza aerodinámica F', unidad: '%', dec: 0 },
+      { id: 'L', etiqueta: 'Sustentación L (⟂ al viento relativo)', unidad: '% de F', dec: 1, destacada: true, barra: { min: 0, max: 100 } },
+      { id: 'D', etiqueta: 'Resistencia inducida D (paralela al viento)', unidad: '% de F', dec: 1, destacada: true, barra: { min: 0, max: 100 } }
+    ],
+    fn: function (v) {
+      var a = U.clamp(v.alfa, 0, 90) * RAD, L = 100 * Math.cos(a), D = 100 * Math.sin(a);
+      return { F: 100, L: L, D: D, _estado: v.alfa < 0.5 ? { tono: 'ok', texto: 'Con la cuerda alineada al viento, toda la fuerza es sustentación y no aparece resistencia inducida.' }
+        : { tono: 'info', texto: 'A más inclinación, un poco menos de F queda como sustentación y un poco más se vuelve resistencia inducida.' } };
+    },
+    grafico: { tipo: 'linea', x: 'alfa', y: ['L', 'D'], etiquetaX: 'Ángulo (°)', etiquetaY: '% de F' },
+    escenarios: [{ nombre: 'Cuerda alineada', valores: { alfa: 0 } }, { nombre: 'Crucero (unos 4°)', valores: { alfa: 4 } }, { nombre: 'Muy inclinado', valores: { alfa: 16 } }]
+  });
+
+  /* ---- actitud, trayectoria y ángulo de ataque: α = actitud − trayectoria (AER-02-07) */
+  M.register('alfa-actitud', {
+    nombre: 'Actitud no es ángulo de ataque', resumen: 'El ángulo de ataque es el que hay entre la cuerda y el viento relativo: sale de la actitud de la nariz menos el ángulo de la trayectoria.',
+    prioridad: 95, reconoce: [/actitud.*trayectoria|trayectoria.*actitud/],
+    controles: [
+      { id: 'actitud', etiqueta: 'Actitud (nariz respecto del horizonte)', tipo: 'rango', min: -10, max: 20, paso: 1, valor: 8, unidad: '°', claves: [/actitud/], marcas: [{ v: -10, t: '−10°' }, { v: 0, t: '0°' }, { v: 10, t: '10°' }, { v: 20, t: '20°' }] },
+      { id: 'trayectoria', etiqueta: 'Trayectoria de vuelo (respecto del horizonte)', tipo: 'rango', min: -15, max: 15, paso: 1, valor: 0, unidad: '°', claves: [/trayectoria/], marcas: [{ v: -15, t: 'baja' }, { v: 0, t: 'nivelado' }, { v: 15, t: 'sube' }] }
+    ],
+    salidas: [
+      { id: 'alfa', etiqueta: 'Ángulo de ataque', unidad: '°', dec: 0, destacada: true, barra: { min: -10, max: 24, marca: 16 } }, { id: 'cl', etiqueta: 'CL (sustentación)', dec: 2, destacada: true },
+      { id: 'estado', etiqueta: 'Qué pasa', tipo: 'texto' }
+    ],
+    fn: function (v) {
+      var a = v.actitud - v.trayectoria, aS = M.alfaPerdida(0), nivel = a >= aS ? 'perdida' : (a >= aS - 1.5 ? 'bocina' : 'normal');
+      return { alfa: a, cl: M.cl(a, 0), nivel: nivel, estado: nivel === 'perdida' ? 'Ángulo crítico superado' : (nivel === 'bocina' ? 'Cerca del ángulo crítico' : (a < 0 ? 'Ángulo de ataque negativo' : 'Ala con margen')), aS: aS };
+    },
+    umbrales: [
+      { salida: 'nivel', igual: 'perdida', tono: 'bad', texto: 'Pasaste el ángulo crítico (unos 16°): el ala ya no sostiene, aunque la nariz no parezca tan alta.' },
+      { salida: 'nivel', igual: 'bocina', tono: 'warn', texto: 'Estás pegado al ángulo crítico: sonaría la bocina de pérdida.' },
+      { siempre: true, tono: 'ok', texto: 'Ángulo de ataque = actitud menos trayectoria. Misma nariz, otra trayectoria, otro ángulo.' }
+    ],
+    consigna: { texto: 'Con la nariz 8° arriba del horizonte, buscá la trayectoria con la que el ángulo de ataque queda en 3°.', salida: 'alfa', igual: 3 },
+    escenarios: [{ nombre: 'Crucero nivelado', valores: { actitud: 8, trayectoria: 0 } }, { nombre: 'En ascenso', valores: { actitud: 8, trayectoria: 5 } }, { nombre: 'En descenso', valores: { actitud: 8, trayectoria: -6 } }]
+  });
+
+  /* ---- cómo avanza el flujo turbulento al subir el ángulo de ataque (AER-02-08) */
+  var TURB = [[0, 0], [8, 12], [12, 35], [17, 70], [19, 92], [22, 100]];
+  M.register('flujo-alfa', {
+    nombre: 'El flujo se despega', resumen: 'Al subir el ángulo de ataque la capa turbulenta avanza desde el borde de fuga; cuando llega a todo el ala, ya no sustenta.',
+    prioridad: 95, reconoce: [/capa turbulenta|punto de transicion|flujo turbulento/],
+    controles: [{ id: 'alfa', etiqueta: 'Ángulo de ataque', tipo: 'rango', min: 0, max: 22, paso: 0.5, valor: 4, unidad: '°', claves: [/alfa|α|angulo/],
+      marcas: [{ v: 0, t: '0°' }, { v: 8, t: '8°' }, { v: 12, t: '12°' }, { v: 16, t: '16°' }, { v: 20, t: '20°' }], zonas: [{ desde: 0, hasta: 12, tono: 'ok' }, { desde: 12, hasta: 16, tono: 'warn' }, { desde: 16, hasta: 22, tono: 'bad' }],
+      rapidos: [{ v: 8, t: '8°' }, { v: 12, t: '12°' }, { v: 17, t: '16°–18°' }, { v: 19, t: '18°–20°' }] }],
+    salidas: [
+      { id: 'turb', etiqueta: 'Extradós con flujo turbulento', unidad: '%', dec: 0, destacada: true, barra: { min: 0, max: 100 } }, { id: 'cl', etiqueta: 'CL (sustentación)', dec: 2, destacada: true },
+      { id: 'fase', etiqueta: 'Estado del flujo', tipo: 'texto' }
+    ],
+    fn: function (v) {
+      var a = v.alfa, t = interp(TURB, a), cl = M.cl(a, 0), aS = M.alfaPerdida(0);
+      var fase = a <= 8 ? 'pegado, con poca turbulencia' : (a <= 12 ? 'turbulencia que avanza' : (a <= 18 ? 'turbulencia muy extensa' : 'casi todo despegado'));
+      return { turb: t, cl: cl, fase: fase, aS: aS, nivel: a <= 8 ? 'pegado' : (a <= 12 ? 'avanza' : (a <= 18 ? 'critico' : 'perdida')) };
+    },
+    umbrales: [
+      { salida: 'nivel', igual: 'perdida', tono: 'bad', texto: 'Casi no queda capa pegada: la sustentación cae y el ala entra en pérdida.' },
+      { salida: 'nivel', igual: 'critico', tono: 'warn', texto: 'Zona del ángulo crítico: la turbulencia es muy extensa y la sustentación llega a su máximo.' },
+      { salida: 'nivel', igual: 'avanza', tono: 'info', texto: 'La capa turbulenta se extiende, pero el ala todavía produce más sustentación.' },
+      { siempre: true, tono: 'ok', texto: 'Flujo ordenado y pegado al ala: sólo hay un poco de turbulencia cerca del borde de fuga.' }
+    ],
+    grafico: { tipo: 'linea', x: 'alfa', y: ['cl'], etiquetaX: 'Ángulo de ataque (°)', etiquetaY: 'CL', lineas: [{ x: 'aS', texto: 'crítico' }] },
+    escenarios: [{ nombre: 'Hasta 8°', valores: { alfa: 8 } }, { nombre: '12°', valores: { alfa: 12 } }, { nombre: '16°–18°', valores: { alfa: 17 } }, { nombre: '18°–20°', valores: { alfa: 19 } }],
+    consigna: { texto: 'Subí el ángulo hasta que casi todo el extradós quede con flujo turbulento y el ala entre en pérdida.', salida: 'turb', mayor: 90 }
+  });
+
+  /* ---- día de verano contra día de invierno: densidad relativa y velocidad extra (AER-02-05) */
+  M.register('verano-invierno', {
+    nombre: 'Verano contra invierno', resumen: 'Con calor el aire es menos denso: para sostener el mismo peso hace falta ir más rápido.',
+    prioridad: 95, reconoce: [/verano.*invierno|invierno.*verano/],
+    controles: [
+      { id: 'tcalor', etiqueta: 'Día de calor', tipo: 'rango', min: 20, max: 45, paso: 1, valor: 35, unidad: '°C', claves: [/calor|verano/], marcas: [{ v: 20, t: '20' }, { v: 35, t: '35' }, { v: 45, t: '45' }] },
+      { id: 'tfrio', etiqueta: 'Día de frío', tipo: 'rango', min: -5, max: 15, paso: 1, valor: 5, unidad: '°C', claves: [/frio|invierno/], marcas: [{ v: -5, t: '−5' }, { v: 5, t: '5' }, { v: 15, t: '15' }] }
+    ],
+    salidas: [
+      { id: 'rho', etiqueta: 'Densidad del aire caluroso', unidad: '% de la del día frío', dec: 0, destacada: true, barra: { min: 70, max: 110, marca: 100 } },
+      { id: 'masVel', etiqueta: 'Velocidad verdadera extra para igualar la sustentación', unidad: '%', dec: 1, destacada: true },
+      { id: 'carrera', etiqueta: 'Carrera de despegue (sólo por la densidad)', unidad: '%', dec: 0, signo: true }
+    ],
+    fn: function (v) {
+      var rho = (273.15 + v.tfrio) / (273.15 + v.tcalor), mas = 100 * (1 / Math.sqrt(rho) - 1), carrera = 100 * (1 / rho - 1);
+      return { rho: 100 * rho, masVel: mas, carrera: carrera, _estado: rho < 1 ? { tono: 'warn', texto: 'Aire más caliente, menos partículas por metro cúbico: el ala sostiene menos y hay que correr más para despegar.' } : { tono: 'ok', texto: 'Los dos días tienen la misma densidad.' } };
+    },
+    escenarios: [{ nombre: 'Enero contra julio (35 °C y 5 °C)', valores: { tcalor: 35, tfrio: 5 } }, { nombre: 'Día templado', valores: { tcalor: 25, tfrio: 15 } }, { nombre: 'Calor extremo', valores: { tcalor: 45, tfrio: -5 } }]
+  });
+
+  /* ---- el aviso de pérdida: al frenar de a poco, el ángulo necesario sube y suenan la bocina, el buffet y por fin la pérdida (AER-03-03) */
+  M.register('aviso-perdida', {
+    nombre: 'La bocina suena antes', resumen: 'Frenando de a poco en vuelo nivelado el ángulo de ataque sube: primero suena la bocina, después vibra el comando y por último el ala entra en pérdida.',
+    prioridad: 95, reconoce: [/bocina suena|aviso de perdida|buffet/],
+    controles: [{ id: 'vel', etiqueta: 'Velocidad indicada', tipo: 'rango', min: 40, max: 80, paso: 1, valor: 70, unidad: 'kt', claves: [/vel|ias|\bv\b/],
+      marcas: [{ v: 47, t: '47' }, { v: 55, t: '55' }, { v: 70, t: '70' }], zonas: [{ desde: 40, hasta: 48, tono: 'bad' }, { desde: 48, hasta: 55, tono: 'warn' }, { desde: 55, hasta: 80, tono: 'ok' }],
+      rapidos: [{ v: 70, t: '70 kt' }, { v: 54, t: '54 kt' }, { v: 49, t: '49 kt' }, { v: 46, t: '46 kt' }] }],
+    salidas: [
+      { id: 'alfa', etiqueta: 'Ángulo de ataque para no bajar', unidad: '°', dec: 1, destacada: true, barra: { min: 0, max: 22, marca: 16 } },
+      { id: 'aviso', etiqueta: 'Qué sentís', tipo: 'texto', destacada: true }
+    ],
+    fn: function (v) {
+      var q = 0.5 * 1.225 * Math.pow(U.clamp(v.vel, 30, 200) * 0.514444, 2), cl = PESO_KG * 9.80665 / (q * SUP), a = U.clamp(cl / 0.085, 0, 22), aS = M.alfaPerdida(0);
+      var nivel = a >= aS - 0.5 ? 'perdida' : (a >= aS - 1.6 ? 'buffet' : (a >= aS - 4.5 ? 'bocina' : 'normal'));
+      var aviso = { perdida: 'La nariz cae: pérdida', buffet: 'Suena la bocina y vibra el comando', bocina: 'Suena la bocina', normal: 'Nada: vuelo normal' }[nivel];
+      return { alfa: a, aviso: aviso, nivel: nivel, aS: aS };
+    },
+    umbrales: [
+      { salida: 'nivel', igual: 'perdida', tono: 'bad', texto: 'Pasaste el ángulo crítico: el ala ya no sostiene y la nariz cae. Bajá la nariz.' },
+      { salida: 'nivel', igual: 'buffet', tono: 'warn', texto: 'La estructura y el comando empiezan a vibrar: la pérdida está a segundos.' },
+      { salida: 'nivel', igual: 'bocina', tono: 'warn', texto: 'La bocina suena unos nudos antes de la pérdida: es tu aviso para bajar la nariz.' },
+      { siempre: true, tono: 'ok', texto: 'Sin avisos: hay margen de sobra para volar con seguridad.' }
+    ],
+    grafico: { tipo: 'linea', x: 'vel', y: ['alfa'], etiquetaX: 'Velocidad indicada (kt)', etiquetaY: 'Ángulo de ataque (°)', lineas: [{ x: 55, texto: 'bocina' }, { x: 47, texto: 'pérdida' }] },
+    escenarios: [{ nombre: 'Crucero lento', valores: { vel: 70 } }, { nombre: 'Suena la bocina', valores: { vel: 54 } }, { nombre: 'Bocina y vibración', valores: { vel: 49 } }, { nombre: 'En pérdida', valores: { vel: 46 } }]
+  });
+
+  /* ---- recuperar la pérdida: nariz abajo, toda la potencia y tirar sólo con velocidad suficiente (AER-03-04) */
+  M.register('recuperacion-perdida', {
+    nombre: 'Recuperá la pérdida', resumen: 'Cuánta altura se pierde según lo que hagas, y por qué tirar antes de tener velocidad te devuelve al ángulo crítico.',
+    prioridad: 95, reconoce: [/recuper(a|ar|acion).*perdida|perdida secundaria/],
+    controles: [
+      { id: 'nariz', etiqueta: 'La nariz', tipo: 'opcion', opciones: ['Dejarla arriba', 'Bajarla bajo el horizonte'], valor: 'Dejarla arriba', claves: [/nariz/] },
+      { id: 'potencia', etiqueta: 'La potencia', tipo: 'opcion', opciones: ['Ralentí', 'Toda la potencia'], valor: 'Ralentí', claves: [/potencia/] },
+      { id: 'tiro', etiqueta: 'Empezás a tirar a', tipo: 'rango', min: 40, max: 90, paso: 1, valor: 50, unidad: 'kt', claves: [/tir|vel|ias/],
+        marcas: [{ v: 47, t: '47' }, { v: 58, t: '58' }, { v: 90, t: '90' }], zonas: [{ desde: 40, hasta: 58, tono: 'bad' }, { desde: 58, hasta: 68, tono: 'ok' }, { desde: 68, hasta: 90, tono: 'warn' }],
+        rapidos: [{ v: 50, t: '50 kt' }, { v: 62, t: '62 kt' }, { v: 85, t: '85 kt' }] }
+    ],
+    salidas: [
+      { id: 'altura', etiqueta: 'Altura perdida', unidad: 'ft', dec: 0, destacada: true, barra: { min: 0, max: 600 } },
+      { id: 'vmin', etiqueta: 'Velocidad mínima para tirar', unidad: 'kt', dec: 0 },
+      { id: 'estado', etiqueta: 'Resultado', tipo: 'texto', destacada: true }
+    ],
+    fn: function (v) {
+      var vs = 47, vmin = vs * Math.sqrt(1.5), abajo = v.nariz === 'Bajarla bajo el horizonte', plena = v.potencia === 'Toda la potencia';
+      if (!abajo) return { altura: 400, vmin: vmin, estado: 'Sigue en pérdida', nivel: 'perdida' };
+      var acc = plena ? 3 : 1.5, t = Math.max(0, (v.tiro - vs) / acc), alt = 50 + 22 * t, sec = v.tiro < vmin;
+      if (sec) return { altura: alt + 150, vmin: vmin, estado: 'Pérdida secundaria', nivel: 'secundaria' };
+      return { altura: alt, vmin: vmin, estado: alt <= 200 ? 'Recuperada' : 'Recuperada, con mucha altura perdida', nivel: alt <= 200 ? 'ok' : 'mucha' };
+    },
+    umbrales: [
+      { salida: 'nivel', igual: 'perdida', tono: 'bad', texto: 'Sin bajar la nariz el ángulo de ataque no baja del crítico: el ala sigue en pérdida.' },
+      { salida: 'nivel', igual: 'secundaria', tono: 'bad', texto: 'Tiraste antes de tener velocidad: volviste al ángulo crítico y entraste en una segunda pérdida.' },
+      { salida: 'nivel', igual: 'mucha', tono: 'warn', texto: 'Recuperaste, pero perdiste mucha altura: sin toda la potencia o con una picada muy larga el avión baja de más.' },
+      { siempre: true, tono: 'ok', texto: 'Bien hecho: nariz abajo, toda la potencia y recién después tiraste, con velocidad suficiente.' }
+    ],
+    escenarios: [
+      { nombre: 'Nariz arriba', valores: { nariz: 'Dejarla arriba', potencia: 'Ralentí', tiro: 50 } },
+      { nombre: 'Tirás demasiado pronto', valores: { nariz: 'Bajarla bajo el horizonte', potencia: 'Toda la potencia', tiro: 50 } },
+      { nombre: 'Sin potencia', valores: { nariz: 'Bajarla bajo el horizonte', potencia: 'Ralentí', tiro: 62 } },
+      { nombre: 'Los tres pasos bien', valores: { nariz: 'Bajarla bajo el horizonte', potencia: 'Toda la potencia', tiro: 62 } }
+    ]
   });
 
   if (typeof module !== 'undefined' && module.exports) module.exports = M;

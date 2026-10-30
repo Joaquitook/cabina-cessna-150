@@ -16,10 +16,28 @@
       "Entender que esta clase es la base de la cultura de seguridad que se exige desde el primer día en la plataforma."
      ],
      "contenido": [
-      "La portada del curso lleva el lema “Donde un sueño se vuelve meta” y el título “Introducción. Curso Piloto Privado. AeroSur Escuela de Vuelo”.",
-      "La agenda (“¿Qué vamos a ver?”) tiene cinco puntos: 1) Funcionamiento de AeroSur y tu curso; 2) El acceso al aeropuerto; 3) Qué reglas seguir en los hangares y la plataforma; 4) Programa de Seguridad Operacional y Calidad de AeroSur; 5) Qué trámites y documentos hacer y llevar para sacar la licencia de alumno piloto.",
-      "La agenda se repite al empezar cada bloque, tachando lo que ya se vio.",
-      "Antes de empezar se “rompe el hielo”: cada alumno cuenta cómo se llama y cuántos años tiene, qué estudió o está estudiando, por qué quiere convertirse en piloto y qué espera del curso."
+      {
+       "titulo": "Donde un sueño se vuelve meta",
+       "tipo": "texto",
+       "texto": "Así arranca el curso: con el lema “Donde un sueño se vuelve meta”.\nEl título de la portada es «Introducción. Curso Piloto Privado. AeroSur Escuela de Vuelo».\nEsta primera clase te muestra el mapa de todo lo que viene."
+      },
+      {
+       "titulo": "Los cinco puntos de la agenda",
+       "tipo": "lista",
+       "texto": "Esta es la **agenda** (“¿Qué vamos a ver?”). Se repite al empezar cada bloque, tachando lo que ya viste:\nCómo funcionan AeroSur y tu curso.\nEl acceso al aeropuerto.\nQué reglas seguir en los hangares y la plataforma.\nEl Programa de Seguridad Operacional y Calidad de AeroSur.\nQué trámites y documentos hacer y llevar para sacar la licencia de alumno piloto.",
+       "resumen": "La Introducción tiene cinco puntos de agenda, desde cómo funciona AeroSur hasta los trámites para la licencia de alumno piloto."
+      },
+      {
+       "titulo": "La seguridad empieza el primer día",
+       "tipo": "idea",
+       "texto": "Esta clase es la base de la **cultura de seguridad** que se exige desde el primer día en la plataforma."
+      },
+      {
+       "titulo": "Rompemos el hielo",
+       "tipo": "lista",
+       "texto": "Antes de empezar se “rompe el hielo” y cada alumno cuenta:\nCómo te llamás y cuántos años tenés.\nQué estudiaste o qué estás estudiando.\nPor qué querés convertirte en piloto.\nQué esperás del curso.",
+       "resumen": "Te presentás: cómo te llamás, qué estudiás, por qué querés volar y qué esperás del curso."
+      }
      ],
      "componentes": [
       {
@@ -194,7 +212,8 @@
        "termino": "Cultura de seguridad",
        "definicion": "Forma de trabajar en la que todos cuidan la seguridad propia y la de los demás y reportan los peligros; es lo que el instructor exige desde el primer día."
       }
-     ]
+     ],
+     "resumen": "La Introducción tiene cinco puntos de agenda y arranca con lo más importante: la cultura de seguridad desde el primer día."
     },
     {
      "id": "INT-01-02",
@@ -207,12 +226,31 @@
       "Nombrar los cursos que se pueden hacer en la escuela y ubicar el Piloto Privado como primer escalón."
      ],
      "contenido": [
-      "AeroSur empezó el 21 de enero de 2013.",
-      "En 2018 DINACIA la certificó como CIAC (Centro de Instrucción de Aeronáutica Civil).",
-      "Ser CIAC significa que todos los exámenes teóricos y prácticos del curso los toman inspectores propios de AeroSur.",
-      "La escuela está reconocida por el Ministerio de Educación y Cultura (MEC).",
-      "La escuela da un certificado para tener días de estudio en el trabajo.",
-      "Cursos que se pueden hacer: Piloto Privado; Habilitación de Vuelo por Instrumentos; Piloto Comercial; Habilitación Multimotor; Instructor de Vuelo; Preparación del examen teórico de Piloto de Línea Aérea."
+      {
+       "titulo": "Seis cursos, un primer escalón",
+       "tipo": "lista",
+       "texto": "En AeroSur se pueden hacer estos cursos. El Piloto Privado, donde estás vos, es el primer escalón:\nPiloto Privado.\nHabilitación de Vuelo por Instrumentos.\nPiloto Comercial.\nHabilitación Multimotor.\nInstructor de Vuelo.\nPreparación del examen teórico de Piloto de Línea Aérea.",
+       "resumen": "El Piloto Privado es el primer escalón de los seis cursos de AeroSur."
+      },
+      {
+       "titulo": "2018: AeroSur se vuelve CIAC",
+       "tipo": "dato",
+       "dato": {
+        "valor": "2018",
+        "etiqueta": "La DINACIA certifica a AeroSur como CIAC"
+       },
+       "texto": "En 2018 la **DINACIA** certificó a AeroSur como **CIAC**.\nLa escuela había empezado el 21 de enero de 2013."
+      },
+      {
+       "titulo": "CIAC",
+       "tipo": "definicion",
+       "texto": "Un Centro de Instrucción de Aeronáutica Civil certificado por la DINACIA.\nQue AeroSur sea CIAC significa que todos los exámenes teóricos y prácticos del curso los toman inspectores propios de AeroSur."
+      },
+      {
+       "titulo": "La DINACIA certifica, el MEC reconoce",
+       "tipo": "texto",
+       "texto": "La escuela está reconocida por el Ministerio de Educación y Cultura (**MEC**): la DINACIA certifica y el MEC reconoce.\nAdemás, da un certificado para tener días de estudio en el trabajo."
+      }
      ],
      "componentes": [
       {
@@ -388,7 +426,8 @@
        "termino": "AeroSur",
        "definicion": "Escuela de vuelo con base en el Aeropuerto de Carrasco, fundada el 21 de enero de 2013."
       }
-     ]
+     ],
+     "resumen": "AeroSur es un CIAC certificado por la DINACIA en 2018 y reconocido por el MEC; el Piloto Privado es el primer escalón de sus cursos."
     },
     {
      "id": "INT-01-03",
@@ -401,10 +440,27 @@
       "Ubicar las cuatro bases en un mapa de Uruguay."
      ],
      "contenido": [
-      "La base principal es el Aeropuerto de Carrasco: “el aeropuerto más profesional del país”.",
-      "En Carrasco se pueden hacer vuelos diurnos, nocturnos y por instrumentos.",
-      "AeroSur tiene 3 bases satélite: “Green”, ubicada en Guazuvirá; el Aeropuerto del Jagüel, en Punta del Este; y el Aeropuerto de Melilla.",
-      "Las bases satélite dan mayor versatilidad en caso de ser necesario."
+      {
+       "titulo": "Cuatro bases en el mapa",
+       "tipo": "lista",
+       "texto": "AeroSur vuela desde una base principal y tres bases satélite:\nCarrasco, la base principal.\n“Green”, en Guazuvirá.\nEl Aeropuerto del Jagüel, en Punta del Este.\nEl Aeropuerto de Melilla.",
+       "resumen": "Una base principal, Carrasco, y tres satélites: Green, El Jagüel y Melilla."
+      },
+      {
+       "titulo": "Base principal",
+       "tipo": "definicion",
+       "texto": "El aeródromo donde la escuela hace la mayor parte de su operación: el aeropuerto de **Carrasco**.\n“El aeropuerto más profesional del país”, dice el curso. Ahí se vuela de día, de noche y por instrumentos."
+      },
+      {
+       "titulo": "Tres bases satélite",
+       "tipo": "dato",
+       "dato": {
+        "valor": 3,
+        "unidad": "bases",
+        "etiqueta": "satélite, además de Carrasco"
+       },
+       "texto": "Una **base satélite** es un aeródromo secundario: da mayor versatilidad a la escuela en caso de ser necesario."
+      }
      ],
      "componentes": [
       {
@@ -596,7 +652,8 @@
        "termino": "Carrasco",
        "definicion": "Aeropuerto de Montevideo, base principal de AeroSur."
       }
-     ]
+     ],
+     "resumen": "Carrasco es la base principal, con vuelos diurnos, nocturnos y por instrumentos; Green, El Jagüel y Melilla son las tres bases satélite."
     },
     {
      "id": "INT-01-04",
@@ -609,12 +666,28 @@
       "Entender la cadena de la instrucción de vuelo y de la instrucción teórica."
      ],
      "contenido": [
-      "La p. 7 presenta al plantel de instructores de la escuela.",
-      "En el organigrama (p. 8) arriba de todo está el Gerente Responsable, junto al Representante Legal.",
-      "En el nivel siguiente están Control de Gestión y Calidad, Asesoría Legal (una empresa externa) y los Auditores.",
-      "Después vienen el Jefe de Seguridad Terrestre, el Director de Operaciones / Director Técnico y el Jefe de Seguridad Operacional.",
-      "Del Director de Operaciones / Director Técnico dependen el Jefe de Instrucción de Vuelo y el Jefe de Instrucción Teórica.",
-      "Debajo del Jefe de Instrucción de Vuelo están el Ayudante de Instrucción de Vuelo y los Instructores de Vuelo."
+      {
+       "titulo": "El organigrama, nivel por nivel",
+       "tipo": "lista",
+       "texto": "La presentación empieza mostrándote al plantel de instructores. Después viene el **organigrama**, de arriba hacia abajo:\nArriba de todo, el Gerente Responsable, junto al Representante Legal.\nDespués, Control de Gestión y Calidad, Asesoría Legal (una empresa externa) y los Auditores.\nLuego, el Jefe de Seguridad Terrestre, el Director de Operaciones / Director Técnico y el Jefe de Seguridad Operacional.\nDel Director de Operaciones / Director Técnico dependen el Jefe de Instrucción de Vuelo y el Jefe de Instrucción Teórica.\nDebajo del Jefe de Instrucción de Vuelo, el Ayudante de Instrucción de Vuelo y los Instructores de Vuelo, que son tus profes.",
+       "resumen": "El organigrama baja desde el Gerente Responsable hasta los Instructores de Vuelo."
+      },
+      {
+       "titulo": "Jefe de Seguridad Operacional",
+       "tipo": "definicion",
+       "texto": "El cargo a cargo del programa SMS (Sistema de Gestión de la Seguridad Operacional) de la escuela.\nLos peligros se reportan por ese programa, que vemos en la unidad 6.",
+       "ejemplo": "Ves algo que puede lastimar a alguien en la plataforma: lo reportás por el programa SMS."
+      },
+      {
+       "titulo": "Dos ramas, un mismo director",
+       "tipo": "idea",
+       "texto": "La instrucción de vuelo y la instrucción teórica son dos ramas distintas, y las dos responden al Director de Operaciones / Director Técnico."
+      },
+      {
+       "titulo": "A quién le corresponde cada cosa",
+       "tipo": "texto",
+       "texto": "Los días y horarios de los vuelos se arreglan con tu profe, el instructor de vuelo.\nLas dudas de teoría son del Jefe de Instrucción Teórica. Las opiniones sobre el curso van por el formulario de Calidad, cuyo cargo más cercano es Control de Gestión y Calidad. Esos formularios los vemos en la unidad 6."
+      }
      ],
      "componentes": [
       {
@@ -899,7 +972,8 @@
        "termino": "Briefing",
        "definicion": "Charla previa con el instructor antes del vuelo o del simulador."
       }
-     ]
+     ],
+     "resumen": "El organigrama ordena los cargos de arriba hacia abajo, y la instrucción tiene dos ramas: la de vuelo y la teórica."
     },
     {
      "id": "INT-01-05",
@@ -912,10 +986,28 @@
       "Ubicar cada materia en los módulos de ESCUELA y en los instrumentos de la cabina 3D."
      ],
      "contenido": [
-      "La diapositiva dice “Son 11 materias” y las lista: Aerodinámica; Instrumentos; Procedimientos Operacionales; Motores y Sistemas; Comunicaciones Aeronáuticas y Radiotelefonía; Meteorología; Performance y Planificación de vuelo; Performance; Peso y Balance; Navegación; Actuaciones Humanas.",
-      "Performance y Planificación de vuelo se abre en dos: Performance y Peso y Balance. El 11 sale de contar todos los renglones de la lista.",
-      "El curso teórico y de vuelo debe completarse en menos de 18 meses para poder dar el examen de vuelo en AeroSur.",
-      "Al terminar cada materia hay un test (lo ves en la lección de tests)."
+      {
+       "titulo": "Las 11 materias del curso",
+       "tipo": "lista",
+       "texto": "El curso tiene {{11|materias}}, en este orden:\nAerodinámica.\nInstrumentos.\nProcedimientos Operacionales.\nMotores y Sistemas.\nComunicaciones Aeronáuticas y Radiotelefonía.\nMeteorología.\nPerformance y Planificación de vuelo.\nPerformance.\nPeso y Balance.\nNavegación.\nActuaciones Humanas.",
+       "ojo": "Performance y Planificación de vuelo se abre en dos: Performance y Peso y Balance. El 11 sale de contar todos los renglones de la lista.",
+       "resumen": "Son 11 materias, desde Aerodinámica hasta Actuaciones Humanas."
+      },
+      {
+       "titulo": "Menos de 18 meses",
+       "tipo": "dato",
+       "dato": {
+        "valor": 18,
+        "unidad": "meses",
+        "etiqueta": "Plazo para completar el curso teórico y de vuelo"
+       },
+       "texto": "Para poder dar el **examen de vuelo** en AeroSur, el curso teórico y de vuelo tiene que estar completo en ==menos de 18 meses==.\nLa fecha límite es la misma fecha, 18 meses después de que empezaste: tenés que terminar antes de ella."
+      },
+      {
+       "titulo": "Cada materia cierra con un test",
+       "tipo": "texto",
+       "texto": "Al terminar cada materia hay un test. Cómo funciona lo ves en la lección de los tests."
+      }
      ],
      "componentes": [
       {
@@ -1215,7 +1307,8 @@
        "termino": "Actuaciones Humanas",
        "definicion": "Materia sobre el rendimiento y las limitaciones de las personas que vuelan (en ESCUELA, módulo Factores Humanos)."
       }
-     ]
+     ],
+     "resumen": "Son 11 materias, cada una cierra con un test, y todo el curso teórico y de vuelo se completa en menos de 18 meses."
     },
     {
      "id": "INT-01-06",
@@ -1228,9 +1321,27 @@
       "Organizar tu estudio con el ritmo de 40 minutos y 5 de recreo."
      ],
      "contenido": [
-      "Las clases teóricas duran 2 horas y cada 40 minutos de clase se hace un recreo de 5 minutos.",
-      "Las clases de vuelo son de 1 hora.",
-      "A medida que se avanza en el curso los vuelos pueden extenderse más de esa hora, especialmente en la etapa de nocturnos y navegaciones."
+      {
+       "titulo": "Dos horas de teoría, una de vuelo",
+       "tipo": "dato",
+       "dato": {
+        "valor": 2,
+        "unidad": "horas",
+        "etiqueta": "Una clase teórica"
+       },
+       "texto": "Las clases teóricas duran 2 horas. Las clases de vuelo son de 1 hora.",
+       "ojo": "Más adelante en el curso los vuelos pueden extenderse más de esa hora, sobre todo en la etapa de nocturnos y navegaciones."
+      },
+      {
+       "titulo": "Cada 40 minutos, un recreo",
+       "tipo": "regla",
+       "texto": "Cada 40 minutos de clase se hace un recreo de 5 minutos. En una clase de 2 horas, eso son dos recreos."
+      },
+      {
+       "titulo": "Tu estudio, al ritmo del curso",
+       "tipo": "idea",
+       "texto": "Estudiá con el ritmo del curso: 40 minutos de trabajo y 5 de recreo."
+      }
      ],
      "componentes": [
       {
@@ -1305,13 +1416,21 @@
       },
       {
        "tipo": "calculadora",
-       "titulo": "Modo clase para estudiar",
-       "descripcion": "Temporizador de estudio con el ritmo del curso: 40 minutos de estudio, 5 de recreo, y al volver del recreo una mini pregunta de repaso del módulo (tomada del banco de preguntas). Sirve para cualquier materia de ESCUELA.",
+       "titulo": "Planificá tu estudio",
+       "descripcion": "Elegí a qué hora empezás y cuántos bloques de 40 minutos querés estudiar: la herramienta cuenta los recreos de 5 minutos y te dice a qué hora terminás.",
        "datos": {
-        "estudio": 40,
-        "recreo": 5,
-        "alVolver": "pregunta de repaso aleatoria",
-        "guardado": "localStorage"
+        "herramienta": "sesion-estudio",
+        "ejemplos": [
+         {
+          "nombre": "Una tarde de tres bloques",
+          "valores": {
+           "hora": "19:00",
+           "bloques": 3
+          },
+          "nota": "Tres bloques de 40 minutos y dos recreos: de 19:00 a 21:10."
+         }
+        ],
+        "nota": "Es el ritmo del curso: 40 minutos de trabajo y 5 de recreo."
        }
       }
      ],
@@ -1375,7 +1494,8 @@
        "termino": "Navegación (etapa de vuelo)",
        "definicion": "Vuelo de ruta, de más de una hora, que se hace hacia el final del curso."
       }
-     ]
+     ],
+     "resumen": "Clase teórica de 2 horas con 5 minutos de recreo cada 40; vuelo de 1 hora, que se estira en las etapas de nocturnos y navegaciones."
     }
    ]
   },
@@ -1393,9 +1513,22 @@
       "Recordar que ahí también están los accesos a los formularios de seguridad y de calidad."
      ],
      "contenido": [
-      "Google Classroom es tu mochila digital: ahí está todo el material que necesitás para el curso (presentaciones, deberes, manuales de los aviones, checklists, links y material extra de interés). Las checklists también las podés practicar en la cabina 3D de esta app.",
-      "Para entrar le pasás tu mail al profe: él te agrega al curso y te llega un mail de invitación para ingresar.",
-      "En la sección “links” de Classroom también están los accesos a los formularios de Seguridad Operacional (SMS) y de Calidad. Los vemos en la unidad 6."
+      {
+       "titulo": "Google Classroom",
+       "tipo": "definicion",
+       "texto": "Tu mochila digital: ahí está todo el material que necesitás para el curso.\nVas a encontrar presentaciones, deberes, manuales de los aviones, **checklists**, links y material extra de interés.\nLas checklists también las podés practicar en la cabina 3D de esta app."
+      },
+      {
+       "titulo": "Cómo entrás al curso",
+       "tipo": "lista",
+       "texto": "Para entrar a Classroom seguís estos pasos:\nLe pasás tu mail al profe.\nEl profe te agrega al curso.\nTe llega un mail de invitación.\nIngresás al curso y ves todo el material.",
+       "resumen": "Le pasás tu mail al profe, él te agrega y entrás con la invitación."
+      },
+      {
+       "titulo": "Formularios de seguridad y calidad",
+       "tipo": "texto",
+       "texto": "En la sección “links” de Classroom también están los accesos a los formularios de Seguridad Operacional (SMS) y de Calidad. Los vemos en la unidad 6."
+      }
      ],
      "componentes": [
       {
@@ -1551,7 +1684,8 @@
        "termino": "Checklist",
        "definicion": "Lista de verificación: pasos que se siguen en orden para no olvidarse de nada."
       }
-     ]
+     ],
+     "resumen": "Classroom es la mochila digital del curso: el profe te agrega y ahí tenés el material, las checklists y los formularios."
     },
     {
      "id": "INT-02-02",
@@ -1826,10 +1960,33 @@
       "Saber cuándo la escuela cobra la clase o la hora de vuelo entera."
      ],
      "contenido": [
-      "Los días y horarios de los teóricos, los vuelos y el simulador se arreglan con tu profe. Cada actividad tiene su anticipación: para volar, 30 minutos antes; para el simulador, 15; al teórico, a la hora acordada.",
-      "En un vuelo, esos 30 minutos son para revisar el avión y hacer el briefing (la charla previa con el profe), y la hora acordada es la de puesta en marcha del motor. En el simulador, los 15 minutos son para el briefing y la hora acordada es la del comienzo.",
-      "Las cancelaciones de vuelos, simuladores o teóricos tienen que avisarse por lo menos 24 horas antes.",
-      "Si llegás media hora tarde o más sin el aviso correspondiente, se cobra la clase o la hora de vuelo entera. Lo mismo pasa si te olvidás de que tenías clase y no concurrís."
+      {
+       "titulo": "Cuánto antes tenés que llegar",
+       "tipo": "lista",
+       "texto": "Los días y horarios de los teóricos, los vuelos y el simulador se arreglan con tu profe. Cada actividad tiene su anticipación:\nVuelo: {{30|min}} antes de la hora acordada.\nSimulador: {{15|min}} antes.\nTeórico: a la hora acordada.",
+       "resumen": "Vuelo: 30 minutos antes. Simulador: 15 minutos antes. Teórico: a la hora acordada."
+      },
+      {
+       "titulo": "Qué hacés en esos minutos",
+       "tipo": "texto",
+       "texto": "En un vuelo, esos 30 minutos son para revisar el avión y hacer el **briefing**, la charla previa con el profe. La hora acordada es la de **puesta en marcha** del motor.\nEn el simulador, los 15 minutos son para el briefing y la hora acordada es la del comienzo.",
+       "ejemplo": "Vuelo acordado a las {{10:30}}: llegás a las 10:00. Simulador acordado a las {{15:00}}: llegás a las 14:45."
+      },
+      {
+       "titulo": "Cancelar: 24 horas de aviso",
+       "tipo": "dato",
+       "dato": {
+        "valor": 24,
+        "unidad": "horas",
+        "etiqueta": "Aviso mínimo para cancelar"
+       },
+       "texto": "Las cancelaciones de vuelos, simuladores o teóricos tienen que avisarse por lo menos 24 horas antes."
+      },
+      {
+       "titulo": "Media hora tarde, clase cobrada",
+       "tipo": "ojo",
+       "texto": "Si llegás media hora tarde o más sin el aviso correspondiente, se cobra la clase o la hora de vuelo entera. Lo mismo pasa si te olvidás de que tenías clase y no concurrís."
+      }
      ],
      "componentes": [
       {
@@ -2062,7 +2219,8 @@
        "termino": "Puesta en marcha",
        "definicion": "Arranque del motor; es la hora que se acuerda para un vuelo."
       }
-     ]
+     ],
+     "resumen": "Llegás 30 minutos antes a un vuelo y 15 al simulador, cancelás con 24 horas de aviso, y media hora tarde sin avisar se cobra entera."
     },
     {
      "id": "INT-02-04",
@@ -2075,10 +2233,22 @@
       "Entender por qué el calzado cerrado es parte de la seguridad."
      ],
      "contenido": [
-      "Cuando se vuela se usa calzado cerrado: no sirven las chancletas, los crocs ni las sandalias.",
-      "El curso da la regla; la razón práctica es que en el avión tus pies trabajan todo el vuelo sobre los pedales. Mirá dónde están y cómo se frena con la punta de cada uno.",
-      "En verano puede llegar a ser necesario un gorro.",
-      "La ropa tiene que ser prolija y no debe contener nada ofensivo."
+      {
+       "titulo": "Calzado cerrado",
+       "tipo": "definicion",
+       "texto": "El que cubre todo el pie, como los championes o los botines: es el único que se usa para volar.\nNo sirven las chancletas, los crocs ni las sandalias."
+      },
+      {
+       "titulo": "Tus pies trabajan en los pedales",
+       "tipo": "idea",
+       "texto": "El curso da la regla; la razón práctica es que tus pies trabajan todo el vuelo sobre los pedales."
+      },
+      {
+       "titulo": "El resto de la ropa",
+       "tipo": "lista",
+       "texto": "Además del calzado, tené en cuenta:\nEn verano puede llegar a ser necesario un gorro.\nLa ropa tiene que ser prolija.\nNo debe tener nada ofensivo.",
+       "resumen": "Gorro si hace falta en verano, y ropa prolija sin nada ofensivo."
+      }
      ],
      "componentes": [
       {
@@ -2261,7 +2431,8 @@
        "termino": "Frenos de punta",
        "definicion": "Frenos del avión que se aplican apretando con la punta del pie la parte de arriba de cada pedal."
       }
-     ]
+     ],
+     "resumen": "Para volar: calzado cerrado, porque tus pies trabajan en los pedales, y ropa prolija sin nada ofensivo."
     }
    ]
   },
@@ -2279,10 +2450,22 @@
       "Reconocer los ejemplos de actitudes que “cuestan cervezas”."
      ],
      "contenido": [
-      "El Cervesómetro es el formulario A1 de seguridad: ahí se anotan todas las actitudes o situaciones que afectan la seguridad propia y la de otros.",
-      "Por cada actitud o situación peligrosa se cobran “cervezas”, que son la unidad con la que se cuentan las faltas. Cuántas, depende de qué tan grave sea.",
-      "Durante el curso es normal cometer errores. Las cervezas empiezan a cobrarse cuando el profe te corrige varias veces lo mismo y no hacés caso.",
-      "Ejemplos de cuándo se anotan cervezas: no hacer los deberes en reiteradas oportunidades, llegar tarde en reiteradas oportunidades, no seguir los pasos de la cartilla (la lista de pasos escritos del avión), dejar los magnetos conectados (la llave de encendido sin llevar a OFF) y equivocarse de pista."
+      {
+       "titulo": "El Cervesómetro",
+       "tipo": "definicion",
+       "texto": "Es el formulario A1 de seguridad: ahí se anotan todas las actitudes o situaciones que afectan la seguridad propia y la de otros.\nPor cada una se cobran “cervezas”, la unidad con la que se cuentan las faltas. Cuántas, depende de qué tan grave sea."
+      },
+      {
+       "titulo": "Equivocarse es normal",
+       "tipo": "idea",
+       "texto": "Durante el curso es normal cometer errores: las cervezas empiezan a cobrarse cuando el profe te corrige varias veces lo mismo y no hacés caso."
+      },
+      {
+       "titulo": "Cuándo se anotan cervezas",
+       "tipo": "lista",
+       "texto": "Algunos ejemplos de cuándo se anotan cervezas:\nNo hacer los deberes en reiteradas oportunidades.\nLlegar tarde en reiteradas oportunidades.\nNo seguir los pasos de la **cartilla** (la lista de pasos escritos del avión).\nDejar los **magnetos** conectados (la llave de encendido sin llevar a OFF).\nEquivocarse de pista.",
+       "resumen": "Repetir deberes sin hacer o llegadas tarde, saltearse la cartilla, dejar los magnetos conectados o equivocarse de pista suma cervezas."
+      }
      ],
      "componentes": [
       {
@@ -2518,7 +2701,8 @@
        "termino": "Magnetos",
        "definicion": "Generadores que producen la chispa del motor; la llave de encendido los conecta o los desconecta."
       }
-     ]
+     ],
+     "resumen": "El Cervesómetro es el formulario A1 de seguridad: equivocarse es normal, pero repetir lo que el profe ya te corrigió suma cervezas."
     },
     {
      "id": "INT-03-02",
@@ -2545,8 +2729,7 @@
       },
       {
        "titulo": "Regla 3: si no concurrís",
-       "tipo": "regla",
-       "n": 3,
+       "tipo": "ojo",
        "texto": "Si un piloto no concurre, igualmente se le debitan las cervezas que le corresponden."
       },
       {
@@ -2563,10 +2746,8 @@
       },
       {
        "titulo": "Regla 6: la aeronave ajena",
-       "tipo": "regla",
-       "n": 6,
-       "texto": "Si un alumno cambia su horario de vuelo para salir a pasear en una aeronave ajena a AeroSur, esa hora no se puede anotar fuera del CIAC y el seguro no cubre un eventual incidente.",
-       "ojo": "Es una muestra de pobre criterio aeronáutico y corresponde la máxima pena por los retrasos que cause en la planilla o en los teóricos."
+       "tipo": "ojo",
+       "texto": "Si un alumno cambia su horario de vuelo para salir a pasear en una aeronave ajena a AeroSur, esa hora no se puede anotar fuera del CIAC y el seguro no cubre un eventual incidente. Es una muestra de pobre criterio aeronáutico y corresponde la máxima pena por los retrasos que cause en la planilla o en los teóricos."
       },
       {
        "titulo": "Regla 7: leves, medias y graves",
@@ -2775,10 +2956,27 @@
       "Relacionar las faltas con los controles de la cabina 3D."
      ],
      "contenido": [
-      "La regla 7 clasifica todas las faltas por su gravedad. Leves: de 1 a 3 cervezas. Medias: hasta 6 (los alumnos reciben menos y los pilotos más). Graves: de 6 a 24.",
-      "Leves: no sacar las calzas (las cuñas de las ruedas) y dejar los cintos colgando hacia afuera. Medias: saltarse pasos de la cartilla, no prender el transpondedor (el equipo que responde al radar) y olvidarse de apagar las luces en un vuelo nocturno. Varias de estas faltas son controles de la cabina: mirá dónde están.",
-      "Graves: todas las que atentan contra la seguridad de las tripulaciones, del avión y de otros tránsitos, como las incursiones en pista, cruzarse con otros tránsitos, los tránsitos equivocados o confundirse de pista.",
-      "Las calzas son cuñas que se ponen en las ruedas para que el avión estacionado no se mueva. Una incursión en pista es la presencia no autorizada de una aeronave, un vehículo o una persona en una pista."
+      {
+       "titulo": "Tres gravedades, tres franjas",
+       "tipo": "lista",
+       "texto": "La regla 7 clasifica todas las faltas por su gravedad:\nLeves: de {{1 a 3|cervezas}}.\nMedias: hasta {{6|cervezas}}; los alumnos reciben menos y los pilotos más.\nGraves: de {{6 a 24|cervezas}}.",
+       "resumen": "Leves de 1 a 3 cervezas, medias hasta 6 y graves de 6 a 24."
+      },
+      {
+       "titulo": "Ejemplos de faltas leves y medias",
+       "tipo": "ejemplo",
+       "texto": "Leves: no sacar las **calzas** (las cuñas que se ponen en las ruedas para que el avión estacionado no se mueva) y dejar los cintos colgando hacia afuera.\nMedias: saltarse pasos de la cartilla, no prender el **transpondedor** (el equipo que responde al radar) y olvidarse de apagar las luces en un vuelo nocturno.\nVarias de estas faltas son controles de la cabina: mirá dónde están."
+      },
+      {
+       "titulo": "Las faltas graves",
+       "tipo": "ojo",
+       "texto": "Son todas las que atentan contra la seguridad de las tripulaciones, del avión y de otros tránsitos: las incursiones en pista, cruzarse con otros tránsitos, los tránsitos equivocados o confundirse de pista."
+      },
+      {
+       "titulo": "Incursión en pista",
+       "tipo": "definicion",
+       "texto": "La presencia no autorizada de una aeronave, un vehículo o una persona en una pista.\nEs una falta grave."
+      }
      ],
      "componentes": [
       {
@@ -3043,7 +3241,8 @@
        "termino": "Tránsito",
        "definicion": "Cada aeronave o vehículo que se mueve en el aeródromo o en el aire."
       }
-     ]
+     ],
+     "resumen": "Leves de 1 a 3 cervezas, medias hasta 6 y graves de 6 a 24: las graves atentan contra la seguridad de las tripulaciones, del avión y de otros tránsitos."
     },
     {
      "id": "INT-03-04",
@@ -3056,9 +3255,28 @@
       "Relacionar el Cervesómetro con los hábitos de seguridad al terminar un vuelo."
      ],
      "contenido": [
-      "A mitad de año y a fin de año se hace un recuento de quiénes tienen cervezas anotadas y cuántas. A cada cerveza se le pone un precio, el monto se descuenta de las cuentas de cada uno y con lo recaudado se hace un asado.",
-      "Lo que castiga el Cervesómetro son hábitos de seguridad. Un buen ejemplo es asegurar el avión al terminar el vuelo: magnetos, master, luces y cintos. Probá el apagado completo en la cabina 3D.",
-      "El apagado sigue un orden: freno de estacionamiento, radios y luces apagados, mezcla en corte (el motor se para), llave en OFF, master en OFF y traba de comandos puesta. El master en OFF evita que la batería se descargue."
+      {
+       "titulo": "Del recuento al asado",
+       "tipo": "lista",
+       "texto": "A mitad de año y a fin de año pasa esto:\nSe hace el **recuento**: quiénes tienen cervezas anotadas y cuántas.\nA cada cerveza se le pone un precio.\nEl monto se descuenta de las cuentas de cada uno.\nCon lo recaudado se hace un asado.",
+       "resumen": "Recuento, precio por cerveza, descuento en las cuentas y asado con lo recaudado."
+      },
+      {
+       "titulo": "El Cervesómetro castiga hábitos",
+       "tipo": "idea",
+       "texto": "Lo que castiga el Cervesómetro son ==hábitos de seguridad==, como asegurar el avión al terminar el vuelo: magnetos, master, luces y cintos."
+      },
+      {
+       "titulo": "El orden del apagado",
+       "tipo": "lista",
+       "texto": "El apagado sigue este orden:\nFreno de estacionamiento puesto.\nRadios y transpondedor apagados.\nLuces apagadas.\nMezcla en corte: el motor se para.\nLlave de encendido en OFF.\nMaster en OFF.\nTraba de comandos puesta.",
+       "resumen": "Freno, radios, luces, mezcla, llave, master y traba de comandos, siempre en ese orden."
+      },
+      {
+       "titulo": "No te olvides del master",
+       "tipo": "ojo",
+       "texto": "El master en OFF evita que la batería se descargue. Si queda prendido, el próximo alumno puede no poder arrancar."
+      }
      ],
      "componentes": [
       {
@@ -3299,7 +3517,8 @@
        "termino": "Recuento",
        "definicion": "Cuenta de las cervezas anotadas a cada uno, que se hace a mitad y a fin de año."
       }
-     ]
+     ],
+     "resumen": "Con las cervezas se hace un recuento y un asado, pero lo que importa es el hábito: apagar el avión siempre en el mismo orden."
     }
    ]
   },
@@ -3326,7 +3545,8 @@
       {
        "titulo": "Horarios y portón de reserva",
        "tipo": "lista",
-       "texto": "El 6A abre:\nDe lunes a viernes, de 06:00 a 21:00.\nSábados y domingos, de 06:00 a 19:00.\nCuando está cerrado se usa el **Portón de Bomberos**, que tiene horario de 24 horas.\nEn el plano: el 6A está detrás del Starbucks y el de Bomberos queda aparte."
+       "texto": "El 6A abre:\nDe lunes a viernes, de 06:00 a 21:00.\nSábados y domingos, de 06:00 a 19:00.\nCuando está cerrado se usa el **Portón de Bomberos**, que tiene horario de 24 horas.\nEn el plano: el 6A está detrás del Starbucks y el de Bomberos queda aparte.",
+       "resumen": "El 6A abre de lunes a viernes de 06:00 a 21:00 y sábados y domingos de 06:00 a 19:00; cuando está cerrado, se usa el de Bomberos."
       },
       {
        "titulo": "Confirmá antes de ir",
@@ -3675,8 +3895,22 @@
       "Enumerar los tres medios de control que usa."
      ],
      "contenido": [
-      "La Policía Aérea Nacional (PAN) controla quién entra a los aeropuertos y se ocupa de todo lo relacionado con la seguridad aeroportuaria. Registra a las personas y sus pertenencias que ingresan a las áreas restringidas o estériles, con detectores de metales, máquinas de rayos X y detectores de droga y explosivos.",
-      "La PAN depende de la Fuerza Aérea, por eso son militares."
+      {
+       "titulo": "Policía Aérea Nacional (PAN)",
+       "tipo": "definicion",
+       "texto": "Controla quién entra a los aeropuertos y se ocupa de todo lo relacionado con la seguridad aeroportuaria.\nRegistra a las personas y sus pertenencias que ingresan a las áreas **restringidas o estériles**."
+      },
+      {
+       "titulo": "Tres medios de control",
+       "tipo": "lista",
+       "texto": "Para revisar a las personas y sus pertenencias, la PAN usa:\nDetectores de metales.\nMáquinas de rayos X.\nDetectores de droga y explosivos.",
+       "resumen": "Detectores de metales, rayos X y detectores de droga y explosivos."
+      },
+      {
+       "titulo": "Por qué son militares",
+       "tipo": "idea",
+       "texto": "La PAN depende de la Fuerza Aérea, por eso son militares."
+      }
      ],
      "componentes": [
       {
@@ -3826,7 +4060,8 @@
        "termino": "Área restringida o estéril",
        "definicion": "Zona del aeropuerto con acceso controlado, donde la PAN registra a las personas y sus pertenencias."
       }
-     ]
+     ],
+     "resumen": "La PAN, que depende de la Fuerza Aérea, controla quién entra con detectores de metales, rayos X y detectores de droga y explosivos."
     },
     {
      "id": "INT-04-03",
@@ -3839,11 +4074,27 @@
       "Saber qué hacer si venís en bicicleta."
      ],
      "contenido": [
-      "No se puede ingresar a los hangares con armas de fuego ni con ningún otro tipo de arma.",
-      "Tampoco con objetos punzantes o con filo (que pinchan o cortan), ni con objetos contundentes (que golpean).",
-      "Están prohibidas las sustancias explosivas e inflamables, las sustancias químicas y tóxicas, y también las herramientas.",
-      "Los líquidos están prohibidos, salvo excepciones. Esas excepciones pueden cambiar: preguntá en la escuela cuáles rigen.",
-      "Si venís en bici, podés entrarla, pero tenés que ir caminando por la plataforma hasta dejarla adentro del hangar."
+      {
+       "titulo": "Lo que no entra a los hangares",
+       "tipo": "lista",
+       "texto": "No se puede ingresar a los hangares con:\nArmas de fuego ni ningún otro tipo de arma.\nObjetos punzantes o con filo, ni objetos contundentes.\nSustancias explosivas e inflamables.\nSustancias químicas y tóxicas.\nHerramientas.",
+       "resumen": "Nada de armas, objetos punzantes o contundentes, explosivos, químicos ni herramientas."
+      },
+      {
+       "titulo": "Punzante o contundente",
+       "tipo": "ejemplo",
+       "texto": "Una tijera o un cortaplumas pinchan o cortan: cada uno es un **objeto punzante o con filo**.\nUn bate golpea: es un **objeto contundente**."
+      },
+      {
+       "titulo": "Los líquidos tienen excepciones",
+       "tipo": "ojo",
+       "texto": "Los líquidos están prohibidos, salvo excepciones. Esas excepciones pueden cambiar: **preguntá en la escuela** cuáles rigen."
+      },
+      {
+       "titulo": "Si venís en bicicleta",
+       "tipo": "texto",
+       "texto": "Podés entrarla, pero tenés que ir caminando por la **plataforma** hasta dejarla adentro del hangar."
+      }
      ],
      "componentes": [
       {
@@ -4100,7 +4351,8 @@
        "termino": "Plataforma",
        "definicion": "Área donde se estacionan y se mueven los aviones."
       }
-     ]
+     ],
+     "resumen": "A los hangares no entran armas, objetos punzantes o contundentes, sustancias peligrosas ni herramientas; los líquidos y la bici tienen sus reglas."
     },
     {
      "id": "INT-04-04",
@@ -4113,12 +4365,27 @@
       "Reconocer los únicos documentos válidos."
      ],
      "contenido": [
-      "Solo podés ingresar a los hangares si vas a tener clase o vuelo en AeroSur.",
-      "Tenés que figurar en el listado de ingresos provisorios mensual de AeroSur, que gestiona la escuela. Para eso le pasás a la escuela tu nombre completo y tu número de cédula.",
-      "En la entrada, el oficial de la PAN verifica que figurás en el listado: por eso tenés que entregarle tu cédula de identidad.",
-      "Cuando verifica tu identidad y anota tus datos (incluido el celular), te entrega un carnet provisorio junto con tu cédula, para poder ingresar a los hangares.",
-      "El carnet provisorio se devuelve cuando te vas de la escuela.",
-      "Los únicos documentos válidos para entrar son la cédula de identidad y el pasaporte."
+      {
+       "titulo": "Solo con clase o vuelo",
+       "tipo": "idea",
+       "texto": "Solo podés ingresar a los hangares si vas a tener clase o vuelo en AeroSur."
+      },
+      {
+       "titulo": "Del listado a la puerta",
+       "tipo": "lista",
+       "texto": "Para entrar, el recorrido es este:\nLe pasás a la escuela tu nombre completo y tu número de cédula.\nLa escuela te incluye en el **listado de ingresos provisorios mensual**.\nEn la entrada le entregás tu cédula al oficial de la PAN, que verifica que figurás en el listado.\nEl oficial verifica tu identidad y anota tus datos, incluido el celular.",
+       "resumen": "Datos a la escuela, listado, cédula a la PAN y verificación de tu identidad."
+      },
+      {
+       "titulo": "Carnet provisorio",
+       "tipo": "definicion",
+       "texto": "El pase que te entrega la PAN, junto con tu cédula, para ingresar a los hangares.\nEs provisorio: lo devolvés cuando te vas de la escuela."
+      },
+      {
+       "titulo": "Solo cédula o pasaporte",
+       "tipo": "ojo",
+       "texto": "Los únicos documentos válidos para entrar son la **cédula de identidad** y el pasaporte."
+      }
      ],
      "componentes": [
       {
@@ -4347,7 +4614,8 @@
        "termino": "Cédula de identidad",
        "definicion": "Documento de identidad uruguayo; junto con el pasaporte es el único válido para entrar."
       }
-     ]
+     ],
+     "resumen": "Entrás solo con clase o vuelo: figurás en el listado, mostrás cédula o pasaporte y la PAN te da un carnet que devolvés al irte."
     },
     {
      "id": "INT-04-05",
@@ -4360,10 +4628,26 @@
       "Leer las zonas habilitadas en el plano del aeropuerto."
      ],
      "contenido": [
-      "Hay dos tipos de carnet provisorio, según la zona que habilitan; los distingue el número del cartel: el “4” y el “3S”.",
-      "El carnet “4” permite ir a los Hangares Sur y además a las plataformas, pero únicamente acompañado de un instructor.",
-      "El carnet “3S” permite ir a los Hangares Sur únicamente.",
-      "En el plano, las zonas habilitadas se ven en amarillo: la plataforma comercial y los Hangares Sur."
+      {
+       "titulo": "Dos carnets, dos zonas",
+       "tipo": "texto",
+       "texto": "Hay dos tipos de **carnet provisorio**, según la zona que habilitan. Los distingue el número del cartel: el “4” y el “3S”.\nEn el plano, las zonas habilitadas se ven en ==amarillo==: la plataforma comercial y los Hangares Sur."
+      },
+      {
+       "titulo": "Carnet “4”",
+       "tipo": "definicion",
+       "texto": "Habilita los Hangares Sur y además las plataformas."
+      },
+      {
+       "titulo": "El 3S, solo Hangares Sur",
+       "tipo": "idea",
+       "texto": "El carnet “3S” habilita únicamente los Hangares Sur."
+      },
+      {
+       "titulo": "A la plataforma, con instructor",
+       "tipo": "ojo",
+       "texto": "A las plataformas se va únicamente acompañado de un instructor, y solo con el carnet “4”."
+      }
      ],
      "componentes": [
       {
@@ -4611,7 +4895,8 @@
        "termino": "Carnet “3S”",
        "definicion": "Carnet provisorio que habilita solamente los Hangares Sur."
       }
-     ]
+     ],
+     "resumen": "El carnet “4” habilita los Hangares Sur y las plataformas (con un instructor); el “3S”, solo los Hangares Sur."
     },
     {
      "id": "INT-04-06",
@@ -4624,9 +4909,27 @@
       "Decidir si llegás a tiempo para un trámite."
      ],
      "contenido": [
-      "Para traer invitados completás un formulario en la página de seguridad de Puertas del Sur (aeropuertosuruguay.sofisbpm.com/tramites). Con él se tramita el pase provisorio del invitado.",
-      "Tenés que hacerlo como mínimo con 48 horas de antelación, de lunes a viernes, para poder tramitar el pase provisorio.",
-      "Si querés traer invitados un fin de semana, el último día para completar el formulario es el jueves."
+      {
+       "titulo": "48 horas de antelación",
+       "tipo": "dato",
+       "dato": {
+        "valor": 48,
+        "unidad": "horas",
+        "etiqueta": "Antelación mínima, de lunes a viernes"
+       },
+       "texto": "Para traer invitados completás un formulario en la página de seguridad de **Puertas del Sur**: con él se tramita el **pase provisorio** del invitado.\nHay que hacerlo como mínimo con 48 horas de antelación, de lunes a viernes."
+      },
+      {
+       "titulo": "El trámite, paso a paso",
+       "tipo": "lista",
+       "texto": "Para traer a un invitado:\nElegís el día de la visita.\nCompletás el formulario en aeropuertosuruguay.sofisbpm.com/tramites.\nLo hacés con la antelación mínima.\nTu invitado recibe el pase provisorio.",
+       "resumen": "Elegís el día, completás el formulario a tiempo y tu invitado recibe el pase."
+      },
+      {
+       "titulo": "Fin de semana: hasta el jueves",
+       "tipo": "ojo",
+       "texto": "Si querés traer invitados un fin de semana, el último día para completar el formulario es el ==jueves==."
+      }
      ],
      "componentes": [
       {
@@ -4863,7 +5166,8 @@
        "termino": "Puertas del Sur",
        "definicion": "Nombre de la administración que tiene la página de seguridad donde se hace el trámite."
       }
-     ]
+     ],
+     "resumen": "Un invitado se tramita por formulario con 48 horas de antelación, de lunes a viernes; para el fin de semana, el último día es el jueves."
     }
    ]
   },
@@ -4881,9 +5185,21 @@
       "Explicar por qué no se fuma en la plataforma ni dentro de los hangares."
      ],
      "contenido": [
-      "En la plataforma usás siempre chaleco: al entrar ahí estás pisando un área operativa del aeropuerto, o sea, una zona por donde se mueven aviones y vehículos. Adentro de la escuela y adentro del avión te lo podés sacar.",
-      "En los hangares y en la plataforma hay sustancias muy inflamables, es decir, que se prenden fuego con facilidad: el combustible, el aceite, la pintura y otras más.",
-      "Por eso está prohibido fumar en la plataforma y adentro de los hangares: una brasa cerca de esas sustancias puede ser un incendio."
+      {
+       "titulo": "Chaleco siempre en la plataforma",
+       "tipo": "regla",
+       "texto": "En la plataforma usás **chaleco** siempre. Entrás a un **área operativa** del aeropuerto, o sea, una zona por donde se mueven aviones y vehículos. Adentro de la escuela y adentro del avión te lo podés sacar."
+      },
+      {
+       "titulo": "Inflamable",
+       "tipo": "definicion",
+       "texto": "Lo que se enciende y arde con facilidad. En los hangares y en la plataforma hay varias sustancias así: el combustible, el aceite, la pintura y otras más."
+      },
+      {
+       "titulo": "Prohibido fumar en la plataforma",
+       "tipo": "ojo",
+       "texto": "No se fuma en la plataforma ni adentro de los hangares. Una brasa cerca de esas sustancias puede terminar en un incendio."
+      }
      ],
      "componentes": [
       {
@@ -5158,10 +5474,10 @@
       {
        "pregunta": "¿Por qué está prohibido fumar en la plataforma y en los hangares?",
        "opciones": [
-        "Porque hay combustible, aceite y pintura que se prenden fácil",
+        "Porque hay combustible, aceite y otras cosas que arden fácil",
         "Porque el humo molesta a quienes trabajan en el hangar",
-        "Porque el olor se pega a la pintura de los aviones",
-        "Porque el humo puede tapar la visión de los pilotos"
+        "Porque el olor del cigarrillo se pega a la pintura de los aviones",
+        "Porque el humo puede tapar la visión de los pilotos al rodar"
        ],
        "correcta": 0,
        "explicacion": "La razón es la seguridad: el combustible, el aceite, la pintura y otras sustancias son muy inflamables.",
@@ -5170,7 +5486,7 @@
       {
        "pregunta": "¿Dónde podés sacarte el chaleco?",
        "opciones": [
-        "Caminando de la escuela al avión",
+        "Caminando de la escuela al avión, por la plataforma",
         "Parado junto al avión, en la plataforma",
         "En cualquier lugar, si hace calor",
         "Adentro de la escuela y adentro del avión"
@@ -5201,7 +5517,8 @@
        "termino": "Inflamable",
        "definicion": "Que se enciende y arde con facilidad; el combustible, el aceite y la pintura lo son."
       }
-     ]
+     ],
+     "resumen": "En la plataforma, chaleco puesto; y ni una brasa cerca del combustible, el aceite o la pintura."
     },
     {
      "id": "INT-05-02",
@@ -5214,9 +5531,21 @@
       "Explicar por qué no hay que ponerse detrás de un avión con el motor prendido."
      ],
      "contenido": [
-      "El beacon es la luz roja giratoria del avión, una luz anticolisión. Si está prendido, el avión está por arrancar el motor o ya lo tiene en marcha.",
-      "No te acerques a un avión con el beacon prendido: la hélice puede estar girando. Mirá en el dibujo dónde queda la zona peligrosa.",
-      "Tampoco te pares detrás de un avión con el motor prendido, aunque sea verano y el aire que corre te parezca lindo. El chorro de la hélice, el aire que ella empuja hacia atrás, puede arrojar una piedra y pegarte."
+      {
+       "titulo": "Beacon",
+       "tipo": "definicion",
+       "texto": "La luz roja giratoria del avión, una luz anticolisión. Si está prendida, el avión está por arrancar el motor o ya lo tiene en marcha."
+      },
+      {
+       "titulo": "Beacon prendido: no te acerques",
+       "tipo": "regla",
+       "texto": "No te acerques a un avión con el beacon prendido: la hélice puede estar girando. Mirá en el dibujo dónde queda la zona peligrosa."
+      },
+      {
+       "titulo": "Detrás tampoco, ni en verano",
+       "tipo": "ojo",
+       "texto": "No te pares detrás de un avión con el motor prendido, aunque el aire que corre te parezca lindo. El **chorro de la hélice**, el aire que ella empuja hacia atrás, puede arrojar una piedra y pegarte."
+      }
      ],
      "componentes": [
       {
@@ -5498,13 +5827,14 @@
      "glosario": [
       {
        "termino": "Beacon",
-       "definicion": "Luz anticolisión roja y giratoria del avión; prendida, avisa que el motor está por arrancar o ya está en marcha."
+       "definicion": "Luz anticolisión roja y giratoria del avión; prendida, significa que el motor está por arrancar o ya está en marcha."
       },
       {
-       "termino": "Chorro de la hélice (flujo de la hélice)",
-       "definicion": "El aire que la hélice empuja hacia atrás; puede arrojar una piedra y golpear a una persona."
+       "termino": "Chorro de la hélice",
+       "definicion": "Aire que la hélice empuja hacia atrás; también se le dice flujo de la hélice. Puede arrojar piedras y golpear a una persona."
       }
-     ]
+     ],
+     "resumen": "Con el beacon prendido, ni delante ni detrás del avión: la hélice gira y su chorro puede arrojar piedras."
     },
     {
      "id": "INT-05-03",
@@ -5517,10 +5847,26 @@
       "Relacionar la regla con la llave de magnetos y con el apagado del avión."
      ],
      "contenido": [
-      "La regla de oro: nunca tocar ni mover una hélice, aunque el avión esté apagado. Al moverla, el motor puede arrancar sin querer y causar heridas muy serias o cosas peores.",
-      "Una razón: los magnetos hacen su propia chispa, sin depender de la batería ni del master. Por eso tratá siempre a la hélice como si estuviera «viva». (El detalle técnico lo vemos en Motores y Sistemas.)",
-      "Las calzas son las cuñas que se ponen en las ruedas para que el avión estacionado no se mueva. El curso tiene un chiste sobre el alumno que cree que no las necesita: no las olvides.",
-      "Más adelante en el curso el instructor te enseña cómo darte cuenta de cuándo es seguro tocar una hélice. Hasta entonces, la respuesta es no."
+      {
+       "titulo": "La regla de oro",
+       "tipo": "idea",
+       "texto": "Nunca toques ni muevas una hélice, aunque el avión esté apagado. Al moverla, el motor puede arrancar sin querer y causar heridas muy serias, o cosas peores."
+      },
+      {
+       "titulo": "Hélice viva",
+       "tipo": "definicion",
+       "texto": "Una hélice «viva» es la que tratás como si pudiera arrancar el motor en cualquier momento. Los **magnetos** hacen su propia chispa, sin depender de la batería ni del master. El detalle técnico lo vemos en Motores y Sistemas."
+      },
+      {
+       "titulo": "No te olvides las calzas",
+       "tipo": "ojo",
+       "texto": "Las **calzas** son las cuñas que se ponen en las ruedas para que el avión estacionado no se mueva. El curso se ríe del alumno que cree que no las necesita: no las olvides."
+      },
+      {
+       "titulo": "Hasta entonces, la respuesta es no",
+       "tipo": "regla",
+       "texto": "Más adelante, el instructor te enseña cómo darte cuenta de cuándo es seguro tocar una hélice. Hasta que lo veas, la respuesta es siempre no."
+      }
      ],
      "componentes": [
       {
@@ -5735,9 +6081,9 @@
       {
        "pregunta": "¿Qué son las calzas de un avión?",
        "opciones": [
-        "Fundas que cubren la hélice dentro del hangar",
-        "Las luces de las puntas de las alas",
-        "Trabas que bloquean los comandos",
+        "Fundas que cubren la hélice cuando el avión está en el hangar",
+        "Las luces rojas que marcan las puntas de las alas",
+        "Trabas que bloquean los comandos mientras estacionás",
         "Cuñas que se ponen en las ruedas para que no se mueva"
        ],
        "correcta": 3,
@@ -5750,7 +6096,8 @@
        "termino": "Hélice viva",
        "definicion": "Forma de decir que una hélice siempre se trata como si pudiera hacer arrancar el motor al moverla."
       }
-     ]
+     ],
+     "resumen": "Una hélice no se toca ni se mueve: los magnetos hacen su propia chispa y el motor puede arrancar aunque el avión parezca apagado."
     },
     {
      "id": "INT-05-04",
@@ -5763,10 +6110,22 @@
       "Ordenar la prioridad de paso: avión, persona, vehículo."
      ],
      "contenido": [
-      "Si entrás por el portón 6A, tenés que cruzar la calle de rodaje (el taxiway, la vía por donde ruedan los aviones entre la plataforma y la pista) y caminar hacia los hangares.",
-      "Antes de cruzar hay un cartel PARE: te detenés y verificás que no venga ningún avión rodando.",
-      "Después caminás pegado a los hangares, atento al movimiento de los aviones que estén en la plataforma.",
-      "Cuando se cruzan caminos, siempre pasa primero el avión, segundo la persona (piloto o peatón) y tercero el vehículo."
+      {
+       "titulo": "Tu camino a pie, tramo por tramo",
+       "tipo": "lista",
+       "texto": "Desde el portón 6A hasta los hangares hacés cuatro tramos:\nEntrás por el portón 6A, el acceso principal a los Hangares Sur.\nFrenás en el cartel PARE, antes de la calle de rodaje, y mirás.\nCruzás la calle de rodaje solo si verificaste que no viene ningún avión rodando.\nCaminás pegado a los hangares, atento a los aviones que se mueven en la plataforma.",
+       "resumen": "Portón 6A, cartel PARE, cruce con la calle libre y caminata pegado a los hangares."
+      },
+      {
+       "titulo": "Calle de rodaje",
+       "tipo": "definicion",
+       "texto": "La vía por donde ruedan los aviones entre la plataforma y la pista; en inglés, **taxiway**. Por eso, antes de cruzarla, se mira."
+      },
+      {
+       "titulo": "Avión, persona, vehículo",
+       "tipo": "idea",
+       "texto": "Cuando se cruzan los caminos, pasa primero el avión, segundo la persona (piloto o peatón) y tercero el vehículo."
+      }
      ],
      "componentes": [
       {
@@ -6106,14 +6465,15 @@
      ],
      "glosario": [
       {
-       "termino": "Calle de rodaje (taxiway)",
-       "definicion": "La vía por donde ruedan los aviones entre la plataforma y la pista."
+       "termino": "Calle de rodaje",
+       "definicion": "Vía por donde ruedan los aviones entre la plataforma y la pista; en inglés, taxiway."
       },
       {
        "termino": "Prioridad de paso",
-       "definicion": "Orden en que se deja pasar en el aeródromo: primero el avión, segundo la persona y tercero el vehículo."
+       "definicion": "Orden en que se deja pasar a avión, persona y vehículo cuando se cruzan caminos en el aeródromo: primero el avión, segundo la persona, tercero el vehículo."
       }
-     ]
+     ],
+     "resumen": "Del 6A a los hangares frenás en el PARE, cruzás con la calle libre y recordás el orden: avión, persona, vehículo."
     },
     {
      "id": "INT-05-05",
@@ -6126,9 +6486,26 @@
       "Resolver tu recorrido completo según el día y la hora de llegada."
      ],
      "contenido": [
-      "Si entrás o salís por el portón de Bomberos es porque el 6A está cerrado. Probá con el día y la hora para ver qué recorrido te toca.",
-      "En ese caso está prohibido caminar por la plataforma: a la plataforma solamente se va acompañado de un instructor.",
-      "Lo que tenés que hacer es llamar al profe: va a buscarte en un auto o camioneta del aeropuerto."
+      {
+       "titulo": "Bomberos: cuando el 6A cierra",
+       "tipo": "dato",
+       "dato": {
+        "valor": 24,
+        "unidad": "horas",
+        "etiqueta": "Horario del portón de Bomberos"
+       },
+       "texto": "Si entrás o salís por el portón de **Bomberos** es porque el 6A está cerrado. Probá con el día y la hora para ver qué recorrido te toca."
+      },
+      {
+       "titulo": "Prohibido caminar por la plataforma",
+       "tipo": "ojo",
+       "texto": "Por Bomberos no caminás por la plataforma. A la plataforma solamente se va acompañado de un instructor."
+      },
+      {
+       "titulo": "Llamá al profe",
+       "tipo": "regla",
+       "texto": "Lo que tenés que hacer es llamar al profe. Él va a buscarte en un auto o camioneta del aeropuerto."
+      }
      ],
      "componentes": [
       {
@@ -6369,7 +6746,8 @@
        "pagina": 34
       }
      ],
-     "glosario": []
+     "glosario": [],
+     "resumen": "Si entrás por Bomberos no caminás por la plataforma: llamás al profe y te busca en un vehículo del aeropuerto."
     }
    ]
   },
@@ -6387,10 +6765,32 @@
       "Conocer los canales de reporte y la regla de que a quien reporta no se lo sanciona."
      ],
      "contenido": [
-      "Dos palabras para empezar. Un peligro es una condición que puede causar daño; el riesgo es qué tan probable y qué tan grave se evalúa que sea ese daño.",
-      "El SMS (Safety Management System, «sistema de gestión de la seguridad operacional») sirve para identificar los peligros o riesgos del día a día, en el vuelo o en tierra, y tomar medidas que reduzcan sus consecuencias a niveles aceptables.",
-      "Para identificar los peligros antes de que ocurra un accidente, hay que reportarlos.",
-      "Los reportes se completan por un formulario de la página web, por el sistema aerosursg, por Google Classroom (en la parte de links) o en los buzones SMS que hay en los hangares. Pueden ser anónimos o no y, lo más importante: a las personas que reportan no se las sanciona."
+      {
+       "titulo": "Peligro",
+       "tipo": "definicion",
+       "texto": "Una condición que puede causar daño. El **riesgo**, en cambio, es qué tan probable y qué tan grave se evalúa que sea ese daño."
+      },
+      {
+       "titulo": "SMS",
+       "tipo": "definicion",
+       "texto": "Safety Management System, el «sistema de gestión de la seguridad operacional». Sirve para identificar los peligros del día a día, en el vuelo o en tierra, y tomar medidas que reduzcan sus consecuencias a niveles aceptables."
+      },
+      {
+       "titulo": "Reportar antes del accidente",
+       "tipo": "idea",
+       "texto": "Para identificar los peligros antes de que ocurra un accidente, hay que reportarlos."
+      },
+      {
+       "titulo": "Cuatro vías para reportar",
+       "tipo": "lista",
+       "texto": "Los reportes se completan por cualquiera de estas vías:\nUn formulario de la página web.\nEl sistema aerosursg.\nGoogle Classroom, en la parte de links.\nLos buzones SMS que hay en los hangares de la escuela.",
+       "resumen": "Formulario web, sistema aerosursg, Google Classroom o los buzones SMS de los hangares."
+      },
+      {
+       "titulo": "A quien reporta no se lo sanciona",
+       "tipo": "regla",
+       "texto": "Lo más importante: a las personas que reportan ==no se las sanciona==. Los reportes pueden ser anónimos o no."
+      }
      ],
      "componentes": [
       {
@@ -6704,7 +7104,7 @@
       {
        "pregunta": "Quien reporta un peligro a través del SMS…",
        "opciones": [
-        "no es sancionado por reportar",
+        "no es sancionado por haber hecho el reporte",
         "es sancionado si el peligro se podía evitar",
         "tiene que identificarse siempre con su nombre",
         "paga una cerveza en el Cervesómetro"
@@ -6740,10 +7140,10 @@
       {
        "pregunta": "¿Cómo pueden ser los reportes al SMS?",
        "opciones": [
-        "Solo anónimos, nunca con nombre",
-        "Anónimos o con nombre, a elección de quien reporta",
-        "Solo con nombre y apellido completos",
-        "Solo verbales, hablando con el instructor"
+        "Solo anónimos, sin poner nunca tu nombre",
+        "Anónimos o con nombre, como prefiera quien reporta",
+        "Solo con nombre y apellido, para saber quién fue",
+        "Solo verbales, hablando directamente con el instructor"
        ],
        "correcta": 1,
        "explicacion": "Los reportes pueden ser anónimos o no.",
@@ -6759,7 +7159,8 @@
        "termino": "Buzón SMS",
        "definicion": "Buzón físico de los hangares de la escuela para dejar reportes de seguridad, con o sin nombre."
       }
-     ]
+     ],
+     "resumen": "El SMS busca los peligros antes del accidente: por eso se reporta, por la vía que prefieras, y a quien reporta no se lo sanciona."
     },
     {
      "id": "INT-06-02",
@@ -6772,9 +7173,27 @@
       "Explicar qué significa ALARP y por qué mitigar tiene un costo y un beneficio."
      ],
      "contenido": [
-      "El ciclo del SMS tiene cinco etapas, que giran alrededor de los «Niveles Aceptables de Seguridad Aérea»: Identificación, Análisis, Planeación, Mitigación y Control.",
-      "La «Matriz de tolerabilidad de riesgos» es un triángulo invertido con tres regiones. Arriba, la no tolerable (roja): el riesgo es inaceptable a cualquier nivel. Abajo, la aceptable (verde): el riesgo es aceptable tal como existe.",
-      "En el medio está la región tolerable (amarilla), llamada ALARP: As Low As Reasonably Practicable, «tan bajo como sea razonablemente practicable». Ahí el riesgo es aceptable gracias a la mitigación y hace falta un análisis de costo-beneficio."
+      {
+       "titulo": "Un ciclo de cinco etapas",
+       "tipo": "dato",
+       "dato": {
+        "valor": 5,
+        "unidad": "etapas",
+        "etiqueta": "Del ciclo del SMS"
+       },
+       "texto": "Identificación, Análisis, Planeación, Mitigación y Control: así gira el ciclo alrededor de los «Niveles Aceptables de Seguridad Aérea»."
+      },
+      {
+       "titulo": "Tres regiones de riesgo",
+       "tipo": "lista",
+       "texto": "La «Matriz de tolerabilidad de riesgos» es un triángulo invertido con tres regiones:\nNo tolerable (arriba, roja): el riesgo es inaceptable a cualquier nivel.\nTolerable (en el medio, amarilla): el riesgo es aceptable gracias a la mitigación, y hace falta un análisis de costo-beneficio.\nAceptable (abajo, verde): el riesgo es aceptable tal como existe.",
+       "resumen": "Roja, no tolerable; amarilla, tolerable con mitigación; verde, aceptable tal como existe."
+      },
+      {
+       "titulo": "ALARP",
+       "tipo": "definicion",
+       "texto": "As Low As Reasonably Practicable: «tan bajo como sea razonablemente practicable». Es el nombre de la región tolerable, donde mitigar tiene un costo y hay que compararlo con el beneficio."
+      }
      ],
      "componentes": [
       {
@@ -7171,7 +7590,8 @@
        "termino": "Costo-beneficio",
        "definicion": "Comparación entre lo que cuesta reducir un riesgo y lo que se gana en seguridad."
       }
-     ]
+     ],
+     "resumen": "Cinco etapas giran alrededor de los niveles aceptables; en la región tolerable (ALARP) cada mitigación se compara en costo y beneficio."
     },
     {
      "id": "INT-06-03",
@@ -7184,9 +7604,27 @@
       "Elegir el canal que más te sirve según dónde estés."
      ],
      "contenido": [
-      "Podés llegar al formulario del SMS por el código QR de la diapositiva o por la página web aerosursg.com.uy, que tiene dos puertas de entrada: el botón «Reporte SMS» de la pantalla de ingreso (log in) y el ítem «Reporte SMS» del menú interno.",
-      "El menú interno del sistema tiene: Home, Pilot Shop, Horas de Vuelo, Horas de Teórico, Exámenes, Firmar Clases Teóricas, Reporte SMS y Links de interés.",
-      "Además están los otros canales: la sección de links de Google Classroom y los buzones SMS de los hangares. Todos valen igual: elegí el que tengas más a mano."
+      {
+       "titulo": "Dos puertas en la página web",
+       "tipo": "lista",
+       "texto": "En la página aerosursg.com.uy hay dos puertas de entrada al formulario:\nEl botón «Reporte SMS» de la pantalla de ingreso (log in).\nEl ítem «Reporte SMS» del menú interno del sistema.",
+       "resumen": "El botón «Reporte SMS» del ingreso o el ítem «Reporte SMS» del menú interno."
+      },
+      {
+       "titulo": "El menú interno",
+       "tipo": "dato",
+       "dato": {
+        "valor": 8,
+        "unidad": "ítems",
+        "etiqueta": "Tiene el menú interno del sistema"
+       },
+       "texto": "Home, Pilot Shop, Horas de Vuelo, Horas de Teórico, Exámenes, Firmar Clases Teóricas, ==Reporte SMS== y Links de interés."
+      },
+      {
+       "titulo": "Elegí el canal que tengas a mano",
+       "tipo": "idea",
+       "texto": "Además de la web están el **código QR**, la sección de links de Google Classroom y los buzones SMS de los hangares. Todos valen igual: elegí el que tengas más a mano."
+      }
      ],
      "componentes": [
       {
@@ -7393,9 +7831,9 @@
       {
        "pregunta": "¿Cuántos lugares de la página aerosursg llevan al formulario SMS?",
        "opciones": [
-        "Uno solo: el menú interno del sistema",
-        "Tres: ingreso, menú y la página de Calidad",
-        "Ninguno: solo se llega por el buzón del hangar",
+        "Uno solo: el menú interno del sistema, una vez adentro",
+        "Tres: ingreso, menú y la página de Calidad del curso",
+        "Ninguno: solo se llega por el buzón de cada hangar",
         "Dos: el botón de la pantalla de ingreso y el menú interno"
        ],
        "correcta": 3,
@@ -7417,13 +7855,13 @@
       {
        "pregunta": "¿Qué canal te lleva al formulario sin escribir ninguna dirección?",
        "opciones": [
-        "La frecuencia de la torre de control",
-        "El libro de vuelo del alumno",
-        "El código QR de la diapositiva",
-        "El carnet provisorio de la PAN"
+        "La frecuencia de radio de la torre de control",
+        "El libro de vuelo que te dan con la licencia",
+        "El código QR que te muestra la escuela",
+        "El carnet provisorio que te da la PAN"
        ],
        "correcta": 2,
-       "explicacion": "El código QR se escanea con el celular y abre el formulario del SMS.",
+       "explicacion": "El código QR se escanea con el celular y abre el formulario del SMS sin escribir nada.",
        "pagina": 37
       }
      ],
@@ -7436,7 +7874,8 @@
        "termino": "Código QR",
        "definicion": "Imagen cuadrada que se escanea con el celular para abrir un enlace, como el del formulario SMS."
       }
-     ]
+     ],
+     "resumen": "Al formulario del SMS llegás por la web aerosursg (dos puertas), por el código QR, por Classroom o por los buzones: todos valen igual."
     },
     {
      "id": "INT-06-04",
@@ -7449,9 +7888,32 @@
       "Saber dónde encontrar el formulario de Calidad."
      ],
      "contenido": [
-      "Además del programa de seguridad (el SMS), la escuela tiene un programa de calidad. A AeroSur le interesa saber si el curso te gusta o no y qué cosas se podrían mejorar.",
-      "Por eso te piden tomarte unos 5 minutos cada tanto para completar el formulario de calidad: qué materias cursaste, qué te gustó o no, cómo fue tu experiencia de vuelo y qué cambiarías.",
-      "El formulario está en la página web, en el sistema aerosursg y en Google Classroom (en los links). También se llega por un código QR o por el enlace aerosursg.com.uy/encuestacalidadpublic.aspx."
+      {
+       "titulo": "Programa de Calidad",
+       "tipo": "definicion",
+       "texto": "Además del programa de seguridad, la escuela tiene un programa de calidad. A AeroSur le interesa saber si el curso te gusta o no, y qué cosas se podrían mejorar."
+      },
+      {
+       "titulo": "Un formulario de cinco minutos",
+       "tipo": "dato",
+       "dato": {
+        "valor": 5,
+        "unidad": "minutos",
+        "etiqueta": "Cada tanto, para completar el formulario"
+       },
+       "texto": "En el formulario contás qué materias cursaste, qué te gustó o no, cómo fue tu experiencia de vuelo y qué cambiarías."
+      },
+      {
+       "titulo": "Dónde está el formulario",
+       "tipo": "lista",
+       "texto": "Encontrás el formulario de Calidad en estos lugares:\nLa página web de la escuela.\nEl sistema aerosursg.\nGoogle Classroom, en los links.\nEl código QR o el enlace aerosursg.com.uy/encuestacalidadpublic.aspx.",
+       "resumen": "Web, sistema aerosursg, Google Classroom, código QR o el enlace de la encuesta."
+      },
+      {
+       "titulo": "SMS o Calidad: no se confunden",
+       "tipo": "ojo",
+       "texto": "Un peligro de seguridad se reporta al SMS. Tu opinión sobre el curso va al formulario de Calidad."
+      }
      ],
      "componentes": [
       {
@@ -7635,7 +8097,8 @@
        "termino": "Encuesta de calidad",
        "definicion": "Formulario de unos 5 minutos que se completa cada tanto para contar qué te parece el curso."
       }
-     ]
+     ],
+     "resumen": "Calidad es para opinar sobre el curso, en unos 5 minutos; los peligros de seguridad van al SMS."
     }
    ]
   },
@@ -7653,10 +8116,31 @@
       "Saber cómo se agenda el turno y dónde queda Medicina Aeronáutica."
      ],
      "contenido": [
-      "Es el quinto y último punto de la agenda de la Introducción: qué trámites y documentos tenés que hacer y llevar para sacar tu licencia de alumno piloto.",
-      "El camino tiene dos paradas: primero Medicina Aeronáutica (el psicofísico) y después Personal Aeronáutico de DINACIA (la licencia).",
-      "En Medicina Aeronáutica se hacen los estudios médicos de los que sale el certificado del psicofísico. Queda en la Base Aérea Capitán Boiso Lanza (Av. Don Pedro de Mendoza 5553), en el Servicio de Sanidad de la Fuerza Aérea Uruguaya.",
-      "El turno se agenda por WhatsApp (092 292 403): no te presentes sin turno. Antes de ir, confirmá que el número y la dirección sigan vigentes."
+      {
+       "titulo": "Último punto de la agenda",
+       "tipo": "dato",
+       "dato": {
+        "valor": "5.º",
+        "etiqueta": "Y último punto de la agenda de la Introducción"
+       },
+       "texto": "Los trámites y los documentos que tenés que hacer y llevar para sacar tu licencia de alumno piloto."
+      },
+      {
+       "titulo": "Dos paradas hasta la licencia",
+       "tipo": "lista",
+       "texto": "El camino a tu licencia tiene dos paradas, en este orden:\nMedicina Aeronáutica, para el psicofísico.\nPersonal Aeronáutico de DINACIA, para la licencia.",
+       "resumen": "Primero Medicina Aeronáutica, para el psicofísico, y después Personal Aeronáutico de DINACIA."
+      },
+      {
+       "titulo": "Psicofísico",
+       "tipo": "definicion",
+       "texto": "El certificado médico que sale de los estudios que te hacen en **Medicina Aeronáutica**. Queda en la Base Aérea Capitán Boiso Lanza (Av. Don Pedro de Mendoza 5553), en el Servicio de Sanidad de la Fuerza Aérea Uruguaya."
+      },
+      {
+       "titulo": "Sin turno no te presentes",
+       "tipo": "ojo",
+       "texto": "El turno se agenda por WhatsApp (092 292 403): no te presentes sin turno. Antes de ir, confirmá que el número y la dirección sigan vigentes."
+      }
      ],
      "componentes": [
       {
@@ -7852,8 +8336,8 @@
        "opciones": [
         "En la propia escuela AeroSur, adentro de los Hangares Sur",
         "En Medicina Aeronáutica, en la Base Aérea Capitán Boiso Lanza",
-        "En el puesto de la PAN del portón 6A",
-        "En la torre de control del aeropuerto"
+        "En el puesto de la PAN que controla el portón 6A",
+        "En la torre de control del aeropuerto, junto a la pista"
        ],
        "correcta": 1,
        "explicacion": "Los estudios médicos para el psicofísico se hacen en Medicina Aeronáutica, que queda en la Base Aérea Capitán Boiso Lanza.",
@@ -7874,9 +8358,9 @@
       {
        "pregunta": "El psicofísico es…",
        "opciones": [
-        "el certificado que sale de los estudios de Medicina Aeronáutica",
-        "la licencia de alumno piloto que entrega DINACIA",
-        "el carnet provisorio que entrega la PAN",
+        "el certificado médico que sale de esos estudios",
+        "la licencia de alumno piloto que entrega DINACIA al final",
+        "el carnet provisorio que entrega la PAN en el portón",
         "la carta de la escuela que se lleva a DINACIA"
        ],
        "correcta": 0,
@@ -7909,7 +8393,8 @@
        "termino": "Base Aérea Capitán Boiso Lanza",
        "definicion": "Base de la Fuerza Aérea Uruguaya donde queda Medicina Aeronáutica (Av. Don Pedro de Mendoza 5553)."
       }
-     ]
+     ],
+     "resumen": "Primero Medicina Aeronáutica (el psicofísico, con turno por WhatsApp) y después DINACIA: dos paradas hasta tu licencia de alumno piloto."
     },
     {
      "id": "INT-07-02",
@@ -7922,9 +8407,27 @@
       "Armar tu lista según tu caso: dónde hacés los análisis y cuántos años tenés."
      ],
      "contenido": [
-      "Si los estudios de sangre y orina se hacen en Medicina Aeronáutica, vas con ayuno de 12 horas y con la primera orina de la mañana. Armá tu lista con la calculadora.",
-      "Siempre se piden: un electroencefalograma completo (con privación de sueño de 24 horas), un certificado de vacuna antitetánica vigente y una foto carné. A partir de los 50 años se suma la ergometría, que es una prueba de esfuerzo.",
-      "Si el electrocardiograma (informado por un cardiólogo, con su tira) y los estudios de sangre y orina los hacés en tu mutualista, llevás todos esos resultados además de lo anterior, menos el ayuno de 12 horas."
+      {
+       "titulo": "Ayuno de doce horas",
+       "tipo": "dato",
+       "dato": {
+        "valor": 12,
+        "unidad": "horas",
+        "etiqueta": "De ayuno si los análisis se hacen en Medicina Aeronáutica"
+       },
+       "texto": "Si la sangre y la orina se hacen en Medicina Aeronáutica, vas en ayunas y con la primera orina de la mañana. Armá tu lista con la calculadora."
+      },
+      {
+       "titulo": "Lo que siempre llevás",
+       "tipo": "lista",
+       "texto": "Siempre llevás tres cosas, y una más si tenés 50 años o más:\nUn electroencefalograma completo, con privación de sueño de 24 horas.\nUn certificado de vacuna antitetánica vigente.\nUna foto carné.\nDesde los 50 años, también la ergometría, que es una prueba de esfuerzo.",
+       "resumen": "Electroencefalograma con privación de sueño, vacuna antitetánica y foto carné; desde los 50 años, también la ergometría."
+      },
+      {
+       "titulo": "En tu mutualista, sin ayuno",
+       "tipo": "ojo",
+       "texto": "Si el electrocardiograma y los estudios de sangre y orina los hacés en tu **mutualista**, llevás todos esos resultados además de lo anterior, menos el ayuno de 12 horas. El electrocardiograma tiene que estar informado por un cardiólogo y traer su tira."
+      }
      ],
      "componentes": [
       {
@@ -8159,7 +8662,8 @@
        "termino": "Mutualista",
        "definicion": "Prestador de salud privado al que está afiliada una persona; ahí se pueden hacer el electrocardiograma y los análisis."
       }
-     ]
+     ],
+     "resumen": "Ayuno de 12 horas si hacés ahí los análisis; siempre electroencefalograma, antitetánica y foto carné, y la ergometría desde los 50 años."
     },
     {
      "id": "INT-07-03",
@@ -8172,9 +8676,27 @@
       "Saber dónde está la lista actualizada de estudios de sangre y orina."
      ],
      "contenido": [
-      "Medicina Aeronáutica cobra: 4 UR si los estudios se hacen en el gabinete de medicina aeronáutica y 2 UR si los llevás hechos vos (la diapositiva sugiere consultar). La UR es la Unidad Reajustable, una unidad de valor que se actualiza con el tiempo.",
-      "Tenés que estar a las 8 de la mañana, y vas a pasar ahí casi toda la mañana. Si vas en ayunas, llevá algo para comer y tomar después de que te saquen sangre.",
-      "La lista de los estudios de sangre y orina que tenés que hacerte está en la página web de AeroSur (aerosur.com.uy/requisitos). Consultá siempre al gabinete si agregaron o quitaron algún estudio."
+      {
+       "titulo": "Cuánto cuesta el psicofísico",
+       "tipo": "dato",
+       "dato": {
+        "valor": 4,
+        "unidad": "UR",
+        "etiqueta": "Si los estudios se hacen en el gabinete de Medicina Aeronáutica"
+       },
+       "texto": "Se cobra en **UR**, la Unidad Reajustable: una unidad de valor que se actualiza con el tiempo. Si llevás los estudios hechos vos, son {{2|UR}}; el curso sugiere consultar."
+      },
+      {
+       "titulo": "Tu mañana en Medicina Aeronáutica",
+       "tipo": "lista",
+       "texto": "Para organizar la mañana del psicofísico:\nEstás a las 8 de la mañana.\nVas a pasar ahí casi toda la mañana.\nSi vas en ayunas, llevás algo para comer y tomar después de que te saquen sangre.",
+       "resumen": "A las 8 de la mañana, casi toda la mañana ahí y algo para comer después de la sangre."
+      },
+      {
+       "titulo": "Consultá antes de ir",
+       "tipo": "ojo",
+       "texto": "La lista de los estudios de sangre y orina está en la página web de AeroSur (aerosur.com.uy/requisitos). Consultá siempre al gabinete si agregaron o quitaron algún estudio."
+      }
      ],
      "componentes": [
       {
@@ -8283,7 +8805,7 @@
         "No tiene costo"
        ],
        "correcta": 0,
-       "explicacion": "La diapositiva dice: 4 UR si se realizan los estudios en el gabinete de medicina aeronáutica.",
+       "explicacion": "El curso indica 4 UR si los estudios se realizan en el gabinete de medicina aeronáutica.",
        "pagina": 42
       },
       {
@@ -8313,9 +8835,9 @@
       {
        "pregunta": "¿Dónde está la lista de los estudios de sangre y orina que hay que hacerse?",
        "opciones": [
-        "En un cartel pegado junto al portón 6A",
-        "En la primera página del libro de vuelo",
-        "En el buzón SMS que está en los hangares",
+        "En un cartel pegado junto al portón 6A de la escuela",
+        "En la primera página del libro de vuelo del alumno",
+        "En el buzón SMS que está en cada uno de los hangares",
         "En la página web de AeroSur, en aerosur.com.uy/requisitos"
        ],
        "correcta": 3,
@@ -8325,10 +8847,10 @@
       {
        "pregunta": "Si vas en ayunas, ¿qué recomienda el curso llevar?",
        "opciones": [
-        "Algo de comer y beber para después de la extracción de sangre",
-        "Nada: no se puede comer durante toda la visita",
-        "Una colación para comer antes de la extracción de sangre",
-        "Solo agua con gas para toda la mañana"
+        "Algo para comer y tomar después de que te saquen sangre",
+        "Nada: no se puede comer durante toda la visita médica",
+        "Una colación para comer antes de que te saquen sangre",
+        "Solo agua con gas para toda la mañana en el gabinete"
        ],
        "correcta": 0,
        "explicacion": "El curso dice que lleves algo de comer y beber para después de que te hayan sacado sangre.",
@@ -8340,7 +8862,8 @@
        "termino": "UR",
        "definicion": "Unidad Reajustable: una unidad de valor que se actualiza con el tiempo; el psicofísico se cobra en UR (4 o 2)."
       }
-     ]
+     ],
+     "resumen": "El psicofísico cuesta 4 UR en el gabinete y 2 UR con los estudios hechos; llegás a las 8 y llevás algo para comer después."
     },
     {
      "id": "INT-07-04",
@@ -8353,8 +8876,26 @@
       "Reconocer los dos dibujos de la diapositiva: la audiometría y la lámina de daltonismo."
      ],
      "contenido": [
-      "Los estudios de la lista del curso son diez: sangre, orina, alcohol y drogas (que se hace en una clínica privada), electrocardiograma, vista, audición, dental, reflejos, clínicos y psicológicos.",
-      "La diapositiva trae dos dibujos de humor: uno de la audición (una persona con auriculares en una cabina, como en una audiometría) y otro de la visión (una lámina de puntos de colores con un número escondido, de las que se usan para detectar el daltonismo: las láminas de Ishihara). No son estudios extra."
+      {
+       "titulo": "Diez estudios en la lista",
+       "tipo": "dato",
+       "dato": {
+        "valor": 10,
+        "unidad": "estudios",
+        "etiqueta": "En la lista del curso"
+       },
+       "texto": "Sangre, orina, alcohol y drogas, electrocardiograma, vista, audición, dental, reflejos, clínicos y psicológicos."
+      },
+      {
+       "titulo": "Alcohol y drogas: clínica privada",
+       "tipo": "ojo",
+       "texto": "El estudio de alcohol y drogas se hace en una clínica privada, como indica la lista del curso. Si tenés dudas, consultá al gabinete por si la lista cambió."
+      },
+      {
+       "titulo": "Los dos dibujos del curso",
+       "tipo": "texto",
+       "texto": "Una persona con auriculares en una cabina es una **audiometría**, el estudio de la audición. Una lámina de puntos de colores con un número escondido es una **lámina de Ishihara**, de las que se usan para detectar el daltonismo. Son dibujos de humor: no son estudios extra."
+      }
      ],
      "componentes": [
       {
@@ -8602,7 +9143,7 @@
       {
        "pregunta": "¿Cuál de estos estudios figura en la lista del curso?",
        "opciones": [
-        "El de audición",
+        "El estudio de la audición",
         "La prueba de natación",
         "La radiografía de tórax",
         "La prueba de manejo de un auto"
@@ -8636,12 +9177,12 @@
        "pagina": 43
       },
       {
-       "pregunta": "¿Para qué sirve la lámina de puntos de colores de la diapositiva?",
+       "pregunta": "¿Para qué sirve una lámina de puntos de colores con un número escondido?",
        "opciones": [
         "Para medir qué tan bien escuchás los tonos agudos",
-        "Para revisar el estado de los dientes",
-        "Para detectar el daltonismo, o sea, problemas con los colores",
-        "Para medir los reflejos ante una luz"
+        "Para revisar el estado de los dientes y las muelas",
+        "Para detectar el daltonismo (problemas con los colores)",
+        "Para medir los reflejos con una luz que se prende"
        ],
        "correcta": 2,
        "explicacion": "Es una lámina de las que se usan para detectar el daltonismo (láminas de Ishihara).",
@@ -8652,8 +9193,8 @@
        "opciones": [
         "El electrocardiograma",
         "La prueba de natación",
-        "Los reflejos",
-        "Los psicológicos"
+        "Los estudios de reflejos",
+        "Los estudios psicológicos"
        ],
        "correcta": 1,
        "explicacion": "La prueba de natación no está en la lista; los otros tres sí.",
@@ -8673,7 +9214,8 @@
        "termino": "Electrocardiograma",
        "definicion": "Registro de la actividad eléctrica del corazón."
       }
-     ]
+     ],
+     "resumen": "Diez estudios en la lista del curso, y el de alcohol y drogas se hace en una clínica privada."
     },
     {
      "id": "INT-07-05",
@@ -8686,10 +9228,32 @@
       "Calcular la fecha mínima de tu cita a partir de la fecha del psicofísico."
      ],
      "contenido": [
-      "En Personal Aeronáutico de DINACIA tenés que agendar fecha y hora para tramitar tu permiso (licencia) de alumno piloto. El teléfono que figura en el curso es 2604 0408: confirmá que siga vigente.",
-      "La cita se agenda por lo menos 3 días después de la fecha en que te hagas el psicofísico. Probalo con la calculadora.",
-      "El psicofísico se manda a tu mail y, si hay algún inconveniente, te avisan. A DINACIA llevás una carta de la escuela que diga que ya estás en el curso teórico, y una foto carné.",
-      "Ahí te dan la licencia de alumno piloto. Para el libro de vuelo, podés comprar uno o usar el que más te guste."
+      {
+       "titulo": "Personal Aeronáutico",
+       "tipo": "definicion",
+       "texto": "La oficina de DINACIA donde tramitás tu permiso (licencia) de alumno piloto. Tenés que agendar fecha y hora; el teléfono que figura en el curso es 2604 0408, y conviene confirmar que siga vigente."
+      },
+      {
+       "titulo": "La cita, tres días después",
+       "tipo": "dato",
+       "dato": {
+        "valor": 3,
+        "unidad": "días",
+        "etiqueta": "Como mínimo, después de tu psicofísico"
+       },
+       "texto": "Agendás la cita para por lo menos tres días después de la fecha de tu psicofísico. Probalo con la calculadora. El psicofísico se manda a tu mail y, si hay algún inconveniente, te avisan."
+      },
+      {
+       "titulo": "Qué llevás a DINACIA",
+       "tipo": "lista",
+       "texto": "A DINACIA llevás:\nUna carta de la escuela que diga que ya estás en el curso teórico.\nUna foto carné.",
+       "resumen": "Una carta de la escuela que diga que ya estás en el curso teórico y una foto carné."
+      },
+      {
+       "titulo": "Tu licencia de alumno piloto",
+       "tipo": "idea",
+       "texto": "Ahí te dan la licencia de alumno piloto. Para el libro de vuelo, podés comprar uno o usar el que más te guste."
+      }
      ],
      "componentes": [
       {
@@ -8959,10 +9523,10 @@
       {
        "pregunta": "Sobre el libro de vuelo, el curso dice que…",
        "opciones": [
-        "es obligatorio comprar el de DINACIA",
-        "te lo entregan gratis con la licencia",
+        "es obligatorio comprar el que vende DINACIA",
+        "te lo entregan gratis junto con la licencia",
         "podés comprar uno o usar el que más te guste",
-        "no hace falta tener ninguno"
+        "no hace falta tener ninguno para empezar a volar"
        ],
        "correcta": 2,
        "explicacion": "Pueden comprar un libro de vuelo o usar el que más les guste.",
@@ -8986,7 +9550,8 @@
        "termino": "Licencia de alumno piloto",
        "definicion": "Permiso para volar como alumno, que entrega DINACIA después del psicofísico."
       }
-     ]
+     ],
+     "resumen": "Cita en DINACIA por lo menos 3 días después del psicofísico, con carta de la escuela y foto carné: ahí te dan la licencia de alumno piloto."
     },
     {
      "id": "INT-07-06",
@@ -8999,10 +9564,27 @@
       "Distinguir qué se lleva en cada parada."
      ],
      "contenido": [
-      "Primero va el psicofísico en Medicina Aeronáutica y, por lo menos 3 días después, la cita en Personal Aeronáutico de DINACIA. Armá tu calendario con la fecha de tu psicofísico.",
-      "En Medicina Aeronáutica: agendás por WhatsApp, estás a las 8 de la mañana y llevás lo que corresponde según dónde hagas los análisis y tu edad.",
-      "En DINACIA: llevás una carta de la escuela que acredite que ya estás en el curso teórico y una foto carné.",
-      "Al final tenés la licencia de alumno piloto y un libro de vuelo, nuevo o el que prefieras. Teléfonos, direcciones, costos y requisitos pueden cambiar: consultá siempre y verificá que estén vigentes."
+      {
+       "titulo": "Primero el psicofísico, después DINACIA",
+       "tipo": "regla",
+       "texto": "Primero va el psicofísico en Medicina Aeronáutica y, por lo menos tres días después, la cita en Personal Aeronáutico de DINACIA. Armá tu calendario con la fecha de tu psicofísico."
+      },
+      {
+       "titulo": "Qué hacés en cada parada",
+       "tipo": "lista",
+       "texto": "Cada parada tiene lo suyo:\nMedicina Aeronáutica: agendás por WhatsApp, estás a las 8 de la mañana y llevás lo que corresponde según dónde hagas los análisis y tu edad.\nDINACIA: llevás una carta de la escuela que acredite que ya estás en el curso teórico y una foto carné.",
+       "resumen": "En Medicina Aeronáutica, turno por WhatsApp y a las 8; en DINACIA, carta de la escuela y foto carné."
+      },
+      {
+       "titulo": "Al final, tu licencia",
+       "tipo": "idea",
+       "texto": "Al final tenés la licencia de alumno piloto y un libro de vuelo, nuevo o el que prefieras."
+      },
+      {
+       "titulo": "Verificá que siga vigente",
+       "tipo": "ojo",
+       "texto": "Teléfonos, direcciones, costos y requisitos pueden cambiar. Consultá siempre y verificá que estén vigentes."
+      }
      ],
      "componentes": [
       {
@@ -9293,7 +9875,7 @@
         "Primero la cita en DINACIA y después el psicofísico",
         "Los dos el mismo día, uno a continuación del otro",
         "La cita en DINACIA un mes antes del psicofísico",
-        "Primero el psicofísico y la cita en DINACIA por lo menos 3 días después"
+        "Primero el psicofísico y, 3 días o más después, DINACIA"
        ],
        "correcta": 3,
        "explicacion": "Se agenda DINACIA por lo menos 3 días después de la fecha del psicofísico.",
@@ -9348,7 +9930,8 @@
        "pagina": 25
       }
      ],
-     "glosario": []
+     "glosario": [],
+     "resumen": "Psicofísico primero, DINACIA al menos 3 días después y, al final, tu licencia de alumno piloto: verificá siempre que los datos sigan vigentes."
     }
    ]
   },
@@ -9366,13 +9949,53 @@
       "Ponerte a prueba con un día completo en AeroSur: de la puerta al avión."
      ],
      "contenido": [
-      "La agenda vuelve a aparecer con todos los puntos tachados: ya recorriste los cinco bloques de la Introducción. Tocá cada estación del mapa para repasar sus datos clave.",
-      "La diapositiva siguiente pregunta «¿Dudas?»: es el momento de preguntarle al instructor lo que no te quedó claro, antes del test.",
-      "Bloque 1, AeroSur y tu curso: la escuela es un CIAC certificado por DINACIA en 2018 y el curso tiene 11 materias que se completan en menos de 18 meses. Los teóricos duran 2 horas con un recreo de 5 minutos cada 40, los tests exigen 75 % y a un vuelo se llega 30 minutos antes. Se cancela con 24 horas, se vuela con calzado cerrado y el Cervesómetro (formulario A1) anota faltas leves, medias y graves.",
-      "Bloque 2, el acceso: portón 6A (lunes a viernes de 06:00 a 21:00; fines de semana de 06:00 a 19:00) y portón de Bomberos (24 horas). La PAN controla quién entra y hay objetos prohibidos. Entrás con cédula o pasaporte, figurando en el listado mensual, y te dan un carnet provisorio que se devuelve; el «4» y el «3S» abren zonas distintas. Los invitados se anotan con 48 horas de antelación, y para un fin de semana, hasta el jueves.",
-      "Bloque 3, hangares y plataforma: chaleco siempre en la plataforma, nada de fumar, no te acercás a un avión con el beacon prendido y nunca tocás ni movés una hélice. La prioridad de paso es avión, persona, vehículo, y si entrás por Bomberos no caminás por la plataforma.",
-      "Bloque 4, SMS y Calidad: el SMS identifica peligros antes de un accidente y no se sanciona a quien reporta; su ciclo tiene cinco etapas y la región tolerable de la matriz se llama ALARP. El formulario de Calidad lleva unos 5 minutos.",
-      "Bloque 5, trámites: el psicofísico en Medicina Aeronáutica (a las 8 de la mañana, con ayuno de 12 horas si hacés ahí los análisis; 4 UR o 2 UR) y, por lo menos 3 días después, DINACIA, con la carta de la escuela y una foto carné."
+      {
+       "titulo": "Cinco bloques tachados",
+       "tipo": "dato",
+       "dato": {
+        "valor": 5,
+        "unidad": "bloques",
+        "etiqueta": "Recorridos en la Introducción"
+       },
+       "texto": "La agenda vuelve a aparecer con todos los puntos tachados: ya recorriste la Introducción. Tocá cada estación del mapa para repasar sus datos clave."
+      },
+      {
+       "titulo": "¿Dudas? Preguntá ahora",
+       "tipo": "idea",
+       "texto": "Antes del test, el curso te pregunta «¿Dudas?». Es el momento de preguntarle al instructor lo que no te quedó claro."
+      },
+      {
+       "titulo": "Bloque 1: AeroSur y tu curso",
+       "tipo": "lista",
+       "texto": "De tu escuela y tu curso tenés que llevarte estos números y reglas:\nAeroSur es un CIAC certificado por DINACIA en 2018.\nEl curso tiene 11 materias, que se completan en menos de 18 meses.\nLos teóricos duran 2 horas, con un recreo de 5 minutos cada 40.\nLos tests exigen 75 % y a un vuelo se llega 30 minutos antes.\nSe cancela con 24 horas y se vuela con calzado cerrado.\nEl Cervesómetro (formulario A1) anota faltas leves, medias y graves.",
+       "resumen": "CIAC desde 2018, 11 materias en menos de 18 meses, tests con 75 % y vuelos con 30 minutos de antelación."
+      },
+      {
+       "titulo": "Bloque 2: el acceso",
+       "tipo": "lista",
+       "texto": "Del acceso a los hangares tenés que llevarte esto:\nHay dos portones: el 6A (de lunes a viernes de 06:00 a 21:00, y los fines de semana de 06:00 a 19:00) y el de Bomberos, las 24 horas.\nLa **PAN** controla quién entra y hay objetos prohibidos.\nEntrás con cédula o pasaporte, figurando en el listado mensual, y te dan un carnet provisorio que devolvés; el «4» y el «3S» abren zonas distintas.\nLos invitados se anotan con 48 horas de antelación, y para un fin de semana, hasta el jueves.",
+       "resumen": "Portones 6A y Bomberos, cédula o pasaporte con listado mensual, carnet provisorio que se devuelve e invitados con 48 horas."
+      },
+      {
+       "titulo": "Bloque 3: hangares y plataforma",
+       "tipo": "ojo",
+       "texto": "Chaleco siempre en la plataforma y nada de fumar. Con el beacon prendido no te acercás al avión, y una hélice nunca se toca ni se mueve. La prioridad de paso es avión, persona, vehículo; y si entrás por Bomberos, no caminás por la plataforma."
+      },
+      {
+       "titulo": "Bloque 4: SMS y Calidad",
+       "tipo": "texto",
+       "texto": "El SMS identifica peligros antes de un accidente, y a quien reporta no se lo sanciona. Su ciclo tiene cinco etapas, y la región tolerable de la matriz se llama ALARP. El formulario de Calidad lleva unos 5 minutos."
+      },
+      {
+       "titulo": "Bloque 5: tus trámites",
+       "tipo": "dato",
+       "dato": {
+        "valor": 3,
+        "unidad": "días",
+        "etiqueta": "Como mínimo entre el psicofísico y DINACIA"
+       },
+       "texto": "El psicofísico se hace en Medicina Aeronáutica (a las 8 de la mañana, con ayuno de 12 horas si hacés ahí los análisis; 4 UR o 2 UR). Después va DINACIA, con la carta de la escuela y una foto carné."
+      }
      ],
      "componentes": [
       {
@@ -9949,15 +10572,15 @@
        "pagina": 19
       },
       {
-       "pregunta": "Al irte de la escuela, ¿qué tenés que devolver?",
+       "pregunta": "Cuando te vas de la escuela, ¿qué hacés con el carnet provisorio de la PAN?",
        "opciones": [
-        "La cédula de identidad",
-        "El libro de vuelo",
-        "El carnet provisorio de la PAN",
-        "La carta de la escuela"
+        "Lo guardás para usarlo la próxima vez que vengas",
+        "Lo llevás a DINACIA para pedir la licencia de alumno",
+        "Lo devolvés cuando te vas: es un pase provisorio",
+        "Lo mostrás en Medicina Aeronáutica cuando pedís turno"
        ],
        "correcta": 2,
-       "explicacion": "El carnet provisorio se devuelve al irse de la escuela (la cédula te la devuelven cuando te entregan el carnet).",
+       "explicacion": "El carnet provisorio es un pase para entrar a los hangares: se devuelve al irse de la escuela (la cédula te la devuelven cuando te entregan el carnet).",
        "pagina": 25
       },
       {
@@ -9978,7 +10601,8 @@
        "termino": "Repaso espaciado",
        "definicion": "Técnica de estudio que vuelve a mostrarte más seguido lo que más te costó."
       }
-     ]
+     ],
+     "resumen": "Cinco bloques en un solo mapa: tu curso, el acceso, las reglas de la plataforma, el SMS y el trámite de tu licencia."
     },
     {
      "id": "INT-08-02",
@@ -9991,11 +10615,36 @@
       "Cerrar el módulo y pasar al siguiente: Aerodinámica."
      ],
      "contenido": [
-      "Cerrás la Introducción con un test. Los tests de cada materia se rinden por Google Classroom, son de múltiple opción y se hacen unos días después de terminar la materia.",
-      "La clase anterior se hace un simulacro, que después podés repetir en tu casa todas las veces que quieras.",
-      "La nota mínima es 75 %. Si no llegás, repasás las preguntas que erraste y hacés el re-take.",
-      "Si perdés también el re-take, tenés que volver a cursar toda la materia para tener un segundo re-take.",
-      "En esta app, el test de la Introducción tiene 15 preguntas sorteadas de las lecciones 1 a 7. Para llegar al 75 % tenés que acertar 12: con 11 de 15 sacás 73 % y no alcanza."
+      {
+       "titulo": "Cómo se rinde el test",
+       "tipo": "texto",
+       "texto": "Cerrás la Introducción con un test. Los tests de cada materia se rinden por Google Classroom, son de múltiple opción y se hacen unos días después de terminar la materia."
+      },
+      {
+       "titulo": "Simulacro",
+       "tipo": "definicion",
+       "texto": "La práctica que se hace la clase anterior al test. Después lo podés repetir en tu casa todas las veces que quieras."
+      },
+      {
+       "titulo": "El mínimo para aprobar",
+       "tipo": "dato",
+       "dato": {
+        "valor": 75,
+        "unidad": "%",
+        "etiqueta": "Nota mínima del test"
+       },
+       "texto": "Si no llegás, repasás las preguntas que erraste y hacés el **re-take**, la segunda oportunidad."
+      },
+      {
+       "titulo": "Si perdés también el re-take",
+       "tipo": "regla",
+       "texto": "Volvés a cursar toda la materia para tener un segundo re-take."
+      },
+      {
+       "titulo": "Tu test: 12 de 15",
+       "tipo": "ejemplo",
+       "texto": "En esta app, el test de la Introducción tiene 15 preguntas sorteadas de las lecciones 1 a 7. Para llegar al 75 % tenés que acertar 12: con 11 de 15 sacás 73 % y no alcanza."
+      }
      ],
      "componentes": [
       {
@@ -10652,17 +11301,18 @@
       {
        "pregunta": "Los tests de cada materia se rinden…",
        "opciones": [
-        "de forma oral, con el instructor de vuelo",
-        "en la torre de control de Carrasco",
-        "por Google Classroom, con preguntas de múltiple opción",
-        "con un examen práctico en el avión"
+        "De forma oral, con el instructor de vuelo, en el hangar",
+        "En la torre de control de Carrasco, con el controlador",
+        "Por Google Classroom, con preguntas de múltiple opción",
+        "Con un examen práctico en el avión, junto al instructor"
        ],
        "correcta": 2,
        "explicacion": "Son tests de múltiple opción por Google Classroom, unos días después de terminar la materia.",
        "pagina": 12
       }
      ],
-     "glosario": []
+     "glosario": [],
+     "resumen": "Test de 15 preguntas con 75 % de mínimo: si no llegás, repasás las erradas y hacés el re-take."
     }
    ]
   }

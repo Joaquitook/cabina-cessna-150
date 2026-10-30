@@ -3740,6 +3740,50 @@ div.card-h:hover { border-color: var(--line); transform: none; }
 .dg-lbl--fg { fill: var(--fg); }
 .dg-lbl--lg { font-size: 13px; }
 /* ==== fin contenido INT ==== */
+/* ==== ESCUELA · CONTENIDO (AER-01 y AER-02): flechas de fuerza, partículas, tubos y zonas de las figuras de Aerodinámica (src/escuela/figuras.js). Sólo tokens del tema. ==== */
+.dg-f { fill: none; stroke-width: 5; stroke-linecap: round; }
+.dg-fh { stroke: none; }
+.dg-f--l, .dg-f--s { stroke: var(--info); } .dg-fh--l, .dg-fh--s { fill: var(--info); }
+.dg-f--w { stroke: var(--bad); } .dg-fh--w { fill: var(--bad); }
+.dg-f--t { stroke: var(--ok); } .dg-fh--t { fill: var(--ok); }
+.dg-f--d { stroke: var(--warn); } .dg-fh--d { fill: var(--warn); }
+.dg-f--a { stroke: var(--accent); } .dg-fh--a { fill: var(--accent); }
+.dg-f--v { stroke-width: 3; stroke: var(--fg); } .dg-fh--v { fill: var(--fg); }
+.dg-lbl--l { fill: var(--info-ink); } .dg-lbl--w { fill: var(--bad-ink); } .dg-lbl--t { fill: var(--ok-ink); } .dg-lbl--d { fill: var(--warn-ink); } .dg-lbl--a { fill: var(--accent-ink); }
+.dg-lbl--sm { font-size: 10px; } .dg-lbl--end { text-anchor: end; }
+.dg-sym { font: 700 26px var(--font-data); fill: var(--fg); }
+.dg-sym--dim { fill: var(--fg-soft); font-weight: 400; }
+.dg-prop { fill: var(--fg-soft); stroke: none; opacity: .55; }
+.dg-wall { fill: var(--surface-2); stroke: var(--fg-soft); stroke-width: 2; stroke-linejoin: round; }
+.dg-fluid { fill: color-mix(in srgb, var(--sky) 13%, transparent); stroke: none; }
+.dg-sl { fill: none; stroke: var(--sky); stroke-width: 1.8; opacity: .8; }
+.dg-glass { fill: var(--surface); stroke: var(--fg-soft); stroke-width: 1.8; }
+.dg-liq { fill: color-mix(in srgb, var(--info) 55%, transparent); stroke: none; }
+.dg-fuel { fill: color-mix(in srgb, var(--warn) 45%, transparent); stroke: var(--warn); stroke-width: 1.6; }
+.dg-pipe { fill: none; stroke: var(--warn); stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }
+.dg-ice { fill: color-mix(in srgb, var(--sky) 45%, white); stroke: var(--sky); stroke-width: 1.6; }
+.dg-part--a { fill: var(--info); stroke: var(--surface); stroke-width: 1.8; }
+.dg-part--b { fill: var(--accent); stroke: var(--surface); stroke-width: 1.8; }
+.dg-part-t { font: 700 11px var(--font-data); fill: var(--surface); text-anchor: middle; pointer-events: none; }
+.dg-part-t--b { fill: var(--accent-fg); }
+.dg-turb { fill: color-mix(in srgb, var(--bad) 24%, transparent); stroke: var(--bad); stroke-width: 1.4; stroke-dasharray: 4 3; stroke-linejoin: round; }
+.dg-arc { fill: color-mix(in srgb, var(--accent) 28%, transparent); stroke: var(--accent); stroke-width: 1.6; stroke-linejoin: round; }
+.dg-arc--i { fill: color-mix(in srgb, var(--info) 24%, transparent); stroke: var(--info); stroke-width: 1.6; stroke-linejoin: round; }
+.dg-tag--d { fill: color-mix(in srgb, var(--accent) 80%, transparent); } .dg-tag--c { fill: color-mix(in srgb, var(--sky) 80%, transparent); } .dg-tag--p { fill: color-mix(in srgb, var(--ok) 80%, transparent); }
+/* ==== fin contenido AER-01 y AER-02 ==== */
+/* ==== ESCUELA · CONTENIDO (AER-03): la curva de sustentación, el aterrizaje, la bocina y la recuperación de la pérdida. Sólo tokens del tema. ==== */
+.dg-curve { fill: none; stroke: var(--info); stroke-width: 3.4; stroke-linecap: round; stroke-linejoin: round; }
+.dg-curve--bad { stroke: var(--bad); }
+.dg-pico { fill: var(--accent); stroke: var(--surface); stroke-width: 2.4; }
+.dg-zona-perdida { fill: color-mix(in srgb, var(--bad) 14%, transparent); stroke: none; }
+.dg-toma { fill: var(--fg); stroke: var(--surface); stroke-width: 1.6; }
+.dg-sonido path { fill: none; stroke: var(--accent); stroke-width: 3; stroke-linecap: round; }
+/* ==== fin contenido AER-03 ==== */
+/* ==== ESCUELA · QA de contenido: una dirección web larga (aeropuertosuruguay.sofisbpm.com/tramites) no debe ensanchar la página en el teléfono ==== */
+.es-lesson .es-blocks p, .es-lesson .es-prose p, .es-lesson .es-lead-p, .es-lesson .es-lista-t, .es-lesson .es-ej-t, .es-lesson .es-ojo-t, .es-lesson .es-def-t, .es-lesson .es-rule-b p, .es-lesson .es-resumen-t { overflow-wrap: anywhere; }
+.es-lesson .es-mk-dato { max-width: 100%; white-space: normal; flex-wrap: wrap; }
+.es-lesson .es-mk-dato b { min-width: 0; overflow-wrap: anywhere; }
+/* ==== fin QA de contenido ==== */
 
 /* ======================================================================================================
    v8 · ESCUELA a pantalla completa + visor 3D a pedido (contrato v8 §2; JS: src/escuela/visor.js, ui.js labApi.stageSuspend)
